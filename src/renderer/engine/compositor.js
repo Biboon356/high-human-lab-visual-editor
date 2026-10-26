@@ -9,7 +9,8 @@ import { GEN_PARAMS } from '/shared/organic-defs.js';
 import { resolveParam, resolveClipProps } from '/shared/params.js';
 import { drawTextClip } from './text-renderer.js';
 
-const STYLE_INDEX = { roots: 0, fluid: 1, cells: 2 };
+const STYLE_INDEX = { roots: 0, fluid: 1, cells: 2, dust: 3 };
+const hexToRgb = (h) => { const n = parseInt(String(h).replace('#', '').padEnd(6, '0').slice(0, 6), 16) || 0; return [(n >> 16 & 255) / 255, (n >> 8 & 255) / 255, (n & 255) / 255]; };
 
 export class Compositor {
   constructor(canvas, width, height) {
@@ -152,6 +153,7 @@ export class Compositor {
     if (mode === 'add') gl.blendFunc(gl.ONE, gl.ONE);
     else if (mode === 'screen') gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_COLOR);
     else if (mode === 'multiply') gl.blendFunc(gl.DST_COLOR, gl.ONE_MINUS_SRC_ALPHA);
+    else if (mode === 'exclusion') gl.blendFunc(gl.ONE_MINUS_DST_COLOR, gl.ONE_MINUS_SRC_COLOR); // |a-b|-like inversion where text crosses bright areas
     else gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
   }
 
@@ -174,7 +176,9 @@ export class Compositor {
     this._set2('u_res', this.w, this.h);
     this._set1('u_time', time);
     for (const d of def.params) {
-      this._set1(`u_${d.key}`, resolveParam(fx, d.key, fx.params[d.key] ?? d.def, tLocal, feats, [d.min, d.max]));
+      if (d.kind === 'color') { const l = this._u(`u_${d.key}`); if (l) this.gl.uniform3f(l, ...hexToRgb(fx.params[d.key] ?? d.def)); }
+      else if (d.options) this._set1(`u_${d.key}`, Number(fx.params[d.key] ?? d.def));
+      else this._set1(`u_${d.key}`, resolveParam(fx, d.key, fx.params[d.key] ?? d.def, tLocal, feats, [d.min, d.max]));
     }
     this._draw();
   }

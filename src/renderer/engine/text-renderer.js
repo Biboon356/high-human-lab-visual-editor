@@ -56,7 +56,16 @@ export function drawTextClip(ctx, W, H, clip, t, p) {
   }
   if (alpha <= 0.001 || !content) return;
 
-  const px = Math.max(4, T.size * H * scale);
+  let px0 = T.size * H * scale;
+  if (T.fit > 0) { // size the text so its widest line spans `fit` of the frame width, whatever the aspect ratio
+    ctx.save();
+    ctx.font = fontString(T, 100); ctx.letterSpacing = `${p.tracking * 100}px`;
+    const full = (T.uppercase ? T.content.toUpperCase() : T.content).split('\n');
+    const wmax = Math.max(...full.map((l) => ctx.measureText(l).width), 1);
+    ctx.restore();
+    px0 = ((T.fit * W) / wmax) * 100 * scale;
+  }
+  const px = Math.max(4, px0);
   const FX = { split: 0, shadow: 0, glow: 0, gradient: false, grad1: '#fff', grad2: '#888', ...(T.fx || {}) };
   ctx.save();
   ctx.font = fontString(T, px);
@@ -111,8 +120,15 @@ export function drawTextClip(ctx, W, H, clip, t, p) {
   }
   ctx.save();
   if (FX.shadow > 0) { ctx.shadowColor = `rgba(0,0,0,${0.55 + 0.4 * FX.shadow})`; ctx.shadowBlur = px * 0.14 * FX.shadow; ctx.shadowOffsetY = px * 0.05 * FX.shadow; ctx.shadowOffsetX = px * 0.02 * FX.shadow; }
+  const sw = T.hollow ? Math.max(T.strokeWidth || 0, 0.03) : T.strokeWidth || 0;
   pass((l, x, y) => {
-    if (T.strokeWidth > 0) { ctx.lineWidth = T.strokeWidth * px; ctx.strokeStyle = T.strokeColor; ctx.strokeText(l, x, y); }
+    if (T.hollow) { // faint fill first, then a full-strength outline on top
+      const fa = T.fillAlpha ?? 0.15;
+      if (fa > 0) { ctx.save(); ctx.globalAlpha *= fa; ctx.fillStyle = fill; ctx.fillText(l, x, y); ctx.restore(); }
+      ctx.lineWidth = sw * px; ctx.strokeStyle = T.strokeColor || T.color; ctx.strokeText(l, x, y);
+      return;
+    }
+    if (sw > 0) { ctx.lineWidth = sw * px; ctx.strokeStyle = T.strokeColor; ctx.strokeText(l, x, y); }
     ctx.fillStyle = fill;
     ctx.fillText(l, x, y);
   });

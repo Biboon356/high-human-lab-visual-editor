@@ -163,5 +163,5 @@ test('premium presets: audio-bound presets carry bindings; text fx and generator
   const g = createGeneratorClip(GEN_PRESETS[0], 0, 6);
   assert.deepEqual(g.gen.keyframes.growth.map((k) => k.v), [0, 1]);
   assert.equal(g.props.blend, 'screen');
-  assert.equal(Object.keys(EFFECTS).length, 17);
+  assert.equal(Object.keys(EFFECTS).length, 23);
 });

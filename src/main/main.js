@@ -3,6 +3,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { Readable } from 'node:stream';
 import { probeMedia, makeProxy, decodePcm, ExportSession, ClipDecoder, FFMPEG } from './ffmpeg.js';
 import { validateProject } from '../shared/project.js';
 import { buildAnalysisArgs, buildExportArgs, validateExportSettings, FORMATS } from '../shared/export-plan.js';
@@ -24,6 +25,29 @@ protocol.registerSchemesAsPrivileged([
 app.commandLine.appendSwitch('ignore-gpu-blocklist');
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 
+const MEDIA_MIME = {
+  '.mp4': 'video/mp4', '.m4v': 'video/mp4', '.mov': 'video/quicktime', '.webm': 'video/webm', '.mkv': 'video/x-matroska', '.avi': 'video/x-msvideo',
+  '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.aac': 'audio/aac', '.m4a': 'audio/mp4', '.flac': 'audio/flac', '.ogg': 'audio/ogg', '.opus': 'audio/ogg',
+  '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.bmp': 'image/bmp',
+};
+
+/** Media must answer Range requests with 206 + Content-Range, otherwise Chromium can't seek into files it hasn't buffered. */
+function serveMedia(file, request) {
+  const size = fs.statSync(file).size;
+  const type = MEDIA_MIME[path.extname(file).toLowerCase()] || 'application/octet-stream';
+  const base = { 'Content-Type': type, 'Accept-Ranges': 'bytes' };
+  const m = /^bytes=(\d*)-(\d*)$/.exec(request.headers.get('range') || '');
+  if (!m || (m[1] === '' && m[2] === '')) {
+    return new Response(Readable.toWeb(fs.createReadStream(file)), { status: 200, headers: { ...base, 'Content-Length': String(size) } });
+  }
+  let start = m[1] === '' ? Math.max(0, size - Number(m[2])) : Number(m[1]);
+  let end = m[1] === '' || m[2] === '' ? size - 1 : Math.min(Number(m[2]), size - 1);
+  if (start >= size || start > end) return new Response(null, { status: 416, headers: { ...base, 'Content-Range': `bytes */${size}` } });
+  return new Response(Readable.toWeb(fs.createReadStream(file, { start, end })), {
+    status: 206, headers: { ...base, 'Content-Range': `bytes ${start}-${end}/${size}`, 'Content-Length': String(end - start + 1) },
+  });
+}
+
 function handleProtocol() {
   protocol.handle('hhlab', async (request) => {
     const url = new URL(request.url);
@@ -39,7 +63,7 @@ function handleProtocol() {
       return new Response('Not found', { status: 404 });
     }
     if (!fs.existsSync(file)) return new Response('Not found', { status: 404 });
-    // net.fetch on file:// forwards Range headers, which <video> seeking needs.
+    if (root === 'media') return serveMedia(file, request);
     return net.fetch(pathToFileURL(file).toString(), { headers: request.headers, bypassCustomProtocolHandlers: true });
   });
 }

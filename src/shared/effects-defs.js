@@ -145,6 +145,69 @@ export const EFFECTS = {
       { key: 'white', label: 'White ↔ Hue', min: 0, max: 1, step: 0.01, def: 0.5 },
     ],
   },
+  gradmap: {
+    label: 'Gradient Map (duotone)',
+    params: [
+      { key: 'shadow', label: 'Shadows', kind: 'color', def: '#05010f' },
+      { key: 'mid', label: 'Midtones', kind: 'color', def: '#4a1fa8' },
+      { key: 'high', label: 'Highlights', kind: 'color', def: '#f1e9ff' },
+      { key: 'midpos', label: 'Mid position', min: 0.1, max: 0.9, step: 0.01, def: 0.5 },
+      { key: 'contrast', label: 'Contrast', min: 0.5, max: 3, step: 0.01, def: 1.2 },
+      { key: 'mix', label: 'Mix', min: 0, max: 1, step: 0.01, def: 1 },
+    ],
+  },
+  threshold: {
+    label: 'Xerox Threshold',
+    params: [
+      { key: 'level', label: 'Level', min: 0, max: 1, step: 0.005, def: 0.5 },
+      { key: 'soft', label: 'Softness', min: 0.005, max: 0.5, step: 0.005, def: 0.2 },
+      { key: 'noise', label: 'Toner noise', min: 0, max: 1.5, step: 0.01, def: 0.6 },
+      { key: 'ink', label: 'Ink', kind: 'color', def: '#050505' },
+      { key: 'paper', label: 'Paper', kind: 'color', def: '#f2f0ea' },
+      { key: 'invert', label: 'Invert', min: 0, max: 1, step: 1, def: 0, toggle: true },
+    ],
+  },
+  solarize: {
+    label: 'Solarize / Channel Swap',
+    params: [
+      { key: 'threshold', label: 'Threshold', min: 0, max: 1, step: 0.005, def: 0.5 },
+      { key: 'amount', label: 'Amount', min: 0, max: 1, step: 0.01, def: 1 },
+      { key: 'rotate', label: 'Channel rotate', min: 0, max: 1, step: 0.01, def: 0.5 },
+      { key: 'hue', label: 'Hue shift', min: -180, max: 180, step: 1, def: 0 },
+    ],
+  },
+  slices: {
+    label: 'Slices / Cut Bars',
+    params: [
+      { key: 'bands', label: 'Bands', min: 2, max: 60, step: 1, def: 14 },
+      { key: 'shift', label: 'Shift', min: 0, max: 0.6, step: 0.005, def: 0.08 },
+      { key: 'black', label: 'Black bars', min: 0, max: 1, step: 0.01, def: 0.25 },
+      { key: 'rate', label: 'Rate (Hz)', min: 0.5, max: 24, step: 0.5, def: 6 },
+      { key: 'split', label: 'RGB split', min: 0, max: 0.05, step: 0.001, def: 0.008 },
+    ],
+  },
+  mask: {
+    label: 'Shape Mask (window)',
+    params: [
+      { key: 'shape', label: 'Shape', options: ['Circle', 'Rounded rect', 'Diamond', 'Blob'], def: 0 },
+      { key: 'x', label: 'Position X', min: -1, max: 1, step: 0.005, def: 0 },
+      { key: 'y', label: 'Position Y', min: -1, max: 1, step: 0.005, def: 0 },
+      { key: 'size', label: 'Size', min: 0.03, max: 1.2, step: 0.005, def: 0.35 },
+      { key: 'aspect', label: 'Aspect', min: 0.3, max: 3, step: 0.01, def: 1 },
+      { key: 'rotate', label: 'Rotate', min: -180, max: 180, step: 1, def: 0 },
+      { key: 'feather', label: 'Feather', min: 0, max: 1, step: 0.01, def: 0 },
+      { key: 'wobble', label: 'Blob wobble', min: 0, max: 1, step: 0.01, def: 0.35 },
+      { key: 'invert', label: 'Invert', min: 0, max: 1, step: 1, def: 0, toggle: true },
+    ],
+  },
+  outline: {
+    label: 'Sticker Outline (die-cut)',
+    params: [
+      { key: 'width', label: 'Width (px @1080p)', min: 0, max: 60, step: 0.5, def: 14 },
+      { key: 'ink', label: 'Colour', kind: 'color', def: '#ffffff' },
+      { key: 'soft', label: 'Edge softness', min: 0, max: 1, step: 0.01, def: 0.2 },
+    ],
+  },
   crt: {
     label: 'Broadcast / CRT',
     params: [
@@ -189,6 +252,13 @@ export const EFFECT_PRESETS = [
   { name: 'Beat Punch (audio)', chain: [fx('shake', { amount: 0.004, zoom: 1.08 }, { amount: { source: 'beat', amount: 0.5 } }), fx('chroma', { amount: 0.004 }, { amount: { source: 'beat', amount: 0.5 } }), fx('flash', { amount: 0.0, white: 0.8 }, { amount: { source: 'beat', amount: 0.35 } })] },
   { name: 'Acid Halftone', chain: [fx('halftone', { size: 9, contrast: 1.6 }), fx('color', { tint: 0.35, contrast: 1.3 }), fx('grain', { amount: 0.25 })] },
   { name: 'Low-Res Rave', chain: [fx('pixel', { size: 10 }), fx('glitch', { amount: 0.4, rate: 8 }), fx('chroma', { amount: 0.02 }), fx('color', { levels: 6, contrast: 1.4 })] },
+  { name: 'Xerox Photocopy', chain: [fx('color', { saturation: 0, contrast: 1.5, brightness: 0.04 }), fx('threshold', { level: 0.48, soft: 0.28, noise: 0.8 }), fx('grain', { amount: 0.3, color: 0 })] },
+  { name: 'Halftone Print (B&W)', chain: [fx('color', { saturation: 0, contrast: 1.6 }), fx('halftone', { size: 7, contrast: 1.8, mix: 1 }), fx('grain', { amount: 0.35, color: 0 }), fx('chroma', { amount: 0.004 })] },
+  { name: 'Comic Flash (red/yellow)', chain: [fx('gradmap', { shadow: '#1a0000', mid: '#d8140f', high: '#ffe11a', contrast: 1.4 }), fx('halftone', { size: 8, contrast: 1.5, mix: 0.45 }), fx('grain', { amount: 0.3 })] },
+  { name: 'Midnight Purple', chain: [fx('gradmap', {}), fx('halftone', { size: 9, mix: 0.3 }), fx('grain', { amount: 0.35 }), fx('chroma', { amount: 0.008 })] },
+  { name: 'Neon Solarize', chain: [fx('solarize', { threshold: 0.45, rotate: 0.6, hue: 40 }), fx('color', { contrast: 1.3, saturation: 1.3 }), fx('slices', { bands: 12, shift: 0.05, black: 0.2 })] },
+  { name: 'Die-Cut Sticker', chain: [fx('mask', { shape: 3, size: 0.36, wobble: 0.3 }), fx('outline', { width: 16, ink: '#ffffff' })] },
+  { name: 'Circle Window', chain: [fx('mask', { shape: 0, size: 0.3 }), fx('outline', { width: 6, ink: '#ffffff', soft: 0.1 })] },
   { name: 'Wet Signal', chain: [fx('distort', { amount: 0.03, freq: 6 }), fx('glitch', { amount: 0.25, rate: 6 }), fx('color', { hue: -25, tint: 0.3 })] },
 ];
 

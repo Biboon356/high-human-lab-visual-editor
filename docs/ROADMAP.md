@@ -4,7 +4,7 @@
 
 The MVP exports correctly but export speed and large-footage handling are its weakest point.
 
-1. **ffmpeg decode pipeline for export.** Decode each video clip with ffmpeg (`-ss` once, then sequential rawvideo
+1. ✅ *(done in v0.1.x)* **ffmpeg decode pipeline for export.** Decode each video clip with ffmpeg (`-ss` once, then sequential rawvideo
    frames over a pipe) instead of seeking `<video>` per frame. Removes the per-frame seek cost on long-GOP/4K footage,
    fixes VFR drift, and removes the need for proxies in export (proxies stay for preview only).
 2. **Worker-side readback + pipelining.** `readPixels` through a PBO and a 2–3 frame in-flight queue to overlap GPU, IPC and x264.

@@ -10,7 +10,9 @@ export const RESOLUTIONS = {
   '1440p': { width: 2560, height: 1440 },
   '2160p': { width: 3840, height: 2160 },
   'square-1080': { width: 1080, height: 1080 },
-  'vertical-1080': { width: 1080, height: 1920 },
+  'vertical-1080': { width: 1080, height: 1920 }, // 9:16 TikTok / Reels / Shorts
+  'vertical-720': { width: 720, height: 1280 },
+  'portrait-4x5': { width: 1080, height: 1350 },
 };
 
 export function createProject(name = 'Untitled Lab') {

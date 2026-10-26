@@ -33,7 +33,7 @@ export const CLIP_PROPS = [
 export const TEXT_PROPS = [
   { key: 'tracking', label: 'Letter spacing (em)', min: -0.2, max: 1.5, step: 0.005, def: 0 },
 ];
-export const BLEND_MODES = ['normal', 'add', 'screen', 'multiply'];
+export const BLEND_MODES = ['normal', 'add', 'screen', 'multiply', 'exclusion'];
 
 /** Resolves every clip-level numeric prop at clip-relative time t. */
 export function resolveClipProps(clip, t, feats) {

@@ -145,18 +145,19 @@ await step('effects: add chain + presets render visibly different output', async
     const grab = () => window.__grab(96, 54);
     const diff = (a, b) => a.reduce((s, v, i) => s + Math.abs(v - b[i]), 0) / a.length;
     const base = grab(); const out = {};
-    for (const type of ['glitch', 'grain', 'noise', 'distort', 'fluid', 'blur', 'color', 'crt', 'chroma', 'bloom', 'film', 'vhs', 'mosh', 'halftone', 'pixel', 'shake', 'flash']) {
-      store.mutate(() => c.effects.push(createEffect(type, ({ color: { tint: 1, saturation: 0.2 }, blur: { radius: 20 }, distort: { amount: 0.08 }, chroma: { amount: 0.07 }, bloom: { intensity: 2, threshold: 0.1 }, film: { grain: 1, vignette: 1 }, vhs: { noise: 1, tracking: 1 }, mosh: { amount: 1 }, halftone: {}, pixel: { size: 30 }, shake: { amount: 0.1, zoom: 1.4, roll: 8 }, flash: { amount: 1.5, rate: 0.5, decay: 1, white: 1 } })[type] || { amount: 0.9 })));
+    for (const type of ['glitch', 'grain', 'noise', 'distort', 'fluid', 'blur', 'color', 'crt', 'chroma', 'bloom', 'film', 'vhs', 'mosh', 'halftone', 'pixel', 'shake', 'flash', 'gradmap', 'threshold', 'solarize', 'slices', 'mask', 'outline']) {
+      const pre = type === 'outline' ? [createEffect('mask', { size: 0.25 })] : []; // outline needs transparency to act on
+      store.mutate(() => c.effects.push(...pre, createEffect(type, ({ color: { tint: 1, saturation: 0.2 }, blur: { radius: 20 }, distort: { amount: 0.08 }, chroma: { amount: 0.07 }, bloom: { intensity: 2, threshold: 0.1 }, film: { grain: 1, vignette: 1 }, vhs: { noise: 1, tracking: 1 }, mosh: { amount: 1 }, halftone: {}, pixel: { size: 30 }, shake: { amount: 0.1, zoom: 1.4, roll: 8 }, flash: { amount: 1.5, rate: 0.5, decay: 1, white: 1 }, gradmap: {}, threshold: { noise: 1 }, solarize: {}, slices: { black: 0.6, shift: 0.3, bands: 8 }, mask: { size: 0.2 }, outline: { width: 30 } })[type] || { amount: 0.9 })));
       await new Promise((r) => setTimeout(r, 250));
       out[type] = +diff(base, grab()).toFixed(2);
-      store.mutate(() => c.effects.pop());
+      store.mutate(() => { c.effects.length -= 1 + pre.length; });
     }
     store.mutate(() => c.effects.push(...instantiatePreset(EFFECT_PRESETS[0])));
     await new Promise((r) => setTimeout(r, 300));
     out.preset = +diff(base, grab()).toFixed(2); out.chain = c.effects.length;
     return out;
   });
-  for (const k of ['glitch', 'grain', 'noise', 'distort', 'fluid', 'blur', 'color', 'crt', 'chroma', 'bloom', 'film', 'vhs', 'mosh', 'halftone', 'pixel', 'shake', 'flash', 'preset']) assert.ok(r[k] > 0.4, `effect ${k} changed the image: ${JSON.stringify(r)}`);
+  for (const k of ['glitch', 'grain', 'noise', 'distort', 'fluid', 'blur', 'color', 'crt', 'chroma', 'bloom', 'film', 'vhs', 'mosh', 'halftone', 'pixel', 'shake', 'flash', 'gradmap', 'threshold', 'solarize', 'slices', 'mask', 'outline', 'preset']) assert.ok(r[k] > 0.4, `effect ${k} changed the image: ${JSON.stringify(r)}`);
   assert.equal(r.chain, 3);
   await shot('04-effects');
 });
@@ -418,6 +419,19 @@ await step('rotated phone video: portrait dimensions detected, project adapts, e
   const px2 = path.join(dir, 'rot.raw'); sh(FFMPEG, ['-v', 'error', '-y', '-ss', '0.5', '-i', out, '-frames:v', '1', '-pix_fmt', 'gray', '-f', 'rawvideo', px2]);
   const d = fs.readFileSync(px2); let lit = 0; for (const b of d) if (b > 40) lit++;
   assert.ok(lit / d.length > 0.5, 'frame fully covered (no letterboxing from a wrong size)');
+});
+
+await step('large file: seeking deep into a file that is not fully buffered works (Range/206 handling)', async () => {
+  const big = path.join(dir, 'big.mp4');
+  sh(FFMPEG, ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc2=size=1280x720:rate=30:duration=20', '-c:v', 'libx264', '-b:v', '9M', '-g', '60', '-pix_fmt', 'yuv420p', big]);
+  assert.ok(fs.statSync(big).size > 8e6, 'fixture is large enough to need real range requests');
+  await resetProject(); await ev((p) => window.__app.importPaths([p]), big);
+  const r = await ev(async () => { const a = window.__app; a.store.setPlayhead(15); await new Promise((r) => setTimeout(r, 2500));
+    const v = [...a.preview.sources.videos.values()][0]; return { ct: v.currentTime, rs: v.readyState, msg: document.getElementById('preview-msg').textContent }; });
+  assert.ok(Math.abs(r.ct - 15) < 0.2 && r.rs >= 2, `video really sought to 15s: ${JSON.stringify(r)}`);
+  assert.equal(r.msg, '');
+  const resp = await ev(async (p) => { const x = await fetch(window.hh.mediaUrl(p), { headers: { Range: 'bytes=100-199' } }); return { s: x.status, cr: x.headers.get('content-range'), n: (await x.arrayBuffer()).byteLength }; }, big);
+  assert.equal(resp.s, 206); assert.match(resp.cr, /^bytes 100-199\//); assert.equal(resp.n, 100);
 });
 
 await step('light theme + collapsible panels', async () => {

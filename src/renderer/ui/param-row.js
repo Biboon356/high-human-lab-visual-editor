@@ -12,6 +12,16 @@ export const rowUpdaters = new Set(); // refreshed on playhead moves so keyframe
  */
 export function paramRow({ owner, def, getBase, setBase, localTime }) {
   const { key, label, min, max, step } = def;
+  // Non-animatable kinds: enumerations and colours are plain static values.
+  if (def.options || def.kind === 'color') {
+    const ctl = def.options
+      ? el('select', {}, def.options.map((o, i) => el('option', { value: i, text: o, ...(i === Number(getBase()) ? { selected: true } : {}) })))
+      : el('input', { type: 'color', value: getBase() });
+    let snapped = false;
+    ctl.addEventListener('input', () => { if (!snapped) { store.snapshot(); snapped = true; } setBase(def.options ? Number(ctl.value) : ctl.value); store.touch('render'); });
+    ctl.addEventListener('change', () => { snapped = false; });
+    return el('div', { class: 'row flat' }, el('label', { text: label, title: label }), el('div', { class: 'inline' }, ctl));
+  }
   const slider = el('input', { type: 'range', min, max, step });
   const num = el('input', { type: 'number', min, max, step });
   const kf = el('button', { class: 'kf', title: 'Keyframe at playhead (click again to remove, Shift-click clears all)', text: '◆' });

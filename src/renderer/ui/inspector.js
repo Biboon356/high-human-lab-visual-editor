@@ -87,13 +87,16 @@ export function mountInspector(root) {
     const anim = field(el('select', {}, Object.entries(TEXT_ANIMATIONS).map(([k, v]) => el('option', { value: k, text: v, ...(k === T.anim.type ? { selected: true } : {}) }))), 'change', (i) => { T.anim.type = i.value; });
     const aDur = field(el('input', { type: 'range', min: 0.1, max: 12, step: 0.05, value: T.anim.duration }), 'input', (i) => { T.anim.duration = Number(i.value); });
     const aSpd = field(el('input', { type: 'range', min: 0.1, max: 4, step: 0.05, value: T.anim.speed }), 'input', (i) => { T.anim.speed = Number(i.value); });
+    const hollow = field(el('input', { type: 'checkbox', checked: !!T.hollow }), 'change', (i) => { T.hollow = i.checked; });
+    const fillA = field(el('input', { type: 'range', min: 0, max: 1, step: 0.01, value: T.fillAlpha ?? 1 }), 'input', (i) => { T.fillAlpha = Number(i.value); });
+    const fit = field(el('input', { type: 'range', min: 0, max: 1, step: 0.01, value: T.fit || 0 }), 'input', (i) => { T.fit = Number(i.value); });
     const sl = (key) => field(el('input', { type: 'range', min: 0, max: 1, step: 0.01, value: T.fx[key] }), 'input', (i) => { T.fx[key] = Number(i.value); });
     const gradOn = field(el('input', { type: 'checkbox', checked: T.fx.gradient }), 'change', (i) => { T.fx.gradient = i.checked; });
     const g1 = field(el('input', { type: 'color', value: T.fx.grad1 }), 'input', (i) => { T.fx.grad1 = i.value; });
     const g2 = field(el('input', { type: 'color', value: T.fx.grad2 }), 'input', (i) => { T.fx.grad2 = i.value; });
     return card('Typography', [ta, fontList, flatRow('Font', font), flatRow('Weight', weight, el('label', { class: 'chk' }, italic, 'italic')),
-      flatRow('Size', size), flatRow('Align', align, el('label', { class: 'chk' }, upper, 'CAPS')), flatRow('Fill', color),
-      flatRow('Outline', stroke, strokeC), flatRow('Plate', bgOn, bgC, bgPad),
+      flatRow('Size', size), flatRow('Fit width', fit), flatRow('Align', align, el('label', { class: 'chk' }, upper, 'CAPS')), flatRow('Fill', color),
+      flatRow('Outline', stroke, strokeC), flatRow('Hollow', hollow, fillA), flatRow('Plate', bgOn, bgC, bgPad),
       flatRow('Chrome fill', gradOn, g1, g2), flatRow('RGB split', sl('split')), flatRow('Shadow', sl('shadow')), flatRow('Glow', sl('glow')),
       flatRow('Animation', anim), flatRow('Anim. time', aDur), flatRow('Anim. speed', aSpd)]);
   }

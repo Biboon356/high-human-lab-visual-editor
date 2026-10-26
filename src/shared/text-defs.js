@@ -31,6 +31,9 @@ export function defaultText() {
     align: 'center',
     lineHeight: 1.1,
     color: '#ffffff',
+    fit: 0, // 0 = use size; >0 = fit widest line to this fraction of frame width
+    hollow: false, // outline only; fillAlpha keeps a faint fill
+    fillAlpha: 1,
     strokeWidth: 0, // fraction of font size
     strokeColor: '#2f7d4f',
     uppercase: false,
@@ -44,6 +47,10 @@ export function defaultText() {
 const mk = (name, text, props, effects = []) => ({ name, text, props, effects });
 
 export const TEXT_PRESETS = [
+  mk('Hollow Glitch Block',
+    { content: 'ROCKY', font: 'Arial Black', weight: 900, size: 0.3, fit: 0.92, uppercase: true, color: '#ffffff', hollow: true, fillAlpha: 0.12, strokeWidth: 0.012, strokeColor: '#ffffff',
+      anim: { type: 'stutter', duration: 0.6, speed: 1 }, fx: { split: 0.55 } },
+    { tracking: -0.01, blend: 'exclusion' }, [createEffect('slices', { bands: 10, shift: 0.022, black: 0.0, rate: 5, split: 0.006 }), createEffect('chroma', { amount: 0.006 })]),
   mk('Chrome Slam',
     { content: 'HIGH HUMAN', font: 'Arial Black', weight: 900, size: 0.24, uppercase: true, color: '#ffffff', lineHeight: 0.95,
       anim: { type: 'slam', duration: 0.55, speed: 1 }, fx: { split: 0.5, shadow: 0.8, glow: 0.2, gradient: true, grad1: '#ffffff', grad2: '#6f8379' } },

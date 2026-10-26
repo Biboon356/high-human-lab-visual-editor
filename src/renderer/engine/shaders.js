@@ -269,6 +269,81 @@ vec4 effect(vec2 uv){
   vec3 tint = mix(hue, vec3(1.), u_white);
   return emit(1.-(1.-c.rgb)*(1.-tint*pulse*u_amount), c.a);
 }`),
+  gradmap: wrap(`
+uniform vec3 u_shadow, u_mid, u_high; uniform float u_midpos, u_contrast, u_mix;
+vec4 effect(vec2 uv){
+  vec4 c = src(uv);
+  float l = clamp((luma(c.rgb)-.5)*u_contrast+.5, 0., 1.);
+  vec3 col = l < u_midpos ? mix(u_shadow, u_mid, l/u_midpos) : mix(u_mid, u_high, (l-u_midpos)/(1.-u_midpos));
+  return emit(mix(c.rgb, col, u_mix), c.a);
+}`),
+  threshold: wrap(`
+uniform vec3 u_ink, u_paper; uniform float u_level, u_soft, u_noise, u_invert;
+vec4 effect(vec2 uv){
+  vec4 c = src(uv);
+  vec2 g = floor(gl_FragCoord.xy/max(1., u_res.y/1080.));
+  float n = (hash12(g + floor(u_time*12.)*7.1) + hash12(g*.7 + 3.3) - 1.)*u_noise*.5;
+  float t = smoothstep(u_level-u_soft, u_level+u_soft, luma(c.rgb)+n);
+  if(u_invert > .5) t = 1.-t;
+  return emit(mix(u_ink, u_paper, t), c.a);
+}`),
+  solarize: wrap(`
+uniform float u_threshold, u_amount, u_rotate, u_hue;
+vec4 effect(vec2 uv){
+  vec4 c = src(uv); vec3 v = mix(c.rgb, c.rgb.gbr, u_rotate);
+  vec3 sol = mix(v, 1.-v, step(vec3(u_threshold), v));
+  v = hueRot(mix(v, sol, u_amount), u_hue);
+  return emit(v, c.a);
+}`),
+  slices: wrap(`
+uniform float u_bands, u_shift, u_black, u_rate, u_split;
+vec4 effect(vec2 uv){
+  float tick = floor(u_time*u_rate);
+  float band = floor(uv.y*u_bands);
+  float on = step(.45, hash12(vec2(band+31., tick)));
+  float sh = (hash12(vec2(band, tick))-.5)*2.*u_shift*on;
+  float blk = step(1.-u_black*.6, hash12(vec2(band+7., tick+3.)))*on;
+  vec2 p = vec2(uv.x+sh, uv.y); float sp = u_split*on;
+  vec4 a = src(p+vec2(sp,0.)), g = src(p), b = src(p-vec2(sp,0.));
+  return emit(vec3(a.r, g.g, b.b)*(1.-blk), max(a.a, max(g.a, b.a)));
+}`),
+  mask: wrap(`
+uniform float u_shape, u_x, u_y, u_size, u_aspect, u_rotate, u_feather, u_wobble, u_invert;
+vec4 effect(vec2 uv){
+  vec4 c = src(uv);
+  float asp = u_res.x/u_res.y;
+  vec2 p = (uv-.5)*vec2(asp,1.) - vec2(u_x*asp*.5, u_y*.5);
+  float r = radians(u_rotate); p = vec2(cos(r)*p.x + sin(r)*p.y, -sin(r)*p.x + cos(r)*p.y);
+  p.x /= u_aspect;
+  float d;
+  if(u_shape < .5) d = length(p) - u_size;
+  else if(u_shape < 1.5){ vec2 q = abs(p) - vec2(u_size*.85); float rr = u_size*.18; d = length(max(q+rr, 0.)) + min(max(q.x+rr, q.y+rr), 0.) - rr; }
+  else if(u_shape < 2.5) d = (abs(p.x)+abs(p.y))*.7071 - u_size;
+  else { float a = atan(p.y, p.x); float wob = vnoise(vec2(cos(a), sin(a))*1.7 + u_time*.35)*2.-1.; d = length(p) - u_size*(1. + u_wobble*wob*.55); }
+  float f = max(u_feather*u_size, 1.5/u_res.y);
+  float m = 1.-smoothstep(-f, f, d);
+  m = mix(m, 1.-m, u_invert);
+  return emit(c.rgb, c.a*m);
+}`),
+  outline: wrap(`
+uniform vec3 u_ink; uniform float u_width, u_soft;
+vec4 effect(vec2 uv){
+  vec4 c = src(uv);
+  float r = u_width*(u_res.y/1080.);
+  float mx = c.a;
+  if(r > .25){
+    for(int k=1;k<=3;k++){
+      float rad = r*float(k)/3.;
+      for(int i=0;i<24;i++){
+        float ang = (float(i)+.5*float(k))/24.*6.2831853;
+        mx = max(mx, texture(u_tex, uv + vec2(cos(ang), sin(ang))*rad/u_res).a);
+      }
+    }
+  }
+  float oa = smoothstep(0., mix(.5, .98, u_soft), mx);
+  vec3 prem = c.rgb*c.a + u_ink*oa*(1.-c.a);
+  return vec4(prem, c.a + oa*(1.-c.a));
+}`),
   crt: wrap(`
 uniform float u_scan, u_lines, u_bleed, u_curve, u_vignette, u_flicker;
 vec4 effect(vec2 uv){
@@ -289,15 +364,16 @@ vec4 effect(vec2 uv){
 };
 
 export const GEN_FRAG = `${PRELUDE}
-uniform float u_density, u_movement, u_distortion, u_thickness, u_glow, u_green, u_seed, u_transparent, u_growth;
+uniform float u_density, u_movement, u_distortion, u_thickness, u_glow, u_green, u_seed, u_transparent, u_growth, u_boil;
 uniform int u_style;
+float T;
 vec2 warp(vec2 p, float t){
   vec2 q = vec2(fbm(p*.9+vec2(0.,t)+u_seed), fbm(p*.9+vec2(5.2,1.3)-t+u_seed));
   return p + (q-.5)*u_distortion*3.2;
 }
 vec2 vor(vec2 p){ vec2 ip=floor(p), fp=fract(p); float d1=8., d2=8.;
   for(int j=-1;j<=1;j++) for(int i=-1;i<=1;i++){ vec2 g=vec2(i,j);
-    vec2 h = hash22(ip+g); h = .5+.5*sin(u_time*u_movement*.8 + 6.2831*h);
+    vec2 h = hash22(ip+g); h = .5+.5*sin(T*u_movement*.8 + 6.2831*h);
     float d = length(g+h-fp); if(d<d1){ d2=d1; d1=d; } else if(d<d2) d2=d; }
   return vec2(d1,d2); }
 // Crisp iso-line: f is zero on the line; fwidth turns it into a pixel distance, so widths stay constant on screen.
@@ -306,9 +382,13 @@ vec2 iso(float f, float wpx){
   return vec2(1.-smoothstep(wpx-.75, wpx+.75, d), d);
 }
 void main(){
+  // "boil": quantise time and jitter the sample point like hand-drawn animation shot on twos/threes
+  float step_ = u_boil > .5 ? floor(u_time*u_boil) : 0.;
+  T = u_boil > .5 ? step_/u_boil : u_time;
   vec2 uv = v_uv; float asp = u_res.x/u_res.y;
+  if(u_boil > .5) uv += (hash22(vec2(step_, 3.7))-.5)*.004;
   vec2 p = (uv-.5)*vec2(asp,1.)*u_density*3.;
-  float t = u_time*u_movement*.35;
+  float t = T*u_movement*.35;
   float px = u_res.y/1080.;
   float W = max(.35, u_thickness*12.*px);
   float m = 0., dmin = 1e3;
@@ -323,6 +403,17 @@ void main(){
     float f = fbm(w + t*.4)*(5.+u_density*7.);
     float d = abs(fract(f+.5)-.5)/max(fwidth(f), 1e-5);
     m = 1.-smoothstep(W*.6-.75, W*.6+.75, d); dmin = d;
+  } else if(u_style == 3){ // dust & scratches: specks and vertical scratches redrawn at 12 fps
+    float f = floor(u_time*12.);
+    vec2 g = floor(gl_FragCoord.xy/(2.*px));
+    float k = 1. - .0045*u_density;
+    float speck = step(k, hash12(g + f*13.1)) * (.5 + .5*hash12(g*1.7 + f));
+    float sx = floor(gl_FragCoord.x/(1.6*px));
+    float on = step(1.-.006*u_density, hash12(vec2(sx, f)));
+    float y0 = hash12(vec2(sx, f+9.)), len = .1 + .5*hash12(vec2(sx, f+5.));
+    float scratch = on * step(y0, uv.y) * step(uv.y, y0+len) * (.35 + .65*hash12(vec2(sx, f+1.)));
+    float fibre = step(1.-.0012*u_density, hash12(floor(gl_FragCoord.xy/(5.*px)) + f*3.))*.8;
+    m = clamp(max(speck, max(scratch, fibre)) * (.4 + u_thickness*3.), 0., 1.); dmin = 1e3;
   } else { // cell membrane: voronoi edges, two scales
     vec2 w = warp(p*.8, t*.5);
     vec2 v1 = vor(w*1.2); float e1 = v1.y - v1.x;
@@ -332,9 +423,10 @@ void main(){
     dmin = min(d1, d2);
   }
   // growth front expands from the bottom-centre, ragged edge, bright tip
+  float reveal0 = u_style == 3 ? 1. : 0.;
   float age = length((uv-vec2(.5,-.1))*vec2(asp,1.)) + (fbm(p*.6+u_seed)-.5)*.6;
   float g = u_growth*2.4 - age;
-  float reveal = smoothstep(0., .05, g);
+  float reveal = max(reveal0, smoothstep(0., .05, g));
   float tip = exp(-abs(g)*22.)*step(u_growth, .999);
   m *= reveal;
   float halo = exp(-dmin*.2/px)*u_glow*reveal;
