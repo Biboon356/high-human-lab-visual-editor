@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' hhlab:; img-src 'self' hhlab: data: blob:; media-src 'self' hhlab: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' hhlab:" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HIGH HUMAN LAB — VISUAL EDITOR</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <canvas id="bg-roots" aria-hidden="true"></canvas>
+  <div id="app" class="app">
+    <header class="topbar">
+      <div class="brand">
+        <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 30V17M16 17C16 11 10 10 6 4M16 17c0-5 5-6 9-12M16 22c-3-2-6-2-9-5M16 24c3-2 6-2 9-6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        <div><b>HIGH HUMAN LAB</b><span>VISUAL EDITOR · ビジュアル研究室</span></div>
+      </div>
+      <div class="project-name"><input id="project-name" spellcheck="false" aria-label="Project name" /><em id="dirty-dot" hidden>●</em></div>
+      <div class="top-actions">
+        <button data-act="new" title="New project (Ctrl/Cmd+N)">New</button>
+        <button data-act="open" title="Open project (Ctrl/Cmd+O)">Open</button>
+        <button data-act="save" title="Save (Ctrl/Cmd+S)">Save</button>
+        <span class="sep"></span>
+        <button data-act="undo" title="Undo (Ctrl/Cmd+Z)">↶</button>
+        <button data-act="redo" title="Redo (Ctrl/Cmd+Shift+Z)">↷</button>
+        <span class="sep"></span>
+        <button id="toggle-left" class="icon" title="Toggle left panel">◧</button>
+        <button id="toggle-timeline" class="icon" title="Toggle timeline">⬓</button>
+        <button id="toggle-right" class="icon" title="Toggle right panel">◨</button>
+        <button id="toggle-theme" title="Light / dark theme">Theme</button>
+        <button data-act="export" class="primary" title="Export video (Ctrl/Cmd+E)">Export ▸</button>
+      </div>
+    </header>
+
+    <aside class="panel left" id="panel-left">
+      <nav class="tabs" data-tabs="left">
+        <button data-tab="media" class="on">01 Media</button>
+        <button data-tab="type">02 Type</button>
+        <button data-tab="organic">03 Organic</button>
+      </nav>
+      <section data-pane="media" class="pane on">
+        <div class="pane-actions"><button data-act="import" class="primary">+ Import</button><span class="hint">or drop files here</span></div>
+        <div id="media-list" class="media-list"></div>
+      </section>
+      <section data-pane="type" class="pane">
+        <div class="pane-actions"><button id="add-text">+ Text clip</button></div>
+        <p class="hint pad">Presets add a text clip at the playhead.</p>
+        <div id="text-presets" class="preset-list"></div>
+      </section>
+      <section data-pane="organic" class="pane">
+        <p class="hint pad">Procedural generators render live in the compositor. Add one, then shape it in the inspector.</p>
+        <div id="gen-presets" class="preset-list"></div>
+      </section>
+    </aside>
+
+    <main class="stage" id="stage">
+      <div class="preview-wrap" id="preview-wrap">
+        <canvas id="preview" width="960" height="540"></canvas>
+        <div id="preview-msg" class="preview-msg" hidden></div>
+        <div class="corner tl"></div><div class="corner tr"></div><div class="corner bl"></div><div class="corner br"></div>
+      </div>
+      <div class="transport">
+        <button id="t-start" title="Go to start (Home)">⏮</button>
+        <button id="t-back" title="Back 1 frame (←)">◂</button>
+        <button id="t-play" class="primary" title="Play / pause (Space)">▶</button>
+        <button id="t-fwd" title="Forward 1 frame (→)">▸</button>
+        <button id="t-end" title="Go to end (End)">⏭</button>
+        <span id="timecode" class="tc">00:00:00.00</span>
+        <input id="seek" type="range" min="0" max="1000" value="0" aria-label="Seek" />
+        <span id="duration" class="tc dim">00:00:00.00</span>
+        <label class="chk"><input type="checkbox" id="loop" /> loop</label>
+      </div>
+    </main>
+
+    <aside class="panel right" id="panel-right">
+      <nav class="tabs" data-tabs="right">
+        <button data-tab="inspector" class="on">Inspector</button>
+        <button data-tab="reactive">Audio-Reactive</button>
+        <button data-tab="project">Project</button>
+      </nav>
+      <section data-pane="inspector" class="pane on" id="inspector"></section>
+      <section data-pane="reactive" class="pane" id="reactive"></section>
+      <section data-pane="project" class="pane" id="project-settings"></section>
+    </aside>
+
+    <section class="timeline" id="timeline-panel">
+      <div class="tl-toolbar">
+        <button id="tl-split" title="Split at playhead (S)">✂ Split</button>
+        <button id="tl-delete" title="Delete selected clip (Delete)">Delete</button>
+        <span class="sep"></span>
+        <button id="tl-zoom-out" title="Zoom out (−)">−</button>
+        <input id="tl-zoom" type="range" min="10" max="400" value="60" aria-label="Timeline zoom" />
+        <button id="tl-zoom-in" title="Zoom in (+)">+</button>
+        <button id="tl-fit" title="Fit project to view">Fit</button>
+        <span class="sep"></span>
+        <button id="tl-add-v">+ Video track</button>
+        <button id="tl-add-a">+ Audio track</button>
+        <label class="chk"><input type="checkbox" id="tl-snap" checked /> snap</label>
+        <span class="grow"></span>
+        <span class="hint" id="tl-hint">Space play · S split · Del delete · drag edges to trim</span>
+      </div>
+      <div class="tl-scroll" id="tl-scroll"><div class="tl-content" id="tl-content"></div></div>
+    </section>
+  </div>
+  <div id="toasts" class="toasts" aria-live="polite"></div>
+  <div id="modal-root"></div>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

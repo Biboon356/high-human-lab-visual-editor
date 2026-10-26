@@ -1,0 +1,145 @@
+// ffmpeg / ffprobe wrapper. Prefers bundled static binaries, falls back to PATH.
+import { spawn } from 'node:child_process';
+import { createRequire } from 'node:module';
+import fs from 'node:fs';
+import path from 'node:path';
+
+const require = createRequire(import.meta.url);
+
+function unpacked(p) {
+  // Inside a packaged app, binaries are unpacked from the asar archive.
+  return p && p.includes('app.asar') ? p.replace('app.asar', 'app.asar.unpacked') : p;
+}
+
+function resolveBinary(envVar, pkg, getPath, fallback) {
+  if (process.env[envVar] && fs.existsSync(process.env[envVar])) return process.env[envVar];
+  try {
+    const p = unpacked(getPath(require(pkg)));
+    if (p && fs.existsSync(p)) return p;
+  } catch { /* package not installed */ }
+  return fallback;
+}
+
+export const FFMPEG = resolveBinary('HHLAB_FFMPEG', 'ffmpeg-static', (m) => m, 'ffmpeg');
+export const FFPROBE = resolveBinary('HHLAB_FFPROBE', 'ffprobe-static', (m) => m.path, 'ffprobe');
+
+const IMAGE_EXT = new Set(['.png', '.jpg', '.jpeg', '.webp', '.bmp', '.gif', '.tif', '.tiff']);
+const AUDIO_EXT = new Set(['.mp3', '.wav', '.aac', '.m4a', '.flac', '.ogg', '.opus', '.aif', '.aiff']);
+
+export function run(bin, args, { collect = true } = {}) {
+  return new Promise((resolve, reject) => {
+    const p = spawn(bin, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+    const out = [], err = [];
+    p.stdout.on('data', (d) => collect && out.push(d));
+    p.stderr.on('data', (d) => err.push(d));
+    p.on('error', (e) =>
+      reject(new Error(e.code === 'ENOENT' ? `Could not find "${bin}". Reinstall dependencies (npm install) or set HHLAB_FFMPEG / HHLAB_FFPROBE.` : e.message)));
+    p.on('close', (code) => {
+      const stderr = Buffer.concat(err).toString();
+      if (code === 0) resolve({ stdout: Buffer.concat(out), stderr });
+      else reject(new Error(`${path.basename(bin)} exited with code ${code}: ${stderr.trim().split('\n').slice(-4).join(' | ')}`));
+    });
+  });
+}
+
+export async function probeMedia(file) {
+  const ext = path.extname(file).toLowerCase();
+  const { stdout } = await run(FFPROBE, ['-v', 'error', '-print_format', 'json', '-show_format', '-show_streams', file]);
+  const info = JSON.parse(stdout.toString());
+  const streams = info.streams || [];
+  const v = streams.find((s) => s.codec_type === 'video' && !(s.disposition && s.disposition.attached_pic));
+  const a = streams.find((s) => s.codec_type === 'audio');
+  let kind;
+  if (IMAGE_EXT.has(ext) && v) kind = 'image';
+  else if (AUDIO_EXT.has(ext) || (!v && a)) kind = 'audio';
+  else if (v) kind = 'video';
+  else throw new Error(`"${path.basename(file)}" has no readable video, audio or image stream.`);
+  const duration = Number(info.format?.duration) || Number(v?.duration) || Number(a?.duration) || 0;
+  let fps = 0;
+  if (v?.avg_frame_rate && v.avg_frame_rate !== '0/0') {
+    const [n, d] = v.avg_frame_rate.split('/').map(Number);
+    fps = d ? n / d : n;
+  }
+  return {
+    path: file,
+    name: path.basename(file),
+    kind,
+    duration: kind === 'image' ? 0 : duration,
+    width: v?.width || 0,
+    height: v?.height || 0,
+    fps: Math.round(fps * 100) / 100,
+    hasAudio: kind !== 'image' && !!a,
+    codec: (v || a)?.codec_name || '',
+  };
+}
+
+/** Transcode to a universally playable H.264/AAC proxy (used when Chromium can't decode the source). */
+export async function makeProxy(src, dest) {
+  await run(FFMPEG, ['-hide_banner', '-loglevel', 'error', '-y', '-i', src, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '18',
+    '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', dest]);
+  return dest;
+}
+
+/** Decode an ffmpeg audio graph to f32le PCM, returned as a Float32Array. */
+export async function decodePcm(args) {
+  const { stdout } = await run(FFMPEG, args);
+  const ab = stdout.buffer.slice(stdout.byteOffset, stdout.byteOffset + stdout.byteLength - (stdout.byteLength % 4));
+  return new Float32Array(ab);
+}
+
+/** Streams raw frames to ffmpeg. Resolves/rejects with real encoder status. */
+export class ExportSession {
+  constructor(args, outPath, totalFrames, onProgress) {
+    this.outPath = outPath;
+    this.tail = [];
+    this.written = 0;
+    this.failed = null;
+    this.proc = spawn(FFMPEG, args, { stdio: ['pipe', 'ignore', 'pipe'] });
+    this.exited = new Promise((resolve) => {
+      this.proc.on('close', (code, sig) => resolve({ code, sig }));
+      this.proc.on('error', (e) => {
+        this.failed = new Error(e.code === 'ENOENT' ? `ffmpeg not found ("${FFMPEG}"). Run npm install or set HHLAB_FFMPEG.` : e.message);
+        resolve({ code: -1 });
+      });
+    });
+    this.proc.stdin.on('error', (e) => { this.failed ||= new Error(`Encoder pipe closed: ${e.code || e.message}`); });
+    let buf = '';
+    this.proc.stderr.on('data', (d) => {
+      buf += d.toString();
+      const lines = buf.split('\n');
+      buf = lines.pop();
+      for (const l of lines) {
+        this.tail.push(l);
+        if (this.tail.length > 30) this.tail.shift();
+        const m = /^frame=(\d+)/.exec(l);
+        if (m && onProgress) onProgress(Number(m[1]) / totalFrames);
+      }
+    });
+  }
+
+  errorText() {
+    return this.tail.filter((l) => !l.includes('=')).slice(-6).join(' | ') || this.tail.slice(-3).join(' | ');
+  }
+
+  async writeFrame(buffer) {
+    if (this.failed) throw this.failed;
+    if (this.proc.exitCode !== null) throw new Error(`Encoder stopped early: ${this.errorText()}`);
+    if (!this.proc.stdin.write(buffer)) {
+      await new Promise((res) => this.proc.stdin.once('drain', res));
+    }
+    this.written++;
+  }
+
+  async finish() {
+    this.proc.stdin.end();
+    const { code } = await this.exited;
+    if (this.failed) throw this.failed;
+    if (code !== 0) throw new Error(`ffmpeg failed (exit ${code}): ${this.errorText()}`);
+    return this.outPath;
+  }
+
+  cancel() {
+    try { this.proc.kill('SIGKILL'); } catch { /* already gone */ }
+    return this.exited.then(() => fs.promises.rm(this.outPath, { force: true }));
+  }
+}
