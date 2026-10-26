@@ -434,6 +434,53 @@ await step('large file: seeking deep into a file that is not fully buffered work
   assert.equal(resp.s, 206); assert.match(resp.cr, /^bytes 100-199\//); assert.equal(resp.n, 100);
 });
 
+await step('beats: markers appear on the ruler and "Cut on beats" splits exactly on the beat grid (undoable)', async () => {
+  await resetProject(); await ev(async ([a, b]) => { await window.__app.importPaths([a, b]); const { store } = window.__app; const { addMediaClip } = await import('/shared/timeline.js');
+    store.mutate((p) => addMediaClip(p, p.media.find((m) => m.kind === 'audio').id, p.tracks.find((t) => t.kind === 'audio').id, 0)); }, [clip, kick]);
+  await ev(() => window.__app.runAnalysis({ quiet: true })); await settle(400);
+  const marks = await ev(() => document.querySelectorAll('.tl-ruler .beat').length);
+  assert.ok(marks >= 10, `beat markers drawn: ${marks}`);
+  await ev(() => { const { store } = window.__app; store.select(store.project.clips.find((c) => c.name === 'clip.mp4').id); document.getElementById('tl-beat-n').value = '2'; });
+  await page.click('#tl-cut-beats'); await settle(500);
+  const r = await ev(() => { const { store } = window.__app; return { starts: store.project.clips.filter((c) => c.name === 'clip.mp4').map((c) => +c.start.toFixed(3)).sort((a, b) => a - b), beats: store.analysis.beats }; });
+  assert.ok(r.starts.length >= 3, `video cut into pieces: ${r.starts}`);
+  for (const t of r.starts.slice(1)) assert.ok(r.beats.some((b) => Math.abs(b - t) < 0.01), `cut at ${t} lies on a beat`);
+  const gaps = r.starts.slice(1).map((t, i) => t - (i ? r.starts[i] : r.starts[0]));
+  await ev(() => window.__app.store.undo()); assert.equal(await ev(() => window.__app.store.project.clips.filter((c) => c.name === 'clip.mp4').length), 1, 'undo restores one clip');
+});
+
+await step('duplicate + copy/paste clips keep effects and keyframes, get fresh ids, undo works', async () => {
+  await resetProject(); await ev((p) => window.__app.importPaths([p]), clip);
+  const setup = await ev(async () => { const { store } = window.__app; const { createEffect } = await import('/shared/effects-defs.js'); const c = store.project.clips[0];
+    store.mutate(() => { c.effects.push(createEffect('grain')); c.keyframes.opacity = [{ t: 0, v: 0.2 }, { t: 1, v: 1 }]; }); store.select(c.id); return c.effects[0].id; });
+  await page.click('#tl-duplicate'); await settle(200);
+  let r = await ev(() => { const { store } = window.__app; return store.project.clips.map((c) => ({ id: c.id, start: c.start, fx: c.effects.map((e) => e.id), kf: c.keyframes.opacity?.length })); });
+  assert.equal(r.length, 2); assert.equal(r[1].start, r[0].start + 6); assert.equal(r[1].kf, 2); assert.notEqual(r[1].fx[0], r[0].fx[0], 'effect ids regenerated');
+  // copy / paste through the DOM events the Edit menu triggers
+  await ev(() => { document.activeElement?.blur?.(); document.dispatchEvent(new ClipboardEvent('copy', { cancelable: true })); window.__app.store.setPlayhead(14); document.dispatchEvent(new ClipboardEvent('paste', { cancelable: true })); });
+  await settle(200);
+  r = await ev(() => window.__app.store.project.clips.map((c) => ({ id: c.id, start: c.start })));
+  assert.equal(r.length, 3); assert.ok(new Set(r.map((c) => c.id)).size === 3); assert.ok(r[2].start >= 12 - 1e-6, `pasted at/after the playhead region: ${r[2].start}`);
+  await ev(() => { const { store } = window.__app; store.undo(); store.undo(); }); assert.equal(await ev(() => window.__app.store.project.clips.length), 1);
+});
+
+await step('relink: a missing file can be pointed at a new one; edits are kept and the preview recovers', async () => {
+  const a = path.join(dir, 'relink-a.mp4'); fs.copyFileSync(clip, a);
+  await resetProject(); await ev((p) => window.__app.importPaths([p]), a);
+  await ev(async () => { const { store } = window.__app; const { createEffect } = await import('/shared/effects-defs.js'); store.mutate((p) => p.clips[0].effects.push(createEffect('grain'))); });
+  const file = path.join(dir, 'relink.hhlab'); await ev((f) => window.hh.saveProject(window.__app.store.project, f, false), file); fs.rmSync(a);
+  await stubDialog('showOpenDialog', { canceled: false, filePaths: [file] }); page.once('dialog', (d) => d.accept()); await page.click('[data-act="open"]'); await page.waitForFunction(() => window.__app.store.project.media[0]?.missing);
+  await ev(() => window.__app.store.setPlayhead(1)); await settle(500);
+  const b = path.join(dir, 'relink-b.mp4'); fs.copyFileSync(clip, b);
+  await stubDialog('showOpenDialog', { canceled: false, filePaths: [b] });
+  await page.click('.media-item.missing button:has-text("Relink")'); await page.waitForFunction(() => !window.__app.store.project.media[0].missing, null, { timeout: 15000 });
+  await settle(1200);
+  const r = await ev(() => ({ path: window.__app.store.project.media[0].path, fx: window.__app.store.project.clips[0].effects.length, miss: !!document.querySelector('.media-item.missing') }));
+  assert.equal(r.path, b); assert.equal(r.fx, 1); assert.equal(r.miss, false);
+  assert.ok((await px()).lit > 0.3, 'preview renders from the relinked file');
+  const out = path.join(dir, 'relink-out.mp4'); await ev((o) => window.__app.exportTo(o, { fps: 30 }), out); assert.ok(probe(out).streams.some((s) => s.codec_type === 'video'));
+});
+
 await step('light theme + collapsible panels', async () => {
   await ev(() => { document.getElementById('toggle-theme').click(); document.getElementById('toggle-left').click(); });
   await settle(300); await shot('11-light-collapsed');

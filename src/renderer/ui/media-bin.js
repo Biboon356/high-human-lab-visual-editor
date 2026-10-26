@@ -20,22 +20,27 @@ function canDecode(media) {
   });
 }
 
+/** Checks Chromium can play the media; if not, builds an H.264 proxy. Returns an error string or null. */
+async function finalizeMedia(media) {
+  let problem = await canDecode(media);
+  if (problem && media.kind !== 'image') {
+    toast(`"${media.name}" isn't directly playable (${problem}). Generating an H.264 proxy…`);
+    try {
+      media.playPath = await window.hh.makeProxy(media.path);
+      problem = await canDecode(media);
+    } catch (e) { problem = e.message; }
+  }
+  return problem;
+}
+
 export async function importResults(results) {
   const added = [];
   for (const r of results) {
     if (!r.ok) { toast(`Import failed: ${r.error}`, 'error'); continue; }
     const info = r.info;
-    let media = store.project.media.find((m) => m.path === info.path);
-    if (media) { toast(`"${info.name}" is already in the project.`); continue; }
-    media = { id: uid('med'), ...info };
-    let problem = await canDecode(media);
-    if (problem && media.kind !== 'image') {
-      toast(`"${info.name}" isn't directly playable (${problem}). Generating an H.264 proxy…`);
-      try {
-        media.playPath = await window.hh.makeProxy(info.path);
-        problem = await canDecode(media);
-      } catch (e) { problem = e.message; }
-    }
+    if (store.project.media.find((m) => m.path === info.path)) { toast(`"${info.name}" is already in the project.`); continue; }
+    const media = { id: uid('med'), ...info };
+    const problem = await finalizeMedia(media);
     if (problem) { toast(`Can't use "${info.name}": ${problem}`, 'error'); continue; }
     store.snapshot();
     store.project.media.push(media);
@@ -55,6 +60,25 @@ export async function importResults(results) {
   }
   store.touch('project');
   return added;
+}
+
+/** Point an existing (missing) media item at a new file; clips keep their edits. */
+export async function relinkMedia(mediaId, results) {
+  const media = store.project.media.find((m) => m.id === mediaId);
+  const r = results?.find((x) => x.ok);
+  if (!media || !r) { if (results?.length) toast(`Relink failed: ${results[0].error || 'no usable file chosen'}`, 'error'); return false; }
+  if (r.info.kind !== media.kind) { toast(`That file is ${r.info.kind}, but "${media.name}" is ${media.kind}.`, 'error'); return false; }
+  const next = { ...media, ...r.info, id: media.id, name: media.name };
+  delete next.missing; delete next.playPath;
+  const problem = await finalizeMedia(next);
+  if (problem) { toast(`Can't use the chosen file: ${problem}`, 'error'); return false; }
+  const short = media.kind !== 'image' && next.duration + 0.05 < Math.max(0, ...store.project.clips.filter((c) => c.mediaId === media.id).map((c) => c.in + c.duration));
+  store.snapshot();
+  Object.assign(media, next); delete media.missing; if (!next.playPath) delete media.playPath;
+  store.relinkedMedia = media.id;
+  store.touch('project'); store.emit('relink');
+  toast(short ? `Relinked "${media.name}" — the new file is shorter than some clips use.` : `Relinked "${media.name}".`, short ? 'error' : 'info');
+  return true;
 }
 
 export function appendToTimeline(mediaId) {
@@ -87,7 +111,8 @@ export function mountMediaBin({ onImport }) {
         el('div', { class: `k ${m.kind}`, text: m.kind === 'video' ? 'VID' : m.kind === 'audio' ? 'AUD' : 'IMG' }),
         el('div', {}, el('div', { class: 'n', text: m.name }),
           el('div', { class: 'm', text: m.missing ? 'FILE MISSING — relink by re-importing' : [m.kind !== 'image' ? fmtTime(m.duration).replace(/^00:/, '') : '', m.width ? `${m.width}×${m.height}` : '', m.fps ? `${m.fps}fps` : ''].filter(Boolean).join(' · ') })),
-        el('button', { text: '＋', title: 'Add to timeline at playhead', onclick: () => appendToTimeline(m.id) }));
+        m.missing ? el('button', { text: 'Relink…', title: 'Choose the file again', onclick: async () => relinkMedia(m.id, await window.hh.pickMedia()) })
+          : el('button', { text: '＋', title: 'Add to timeline at playhead', onclick: () => appendToTimeline(m.id) }));
       item.addEventListener('dragstart', (e) => { e.dataTransfer.setData('application/x-hh-media', m.id); e.dataTransfer.effectAllowed = 'copy'; });
       item.addEventListener('dblclick', () => appendToTimeline(m.id));
       list.append(item);

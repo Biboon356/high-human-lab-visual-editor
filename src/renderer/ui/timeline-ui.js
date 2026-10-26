@@ -1,8 +1,9 @@
 // DOM timeline: ruler, track rows, draggable/trimmable clips, playhead, drag-and-drop from the media bin.
-import { el } from './dom.js';
+import { el, toast } from './dom.js';
+import { runAnalysis } from './reactive-ui.js';
 import { store } from '../store.js';
-import { clipEnd, projectDuration, moveClip, trimStart, trimEnd, splitClip, deleteClip, addMediaClip, addTrack, clipKind } from '/shared/timeline.js';
-import { findMedia, findTrack } from '/shared/project.js';
+import { overlaps, trackEnd, canPlace, clipEnd, projectDuration, moveClip, trimStart, trimEnd, splitClip, deleteClip, addMediaClip, addTrack, clipKind } from '/shared/timeline.js';
+import { findMedia, findTrack, uid } from '/shared/project.js';
 
 const LABEL_W = 118;
 const SNAP_PX = 8;
@@ -12,6 +13,7 @@ export function mountTimeline() {
   const content = document.getElementById('tl-content');
   const zoomIn = document.getElementById('tl-zoom');
   const snapBox = document.getElementById('tl-snap');
+  const beatSnap = document.getElementById('tl-snap-beats');
   let playheadEl = null;
 
   const px = (t) => t * store.zoom;
@@ -32,6 +34,8 @@ export function mountTimeline() {
       const m = Math.floor(t / 60), s = t % 60;
       rl.append(el('div', { class: 'tick', style: `left:${px(t)}px`, text: `${m}:${String(Math.round(s * 100) / 100).padStart(2, '0')}` }));
     }
+    // detected beats (every 4th drawn taller as a "bar")
+    store.analysis?.beats.forEach((b, i) => rl.append(el('div', { class: `beat ${i % 4 === 0 ? 'bar' : ''}`, style: `left:${px(b)}px` })));
     ruler.append(rl);
     content.append(ruler);
     rl.addEventListener('pointerdown', (e) => scrub(e, rl));
@@ -95,6 +99,7 @@ export function mountTimeline() {
 
   function snapTargets(excludeId) {
     const ts = [0, store.playhead];
+    if (beatSnap.checked && store.analysis) ts.push(...store.analysis.beats);
     for (const c of store.project.clips) if (c.id !== excludeId) ts.push(c.start, clipEnd(c));
     return ts;
   }
@@ -169,8 +174,11 @@ export function mountTimeline() {
   document.getElementById('tl-add-a').onclick = () => store.mutate((p) => addTrack(p, 'audio'));
   document.getElementById('tl-delete').onclick = () => deleteSelected();
   document.getElementById('tl-split').onclick = () => splitSelected();
+  document.getElementById('tl-duplicate').onclick = () => duplicateSelected();
 
   store.on('project', render);
+  store.on('analysis', render);
+  document.getElementById('tl-cut-beats').onclick = () => cutOnBeats(Number(document.getElementById('tl-beat-n').value));
   store.on('selection', () => { for (const n of content.querySelectorAll('.clip')) n.classList.toggle('sel', n.dataset.clip === store.selection); });
   store.on('playhead', () => { placePlayhead(); followPlayhead(); });
   render();
@@ -189,6 +197,74 @@ export function splitSelected() {
   if (!did) { store.undoStack.pop(); return false; }
   store.touch('project');
   if (clip && last) store.select(last.id);
+  return true;
+}
+
+/** Splits the selected clip at every n-th detected beat. Analyses the audio first if needed. */
+export async function cutOnBeats(n = 4) {
+  const clip = store.selectedClip;
+  if (!clip) { toast('Select a clip to cut first.', 'error'); return 0; }
+  if (!store.analysis || store.analysisStale) await runAnalysis({ quiet: true });
+  const beats = store.analysis?.beats;
+  if (!beats?.length) { toast('No beats found — import music and run the audio analysis.', 'error'); return 0; }
+  const cuts = beats.filter((b, i) => i % n === 0 && b > clip.start + 0.15 && b < clipEnd(clip) - 0.15);
+  if (!cuts.length) { toast('No beats fall inside this clip.', 'error'); return 0; }
+  store.snapshot();
+  let current = clip.id, made = 0;
+  for (const t of cuts) {
+    const right = splitClip(store.project, current, t);
+    if (!right) continue;
+    current = right.id; made++;
+  }
+  store.touch('project');
+  toast(`Cut into ${made + 1} pieces on every ${n === 1 ? '' : n + 'th '}beat.`);
+  return made;
+}
+
+const fresh = (clip) => {
+  const c = structuredClone(clip);
+  c.id = uid('clip');
+  for (const fx of c.effects || []) fx.id = uid('fx');
+  return c;
+};
+
+function placeCopy(copy, trackId, start) {
+  const p = store.project;
+  const track = findTrack(p, trackId) || p.tracks.find((t) => canPlace(p, copy, t));
+  if (!track || !canPlace(p, copy, track)) return null;
+  copy.trackId = track.id;
+  copy.start = Math.max(0, start);
+  if (overlaps(p, track.id, copy.start, copy.duration)) copy.start = trackEnd(p, track.id);
+  p.clips.push(copy);
+  return copy;
+}
+
+/** Duplicates the selected clip right after itself (effects, keyframes and bindings included). */
+export function duplicateSelected() {
+  const c = store.selectedClip;
+  if (!c) return false;
+  store.snapshot();
+  const copy = placeCopy(fresh(c), c.trackId, clipEnd(c));
+  if (!copy) { store.undoStack.pop(); return false; }
+  store.touch('project'); store.select(copy.id);
+  return true;
+}
+
+export function copySelected() {
+  const c = store.selectedClip;
+  if (!c) return false;
+  store.clipboard = JSON.stringify(c);
+  return true;
+}
+
+/** Pastes the copied clip at the playhead on its original track (or the first compatible one). */
+export function pasteClip() {
+  if (!store.clipboard) return false;
+  const src = JSON.parse(store.clipboard);
+  store.snapshot();
+  const copy = placeCopy(fresh(src), store.selectedClip?.trackId || src.trackId, store.playhead);
+  if (!copy) { store.undoStack.pop(); toast("Can't paste that clip here.", 'error'); return false; }
+  store.touch('project'); store.select(copy.id);
   return true;
 }
 

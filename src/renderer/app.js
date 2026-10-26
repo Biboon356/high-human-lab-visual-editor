@@ -2,7 +2,7 @@ import { store } from './store.js';
 import { toast } from './ui/dom.js';
 import { createProject } from '/shared/project.js';
 import { mountPreview } from './ui/preview.js';
-import { mountTimeline, splitSelected, deleteSelected } from './ui/timeline-ui.js';
+import { mountTimeline, splitSelected, deleteSelected, duplicateSelected, copySelected, pasteClip, cutOnBeats } from './ui/timeline-ui.js';
 import { mountInspector } from './ui/inspector.js';
 import { mountMediaBin, importResults } from './ui/media-bin.js';
 import { mountReactive, runAnalysis } from './ui/reactive-ui.js';
@@ -73,7 +73,7 @@ async function openProject() {
 const actions = {
   new: newProject, open: openProject, save: () => save(false), saveAs: () => save(true),
   import: importMedia, export: openExportDialog,
-  undo: () => store.undo(), redo: () => store.redo(),
+  undo: () => store.undo(), redo: () => store.redo(), duplicate: duplicateSelected,
 };
 document.querySelectorAll('[data-act]').forEach((b) => b.addEventListener('click', () => actions[b.dataset.act]()));
 hh.onMenu((a) => actions[a]?.());
@@ -119,9 +119,14 @@ addEventListener('keydown', (e) => {
 addEventListener('error', (e) => toast(`Unexpected error: ${e.message}`, 'error'));
 addEventListener('unhandledrejection', (e) => toast(`Unexpected error: ${e.reason?.message || e.reason}`, 'error'));
 
+// Clip copy/paste rides on the native Edit menu's copy/paste events, so text fields keep normal behaviour.
+const inTextField = () => ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName) && !['range', 'checkbox'].includes(document.activeElement.type);
+document.addEventListener('copy', (e) => { if (!inTextField() && copySelected()) { e.preventDefault(); toast('Clip copied.'); } });
+document.addEventListener('paste', (e) => { if (!inTextField() && store.clipboard) { e.preventDefault(); pasteClip(); } });
+
 // ---- automation hook (used by scripts/e2e.mjs; harmless in normal use)
 window.__app = {
-  store, preview, timeline, runAnalysis, importPaths: async (paths) => importResults(await hh.probePaths(paths)),
+  store, preview, timeline, runAnalysis, cutOnBeats, importPaths: async (paths) => importResults(await hh.probePaths(paths)),
   exportTo: async (outPath, overrides = {}) => {
     const s = store.project.settings;
     const settings = { width: s.width, height: s.height, fps: s.fps, quality: 'draft', format: outPath.endsWith('.webm') ? 'webm' : 'mp4', ...overrides, outPath };

@@ -102,6 +102,7 @@ export function mountPreview() {
   store.on('project', () => { fitSize(); updateUI(); dirty = true; });
   store.on('reset', () => { fitSize(); dirty = true; });
   sources.onFrameReady = () => { dirty = true; };
+  store.on('relink', () => { sources.forgetMedia(store.project, store.relinkedMedia); dirty = true; });
 
   seek.addEventListener('input', () => { store.setPlayhead((Number(seek.value) / 1000) * duration()); });
   playBtn.onclick = toggle;

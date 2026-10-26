@@ -86,6 +86,7 @@
     <section class="timeline" id="timeline-panel">
       <div class="tl-toolbar">
         <button id="tl-split" title="Split at playhead (S)">✂ Split</button>
+        <button id="tl-duplicate" title="Duplicate selected clip (Ctrl/Cmd+D)">⧉ Duplicate</button>
         <button id="tl-delete" title="Delete selected clip (Delete)">Delete</button>
         <span class="sep"></span>
         <button id="tl-zoom-out" title="Zoom out (−)">−</button>
@@ -96,6 +97,10 @@
         <button id="tl-add-v">+ Video track</button>
         <button id="tl-add-a">+ Audio track</button>
         <label class="chk"><input type="checkbox" id="tl-snap" checked /> snap</label>
+        <label class="chk" title="Also snap to detected beats (run Audio-Reactive → Analyze first)"><input type="checkbox" id="tl-snap-beats" checked /> beats</label>
+        <span class="sep"></span>
+        <button id="tl-cut-beats" title="Split the selected clip on detected beats">♪ Cut on beats</button>
+        <select id="tl-beat-n" title="Cut every N-th beat"><option value="1">every beat</option><option value="2">every 2</option><option value="4" selected>every 4 (bar)</option><option value="8">every 8</option></select>
         <span class="grow"></span>
         <span class="hint" id="tl-hint">Space play · S split · Del delete · drag edges to trim</span>
       </div>

@@ -20,6 +20,8 @@ class Store {
     this.redoStack = [];
     this.listeners = new Map();
     this.pendingSnap = null;
+    this.clipboard = null; // copied clip (JSON)
+    this.relinkedMedia = null;
   }
 
   on(topic, fn) {

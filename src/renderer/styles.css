@@ -146,3 +146,7 @@ textarea { width: 100%; resize: vertical; font-family: var(--mono); }
 .okbox { border: 1px solid var(--accent2); padding: 8px; border-radius: 3px; font: 11px var(--mono); }
 ::-webkit-scrollbar { width: 9px; height: 9px; } ::-webkit-scrollbar-thumb { background: var(--line2); border-radius: 5px; } ::-webkit-scrollbar-track { background: transparent; }
 @media (prefers-reduced-motion: reduce) { #bg-roots { display: none; } }
+
+.beat { position: absolute; bottom: 0; height: 7px; width: 1px; background: var(--accent2); opacity: .8; pointer-events: none; }
+.beat.bar { height: 12px; }
+#tl-beat-n { padding: 2px 4px; }

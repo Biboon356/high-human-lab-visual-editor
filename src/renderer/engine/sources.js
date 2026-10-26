@@ -102,6 +102,16 @@ export class Sources {
     }
   }
 
+  /** Drop cached elements/errors for a media item (after relinking it to a different file). */
+  forgetMedia(project, mediaId) {
+    this.errors.delete(mediaId);
+    this.images.delete(mediaId);
+    for (const clip of project.clips) {
+      if (clip.mediaId !== mediaId) continue;
+      for (const map of [this.videos, this.audios]) { const el = map.get(clip.id); if (el) { el.pause(); el.removeAttribute('src'); el.load(); map.delete(clip.id); } }
+    }
+  }
+
   pauseAll() { for (const el of [...this.videos.values(), ...this.audios.values()]) el.pause(); }
 
   /** Export: position every active video at project time t and wait until its frame is decoded. */
