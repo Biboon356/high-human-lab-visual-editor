@@ -7,7 +7,10 @@ const SEEK_TIMEOUT_MS = 15000;
 
 export class Sources {
   /** @param {{mediaUrl:(p:string)=>string, audible:boolean}} opts */
-  constructor({ mediaUrl, audible }) {
+  constructor({ mediaUrl, audible, decoder = 'element', maxDim = 4096 }) {
+    this.decoder = decoder; // 'element' = <video> seeking (preview), 'ffmpeg' = sequential ffmpeg frames (export)
+    this.maxDim = maxDim;
+    this.dec = new Map(); // clipId -> {next, frame, pending, w, h}
     this.mediaUrl = mediaUrl;
     this.audible = audible;
     this.videos = new Map(); // clipId -> HTMLVideoElement
@@ -57,6 +60,7 @@ export class Sources {
       const img = this._image(media);
       return img.complete && img.naturalWidth ? { el: img, w: img.naturalWidth, h: img.naturalHeight } : null;
     }
+    if (media.kind === 'video' && this.decoder === 'ffmpeg') return this.dec.get(clip.id)?.frame || null;
     if (media.kind === 'video') {
       const v = this._video(clip, media);
       return v.readyState >= 2 && v.videoWidth ? { el: v, w: v.videoWidth, h: v.videoHeight } : null;
@@ -102,6 +106,7 @@ export class Sources {
 
   /** Export: position every active video at project time t and wait until its frame is decoded. */
   async seekAll(project, t, fps) {
+    if (this.decoder === 'ffmpeg') return this._decodeAll(project, t, fps);
     const jobs = [];
     for (const clip of project.clips) {
       if (clip.type !== 'media' || t < clip.start - 1e-6 || t >= clipEnd(clip) - 1e-6) continue;
@@ -118,6 +123,40 @@ export class Sources {
       jobs.push(this._seek(v, target, media.name));
     }
     await Promise.all(jobs);
+  }
+
+  async _decodeAll(project, t, fps) {
+    const jobs = [];
+    for (const clip of project.clips) {
+      if (clip.type !== 'media' || t < clip.start - 1e-6 || t >= clipEnd(clip) - 1e-6) continue;
+      const media = findMedia(project, clip.mediaId);
+      if (!media || media.kind !== 'video') {
+        if (media?.kind === 'image') { const img = this._image(media); jobs.push(img.decode().catch(() => { throw new Error(`Cannot decode image "${media.name}".`); })); }
+        continue;
+      }
+      if (media.missing) throw new Error(`Source file missing: ${media.name}`);
+      jobs.push(this._decodeClip(clip, media, t, fps));
+    }
+    await Promise.all(jobs);
+  }
+
+  async _decodeClip(clip, media, t, fps) {
+    let st = this.dec.get(clip.id);
+    if (!st) {
+      const k = Math.min(1, this.maxDim / Math.max(media.width, media.height));
+      const w = Math.max(2, Math.round(media.width * k)), h = Math.max(2, Math.round(media.height * k));
+      await window.hh.exportOpenDecoder({ id: clip.id, path: media.path, start: clip.in, duration: clip.duration + 0.5, fps, width: w, height: h });
+      st = { next: 0, frame: null, pending: null, w, h };
+      this.dec.set(clip.id, st);
+    }
+    const want = Math.max(0, Math.round((t - clip.start) * fps));
+    while (st.next <= want) {
+      const buf = await (st.pending || window.hh.exportNextFrame(clip.id));
+      st.pending = null;
+      st.frame = { data: new Uint8Array(buf), w: st.w, h: st.h };
+      st.next++;
+    }
+    if ((want + 1) / fps < clip.duration) st.pending = window.hh.exportNextFrame(clip.id); // prefetch while the GPU renders
   }
 
   async _seek(v, target, name) {

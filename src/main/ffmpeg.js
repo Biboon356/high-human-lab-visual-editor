@@ -54,6 +54,9 @@ export async function probeMedia(file) {
   else if (AUDIO_EXT.has(ext) || (!v && a)) kind = 'audio';
   else if (v) kind = 'video';
   else throw new Error(`"${path.basename(file)}" has no readable video, audio or image stream.`);
+  // Phone footage is often stored sideways with a rotation flag that players (and ffmpeg) apply automatically.
+  const rot = Math.abs(Number(v?.side_data_list?.find((d) => 'rotation' in d)?.rotation ?? v?.tags?.rotate ?? 0)) % 180;
+  const [vw, vh] = rot === 90 ? [v?.height || 0, v?.width || 0] : [v?.width || 0, v?.height || 0];
   const duration = Number(info.format?.duration) || Number(v?.duration) || Number(a?.duration) || 0;
   let fps = 0;
   if (v?.avg_frame_rate && v.avg_frame_rate !== '0/0') {
@@ -65,8 +68,8 @@ export async function probeMedia(file) {
     name: path.basename(file),
     kind,
     duration: kind === 'image' ? 0 : duration,
-    width: v?.width || 0,
-    height: v?.height || 0,
+    width: vw,
+    height: vh,
     fps: Math.round(fps * 100) / 100,
     hasAudio: kind !== 'image' && !!a,
     codec: (v || a)?.codec_name || '',
@@ -125,7 +128,9 @@ export class ExportSession {
     if (this.failed) throw this.failed;
     if (this.proc.exitCode !== null) throw new Error(`Encoder stopped early: ${this.errorText()}`);
     if (!this.proc.stdin.write(buffer)) {
-      await new Promise((res) => this.proc.stdin.once('drain', res));
+      // Wait for the pipe to drain — or for the encoder to die, in which case 'drain' never comes.
+      const died = await Promise.race([new Promise((res) => this.proc.stdin.once('drain', () => res(false))), this.exited.then(() => true)]);
+      if (died) throw this.failed || new Error(`Encoder stopped: ${this.errorText() || 'cancelled'}`);
     }
     this.written++;
   }
@@ -142,4 +147,62 @@ export class ExportSession {
     try { this.proc.kill('SIGKILL'); } catch { /* already gone */ }
     return this.exited.then(() => fs.promises.rm(this.outPath, { force: true }));
   }
+}
+
+/**
+ * Sequential RGBA frame reader for one video clip: ffmpeg seeks once, then emits frames at the project fps.
+ * Replaces per-frame <video> seeking during export (faster, VFR-safe, always reads the original file, never a proxy).
+ */
+export class ClipDecoder {
+  constructor({ path: file, start, duration, fps, width, height }) {
+    this.frameBytes = width * height * 4;
+    this.queue = [];
+    this.waiters = [];
+    this.chunks = [];
+    this.have = 0;
+    this.ended = false;
+    this.last = null;
+    this.err = [];
+    this.error = null;
+    const args = ['-hide_banner', '-loglevel', 'error', '-ss', String(start), '-t', String(duration), '-i', file, '-an', '-sn',
+      '-vf', `fps=${fps},scale=${width}:${height}:flags=bicubic,format=rgba`, '-f', 'rawvideo', '-pix_fmt', 'rgba', 'pipe:1'];
+    this.proc = spawn(FFMPEG, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+    this.proc.on('error', (e) => { this.error = new Error(e.code === 'ENOENT' ? `ffmpeg not found ("${FFMPEG}")` : e.message); this._finish(); });
+    this.proc.stderr.on('data', (d) => this.err.push(d));
+    this.proc.stdout.on('data', (d) => this._data(d));
+    this.proc.on('close', (code) => {
+      if (code !== 0 && !this.killed) this.error = new Error(`Decoding "${path.basename(file)}" failed: ${Buffer.concat(this.err).toString().trim().split('\n').slice(-3).join(' | ') || `exit ${code}`}`);
+      this._finish();
+    });
+  }
+
+  _data(d) {
+    this.chunks.push(d); this.have += d.length;
+    while (this.have >= this.frameBytes) {
+      const all = this.chunks.length === 1 ? this.chunks[0] : Buffer.concat(this.chunks);
+      const frame = Buffer.from(all.subarray(0, this.frameBytes));
+      const rest = all.subarray(this.frameBytes);
+      this.chunks = rest.length ? [rest] : []; this.have = rest.length;
+      this._push(frame);
+    }
+    if (this.queue.length >= 6) this.proc.stdout.pause(); // back-pressure: don't decode far ahead of the renderer
+  }
+  _push(frame) { const w = this.waiters.shift(); if (w) w.resolve(frame); else this.queue.push(frame); }
+  _finish() {
+    this.ended = true;
+    for (const w of this.waiters.splice(0)) this.error ? w.reject(this.error) : w.resolve(null);
+  }
+
+  /** Next frame in order, or the last frame again once the stream ends (rounding at clip tails). */
+  async next() {
+    let f;
+    if (this.queue.length) { f = this.queue.shift(); if (this.queue.length < 3) this.proc.stdout.resume(); }
+    else if (this.ended) { if (this.error && !this.last) throw this.error; f = null; }
+    else f = await new Promise((resolve, reject) => { this.waiters.push({ resolve, reject }); this.proc.stdout.resume(); });
+    if (f) this.last = f;
+    else if (!this.last) throw this.error || new Error('Decoder produced no frames.');
+    return this.last;
+  }
+
+  close() { this.killed = true; try { this.proc.kill('SIGKILL'); } catch { /* already gone */ } }
 }

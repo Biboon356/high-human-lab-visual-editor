@@ -124,6 +124,15 @@ export class Compositor {
     return this.srcTex;
   }
 
+  _uploadRaw(data, w, h) {
+    const gl = this.gl;
+    this._bindTex(this.srcTex);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false); // decoded video is opaque
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, data);
+    return this.srcTex;
+  }
+
   _drawLayer(tex, halfW, halfH, offX, offY, rot, opacity) {
     const p = this._program('layer', VERT_LAYER, FRAG_LAYER);
     this._use(p);
@@ -202,7 +211,7 @@ export class Compositor {
       if (clip.type === 'media') {
         const fr = sources.frameFor(project, clip);
         if (!fr) { const m = findMedia(project, clip.mediaId); if (m) missing.push(m.name); continue; }
-        const tex = this._upload(fr.el);
+        const tex = fr.data ? this._uploadRaw(fr.data, fr.w, fr.h) : this._upload(fr.el);
         this._clear(this.fbos.a, 0, 0, 0, 0);
         const fit = Math.min(this.w / fr.w, this.h / fr.h) * props.scale;
         this._drawLayer(tex, (fr.w * fit) / 2, (fr.h * fit) / 2, props.x * this.w, props.y * this.h, (-props.rotation * Math.PI) / 180, 1);

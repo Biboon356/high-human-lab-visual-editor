@@ -13,6 +13,8 @@ contextBridge.exposeInMainWorld('hh', {
   analyzeAudio: (project) => invoke('audio:analyze', project),
   pickExportPath: (defaultName, format) => invoke('export:pickPath', { defaultName, format }),
   exportStart: (project, settings) => invoke('export:start', { project, settings }),
+  exportOpenDecoder: (o) => invoke('export:openDecoder', o),
+  exportNextFrame: (id) => invoke('export:nextFrame', id),
   exportFrame: (buf) => invoke('export:frame', buf),
   exportFinish: () => invoke('export:finish'),
   exportCancel: () => invoke('export:cancel'),

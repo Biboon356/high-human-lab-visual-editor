@@ -3,7 +3,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { probeMedia, makeProxy, decodePcm, ExportSession, FFMPEG } from './ffmpeg.js';
+import { probeMedia, makeProxy, decodePcm, ExportSession, ClipDecoder, FFMPEG } from './ffmpeg.js';
 import { validateProject } from '../shared/project.js';
 import { buildAnalysisArgs, buildExportArgs, validateExportSettings, FORMATS } from '../shared/export-plan.js';
 
@@ -14,6 +14,8 @@ const allowedMedia = new Set(); // absolute paths the renderer may stream via hh
 let win = null;
 let dirty = false;
 let session = null;
+const decoders = new Map();
+const closeDecoders = () => { for (const d of decoders.values()) d.close(); decoders.clear(); };
 
 protocol.registerSchemesAsPrivileged([
   { scheme: 'hhlab', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, corsEnabled: true } },
@@ -175,8 +177,21 @@ function registerIpc() {
     fs.mkdirSync(path.dirname(settings.outPath), { recursive: true });
     const total = Math.round(settings.duration * settings.fps);
     const args = buildExportArgs(project, settings);
+    closeDecoders();
     session = new ExportSession(args, settings.outPath, total, (p) => win?.webContents.send('export:progress', { encoded: Math.min(1, p) }));
     return { ffmpeg: FFMPEG };
+  });
+  ipcMain.handle('export:openDecoder', (_e, o) => {
+    if (!session) throw new Error('No export session.');
+    if (!allowedMedia.has(path.resolve(o.path)) || !fs.existsSync(o.path)) throw new Error(`Source file is missing: ${o.path}`);
+    decoders.set(o.id, new ClipDecoder(o));
+    return true;
+  });
+  ipcMain.handle('export:nextFrame', async (_e, id) => {
+    const d = decoders.get(id);
+    if (!d) throw new Error('Unknown decoder.');
+    const f = await d.next();
+    return f.buffer.slice(f.byteOffset, f.byteOffset + f.byteLength);
   });
   ipcMain.handle('export:frame', async (_e, buf) => {
     if (!session) throw new Error('No export session.');
@@ -186,6 +201,7 @@ function registerIpc() {
   ipcMain.handle('export:finish', async () => {
     const s = session;
     if (!s) throw new Error('No export session.');
+    closeDecoders();
     try {
       await s.finish();
       const stat = fs.statSync(s.outPath);
@@ -202,6 +218,7 @@ function registerIpc() {
   ipcMain.handle('export:cancel', async () => {
     if (!session) return false;
     const s = session; session = null;
+    closeDecoders();
     await s.cancel();
     return true;
   });

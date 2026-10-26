@@ -277,6 +277,7 @@ await step('export errors are real: missing source file is reported, nothing wri
 
 await step('export cancel leaves no file and the app stays usable', async () => {
   const out = path.join(dir, 'cancel.mp4');
+  if (!(await ev(() => window.__app.store.project.clips.length))) await ev((p) => window.__app.importPaths([p]), clip);
   const msg = await ev(async (o) => { const { renderProject, ExportCancelled } = await import('/app/engine/exporter.js'); const { store } = window.__app; const signal = { cancelled: false };
     setTimeout(() => { signal.cancelled = true; }, 700);
     try { await renderProject({ project: structuredClone(store.project), settings: { width: 640, height: 360, fps: 30, quality: 'high', format: 'mp4', outPath: o }, analysis: store.analysis, onProgress() {}, signal }); return 'NO ERROR'; } catch (e) { return e instanceof ExportCancelled ? 'cancelled' : e.message; } }, out);
@@ -369,6 +370,54 @@ await step('missing media after reopen: clip flagged, preview survives, export r
   const txt = await ev(() => document.querySelector('.modal .errbox, .modal .okbox').textContent);
   assert.match(txt, /Export failed.*(missing|not found)/i, txt); assert.equal(fs.existsSync(out), false);
   await ev(() => [...document.querySelectorAll('.modal button')].find((b) => b.textContent === 'Close').click());
+});
+
+await step('ffmpeg-decode export: faster than element seeking, same picture, uses the original not the proxy', async () => {
+  const longGop = path.join(dir, 'longgop.mp4');
+  sh(FFMPEG, ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc2=size=1280x720:rate=30:duration=8', '-c:v', 'libx264', '-g', '240', '-pix_fmt', 'yuv420p', longGop]);
+  await resetProject(); await ev((p) => window.__app.importPaths([p]), longGop);
+  const run = async (decoder, out) => { const t0 = Date.now(); await ev((a) => window.__app.exportTo(a.out, { width: 640, height: 360, fps: 30, decoder: a.decoder }), { out, decoder }); return Date.now() - t0; };
+  const oEl = path.join(dir, 'dec-el.mp4'), oFf = path.join(dir, 'dec-ff.mp4');
+  const tEl = await run('element', oEl), tFf = await run('ffmpeg', oFf);
+  console.log(`      timing (8s long-GOP 720p -> 360p): element-seek ${tEl}ms, ffmpeg-decode ${tFf}ms`);
+  assert.ok(tFf < tEl, `ffmpeg decode should be faster (${tFf} vs ${tEl})`);
+  const info = probe(oFf); assert.ok(Math.abs(Number(info.format.duration) - 8) < 0.2);
+  const psnrOf = (x, y) => { const r = spawnSync(FFMPEG, ['-v', 'info', '-i', x, '-i', y, '-lavfi', 'psnr', '-f', 'null', '-'], { encoding: 'utf8' }); const m = /average:([\d.]+|inf)/.exec(r.stderr); return m ? (m[1] === 'inf' ? 99 : Number(m[1])) : 0; };
+  // Ground truth: ffmpeg scaling the source directly. testsrc2 burns in a frame counter, so any off-by-one frame tanks PSNR.
+  const ref = path.join(dir, 'longgop-ref.mp4'); sh(FFMPEG, ['-v', 'error', '-y', '-i', longGop, '-vf', 'scale=640:360', '-c:v', 'libx264', '-crf', '12', '-pix_fmt', 'yuv420p', ref]);
+  const pFf = psnrOf(oFf, ref), pEl = psnrOf(oEl, ref);
+  console.log(`      PSNR vs ground truth: ffmpeg-decode ${pFf.toFixed(1)} dB, element-seek ${pEl.toFixed(1)} dB`);
+  assert.ok(pFf > 33, `ffmpeg-decode export is frame-accurate (PSNR ${pFf})`);
+  // frame-accurate: the burned-in testsrc2 frame counter must advance in order — 3 sample frames differ and are non-black
+  const f = [1, 4, 7].map((t, i) => { const o = path.join(dir, `acc${i}.png`); sh(FFMPEG, ['-v', 'error', '-y', '-ss', String(t), '-i', oFf, '-frames:v', '1', o]); return fs.statSync(o).size; });
+  assert.ok(f.every((x) => x > 3000));
+});
+
+await step('proxy-needing source exports from the ORIGINAL file (full quality), not the proxy', async () => {
+  const prores = path.join(dir, 'pro2.mov');
+  sh(FFMPEG, ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc=size=640x360:rate=25:duration=2', '-c:v', 'prores_ks', '-profile:v', '3', prores]);
+  await resetProject(); await ev((p) => window.__app.importPaths([p]), prores);
+  assert.equal(await ev(() => !!window.__app.store.project.media[0].playPath), true, 'preview uses a proxy');
+  const out = path.join(dir, 'pro2-out.mp4'); await ev((o) => window.__app.exportTo(o, { fps: 25, quality: 'high' }), out);
+  const ref = path.join(dir, 'pro2-ref.mp4'); sh(FFMPEG, ['-v', 'error', '-y', '-i', prores, '-c:v', 'libx264', '-crf', '17', '-pix_fmt', 'yuv420p', ref]);
+  const r = spawnSync(FFMPEG, ['-v', 'info', '-i', out, '-i', ref, '-lavfi', 'psnr', '-f', 'null', '-'], { encoding: 'utf8' });
+  const m = /average:([\d.]+|inf)/.exec(r.stderr); const psnr = m ? (m[1] === 'inf' ? 99 : Number(m[1])) : 0;
+  console.log(`      PSNR export vs direct ffmpeg encode of the original: ${psnr} dB`);
+  assert.ok(psnr > 38, `export matches the original-quality reference (PSNR ${psnr})`);
+});
+
+await step('rotated phone video: portrait dimensions detected, project adapts, export is upright', async () => {
+  const base = path.join(dir, 'land.mp4'), rot = path.join(dir, 'rot.mp4');
+  sh(FFMPEG, ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc2=size=320x180:rate=30:duration=2', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', base]);
+  sh(FFMPEG, ['-v', 'error', '-y', '-display_rotation:v', '90', '-i', base, '-c', 'copy', rot]);
+  await resetProject(); await ev((p) => window.__app.importPaths([p]), rot);
+  const st = await ev(() => ({ ...window.__app.store.project.settings, mw: window.__app.store.project.media[0].width, mh: window.__app.store.project.media[0].height }));
+  assert.equal(st.mw, 180); assert.equal(st.mh, 320); assert.equal(st.width, 180); assert.equal(st.height, 320);
+  const out = path.join(dir, 'rot-out.mp4'); await ev((o) => window.__app.exportTo(o, { fps: 30 }), out);
+  const v = probe(out).streams.find((s) => s.codec_type === 'video'); assert.equal(v.width, 180); assert.equal(v.height, 320);
+  const px2 = path.join(dir, 'rot.raw'); sh(FFMPEG, ['-v', 'error', '-y', '-ss', '0.5', '-i', out, '-frames:v', '1', '-pix_fmt', 'gray', '-f', 'rawvideo', px2]);
+  const d = fs.readFileSync(px2); let lit = 0; for (const b of d) if (b > 40) lit++;
+  assert.ok(lit / d.length > 0.5, 'frame fully covered (no letterboxing from a wrong size)');
 });
 
 await step('light theme + collapsible panels', async () => {
