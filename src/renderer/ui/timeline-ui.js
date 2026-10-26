@@ -1,6 +1,7 @@
 // DOM timeline: ruler, track rows, draggable/trimmable clips, playhead, drag-and-drop from the media bin.
 import { el, toast } from './dom.js';
 import { runAnalysis } from './reactive-ui.js';
+import { visualsFor, drawVisuals } from '../engine/media-cache.js';
 import { store } from '../store.js';
 import { overlaps, trackEnd, canPlace, clipEnd, projectDuration, moveClip, trimStart, trimEnd, splitClip, deleteClip, addMediaClip, addTrack, clipKind } from '/shared/timeline.js';
 import { findMedia, findTrack, uid } from '/shared/project.js';
@@ -82,6 +83,14 @@ export function mountTimeline() {
       media?.missing ? el('span', { class: 'badge', text: '⚠ missing' }) : null,
       kfs.length ? el('div', { class: 'kfs' }, kfs) : null,
       el('div', { class: 'h l', 'data-h': 'l' }), el('div', { class: 'h r', 'data-h': 'r' }));
+    const vis = media && (media.kind === 'video' || media.kind === 'audio') ? visualsFor(media) : null;
+    if (vis && (vis.thumbs || vis.peaks)) {
+      const cv = el('canvas', { class: 'clip-vis' });
+      const scale = Math.min(1, 6000 / Math.max(1, px(clip.duration)));
+      cv.width = Math.max(4, Math.round(px(clip.duration) * scale)); cv.height = 38;
+      n.prepend(cv);
+      drawVisuals(cv, clip, vis, store.zoom);
+    }
     n.addEventListener('pointerdown', (e) => beginDrag(e, clip, n));
     return n;
   }
@@ -178,6 +187,7 @@ export function mountTimeline() {
 
   store.on('project', render);
   store.on('analysis', render);
+  store.on('mediavis', render);
   document.getElementById('tl-cut-beats').onclick = () => cutOnBeats(Number(document.getElementById('tl-beat-n').value));
   store.on('selection', () => { for (const n of content.querySelectorAll('.clip')) n.classList.toggle('sel', n.dataset.clip === store.selection); });
   store.on('playhead', () => { placePlayhead(); followPlayhead(); });

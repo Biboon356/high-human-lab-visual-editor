@@ -206,3 +206,28 @@ export class ClipDecoder {
 
   close() { this.killed = true; try { this.proc.kill('SIGKILL'); } catch { /* already gone */ } }
 }
+
+/** One JPEG sprite (n tiles side by side) of evenly spaced video frames for timeline thumbnails. Keyframes only: fast on long files. */
+export async function makeThumbs(file, { duration, width, height, h = 56 }) {
+  const step = Math.max(1, duration / 48);
+  const n = Math.max(1, Math.ceil(duration / step));
+  const tileW = Math.max(8, Math.round(((h * width) / Math.max(1, height)) / 2) * 2);
+  const { stdout } = await run(FFMPEG, ['-hide_banner', '-loglevel', 'error', '-skip_frame', 'nokey', '-i', file, '-an', '-sn',
+    '-vf', `fps=1/${step},scale=${tileW}:${h},tile=${n}x1`, '-frames:v', '1', '-q:v', '5', '-f', 'image2pipe', '-c:v', 'mjpeg', 'pipe:1']);
+  return { jpeg: stdout, step, n, tileW, h };
+}
+
+/** Peak envelope (0..255) of the audio, `perSec` bins per second. */
+export async function makePeaks(file, perSec = 50) {
+  const rate = 8000;
+  const { stdout } = await run(FFMPEG, ['-hide_banner', '-loglevel', 'error', '-i', file, '-vn', '-ac', '1', '-ar', String(rate), '-f', 's16le', 'pipe:1']);
+  const samples = new Int16Array(stdout.buffer.slice(stdout.byteOffset, stdout.byteOffset + stdout.byteLength - (stdout.byteLength % 2)));
+  const bin = Math.round(rate / perSec);
+  const out = new Uint8Array(Math.max(1, Math.floor(samples.length / bin)));
+  for (let i = 0; i < out.length; i++) {
+    let m = 0;
+    for (let j = i * bin, e = j + bin; j < e; j++) { const v = Math.abs(samples[j]); if (v > m) m = v; }
+    out[i] = Math.min(255, Math.round((m / 32768) * 255 * 1.6)); // gentle boost so quiet material is still visible
+  }
+  return { peaks: out, perSec };
+}

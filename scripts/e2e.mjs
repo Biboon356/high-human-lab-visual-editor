@@ -481,6 +481,17 @@ await step('relink: a missing file can be pointed at a new one; edits are kept a
   const out = path.join(dir, 'relink-out.mp4'); await ev((o) => window.__app.exportTo(o, { fps: 30 }), out); assert.ok(probe(out).streams.some((s) => s.codec_type === 'video'));
 });
 
+await step('timeline shows video thumbnails and audio waveforms drawn from the real media', async () => {
+  await resetProject(); await ev(async ([a, b]) => { await window.__app.importPaths([a, b]); const { store } = window.__app; const { addMediaClip } = await import('/shared/timeline.js');
+    store.mutate((p) => addMediaClip(p, p.media.find((m) => m.kind === 'audio').id, p.tracks.find((t) => t.kind === 'audio').id, 0)); }, [clip, kick]);
+  await page.waitForFunction(() => document.querySelectorAll('canvas.clip-vis').length >= 2, null, { timeout: 30000 });
+  const r = await ev(() => { const stat = (sel) => { const cv = document.querySelector(sel); const d = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data; let opaque = 0, lum = new Set(); for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 200) { opaque++; lum.add(Math.round(d[i] / 16)); } return { w: cv.width, opaque: opaque / (d.length / 4), levels: lum.size }; };
+    return { video: stat('.clip.video canvas.clip-vis'), audio: stat('.clip.audio canvas.clip-vis') }; });
+  assert.ok(r.video.opaque > 0.95 && r.video.levels > 4, `thumbnails fill the clip with real image content: ${JSON.stringify(r.video)}`);
+  assert.ok(r.audio.opaque > 0.03 && r.audio.opaque < 0.9, `waveform drawn (not empty, not solid): ${JSON.stringify(r.audio)}`);
+  await shot('13-thumbs-waveforms');
+});
+
 await step('light theme + collapsible panels', async () => {
   await ev(() => { document.getElementById('toggle-theme').click(); document.getElementById('toggle-left').click(); });
   await settle(300); await shot('11-light-collapsed');

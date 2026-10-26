@@ -7,6 +7,8 @@ contextBridge.exposeInMainWorld('hh', {
   pickMedia: () => invoke('media:pick'),
   probePaths: (paths) => invoke('media:probe', paths),
   pathForFile: (file) => webUtils.getPathForFile(file),
+  mediaThumbs: (o) => invoke('media:thumbs', o),
+  mediaPeaks: (p) => invoke('media:peaks', p),
   makeProxy: (p) => invoke('media:proxy', p),
   openProject: () => invoke('project:open'),
   saveProject: (project, filePath, saveAs) => invoke('project:save', { project, filePath, saveAs }),

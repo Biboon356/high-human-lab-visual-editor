@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { Readable } from 'node:stream';
-import { probeMedia, makeProxy, decodePcm, ExportSession, ClipDecoder, FFMPEG } from './ffmpeg.js';
+import { probeMedia, makeProxy, decodePcm, ExportSession, ClipDecoder, makeThumbs, makePeaks, FFMPEG } from './ffmpeg.js';
 import { validateProject } from '../shared/project.js';
 import { buildAnalysisArgs, buildExportArgs, validateExportSettings, FORMATS } from '../shared/export-plan.js';
 
@@ -143,6 +143,17 @@ function registerIpc() {
     return r.canceled ? [] : probeAll(r.filePaths);
   });
   ipcMain.handle('media:probe', (_e, paths) => probeAll(paths));
+  const ab = (b) => b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
+  ipcMain.handle('media:thumbs', async (_e, o) => {
+    if (!allowedMedia.has(path.resolve(o.path))) throw new Error('Not an imported media file');
+    const r = await makeThumbs(o.path, o);
+    return { jpeg: ab(r.jpeg), step: r.step, n: r.n, tileW: r.tileW, h: r.h };
+  });
+  ipcMain.handle('media:peaks', async (_e, p) => {
+    if (!allowedMedia.has(path.resolve(p))) throw new Error('Not an imported media file');
+    const r = await makePeaks(p);
+    return { peaks: ab(r.peaks), perSec: r.perSec };
+  });
   ipcMain.handle('media:proxy', async (_e, src) => {
     fs.mkdirSync(proxyDir(), { recursive: true });
     const key = crypto.createHash('sha1').update(src + fs.statSync(src).mtimeMs).digest('hex').slice(0, 16);

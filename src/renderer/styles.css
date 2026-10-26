@@ -150,3 +150,7 @@ textarea { width: 100%; resize: vertical; font-family: var(--mono); }
 .beat { position: absolute; bottom: 0; height: 7px; width: 1px; background: var(--accent2); opacity: .8; pointer-events: none; }
 .beat.bar { height: 12px; }
 #tl-beat-n { padding: 2px 4px; }
+.clip canvas.clip-vis { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.clip .nm, .clip .badge { position: relative; z-index: 1; text-shadow: 0 0 3px rgba(0,0,0,.9); }
+[data-theme="light"] .clip .nm { text-shadow: 0 0 3px rgba(255,255,255,.9); }
+.clip .h { z-index: 2; }
