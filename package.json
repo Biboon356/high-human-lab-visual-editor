@@ -44,7 +44,8 @@
       "category": "public.app-category.video",
       "target": [
         "dmg"
-      ]
+      ],
+      "identity": null
     },
     "win": {
       "target": [
@@ -53,9 +54,11 @@
     },
     "directories": {
       "output": "dist"
-    }
+    },
+    "artifactName": "HIGH-HUMAN-LAB-${version}-${os}-${arch}.${ext}"
   },
   "engines": {
     "node": ">=20"
-  }
+  },
+  "author": "HIGH HUMAN LAB"
 }
