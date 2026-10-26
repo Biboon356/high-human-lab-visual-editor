@@ -65,6 +65,86 @@ export const EFFECTS = {
       { key: 'invert', label: 'Invert', min: 0, max: 1, step: 1, def: 0, toggle: true },
     ],
   },
+  chroma: {
+    label: 'Lens Chromatic',
+    params: [
+      { key: 'amount', label: 'Amount', min: 0, max: 0.08, step: 0.0005, def: 0.012 },
+      { key: 'radial', label: 'Radial ↔ Linear', min: 0, max: 1, step: 0.01, def: 1 },
+      { key: 'angle', label: 'Angle', min: 0, max: 180, step: 1, def: 0 },
+    ],
+  },
+  bloom: {
+    label: 'Bloom',
+    params: [
+      { key: 'threshold', label: 'Threshold', min: 0, max: 0.95, step: 0.01, def: 0.55 },
+      { key: 'intensity', label: 'Intensity', min: 0, max: 2, step: 0.01, def: 0.6 },
+      { key: 'radius', label: 'Radius (px @1080p)', min: 2, max: 120, step: 1, def: 36 },
+    ],
+  },
+  film: {
+    label: 'Film 35mm',
+    params: [
+      { key: 'grain', label: 'Grain', min: 0, max: 1, step: 0.01, def: 0.35 },
+      { key: 'halation', label: 'Halation', min: 0, max: 1, step: 0.01, def: 0.25 },
+      { key: 'contrast', label: 'S-curve', min: 0, max: 1, step: 0.01, def: 0.5 },
+      { key: 'lift', label: 'Faded blacks', min: 0, max: 0.5, step: 0.01, def: 0.1 },
+      { key: 'vignette', label: 'Vignette', min: 0, max: 1, step: 0.01, def: 0.35 },
+      { key: 'weave', label: 'Gate weave', min: 0, max: 1, step: 0.01, def: 0.4 },
+    ],
+  },
+  vhs: {
+    label: 'VHS Tape',
+    params: [
+      { key: 'jitter', label: 'Line jitter', min: 0, max: 1, step: 0.01, def: 0.35 },
+      { key: 'bleed', label: 'Chroma bleed', min: 0, max: 0.05, step: 0.0005, def: 0.012 },
+      { key: 'noise', label: 'Tape noise', min: 0, max: 1, step: 0.01, def: 0.4 },
+      { key: 'tracking', label: 'Tracking error', min: 0, max: 1, step: 0.01, def: 0.5 },
+    ],
+  },
+  mosh: {
+    label: 'Mosh / Smear',
+    params: [
+      { key: 'amount', label: 'Amount', min: 0, max: 1, step: 0.01, def: 0.45 },
+      { key: 'block', label: 'Block size (px)', min: 4, max: 128, step: 1, def: 32 },
+      { key: 'hold', label: 'Change rate (Hz)', min: 0.5, max: 24, step: 0.5, def: 6 },
+      { key: 'smear', label: 'Smear length', min: 0, max: 3, step: 0.05, def: 1.2 },
+    ],
+  },
+  halftone: {
+    label: 'Halftone',
+    params: [
+      { key: 'size', label: 'Dot size (px)', min: 3, max: 40, step: 0.5, def: 10 },
+      { key: 'angle', label: 'Angle', min: 0, max: 90, step: 1, def: 30 },
+      { key: 'contrast', label: 'Dot gain', min: 0.5, max: 3, step: 0.01, def: 1.4 },
+      { key: 'mix', label: 'Mix', min: 0, max: 1, step: 0.01, def: 1 },
+    ],
+  },
+  pixel: {
+    label: 'Pixelate',
+    params: [
+      { key: 'size', label: 'Pixel size', min: 1, max: 96, step: 1, def: 12 },
+      { key: 'mix', label: 'Mix', min: 0, max: 1, step: 0.01, def: 1 },
+    ],
+  },
+  shake: {
+    label: 'Camera Shake / Punch',
+    params: [
+      { key: 'amount', label: 'Shake', min: 0, max: 0.1, step: 0.001, def: 0.012 },
+      { key: 'speed', label: 'Speed', min: 0.2, max: 12, step: 0.1, def: 4 },
+      { key: 'zoom', label: 'Zoom', min: 1, max: 1.6, step: 0.005, def: 1.06 },
+      { key: 'roll', label: 'Roll (deg)', min: 0, max: 12, step: 0.1, def: 0.8 },
+    ],
+  },
+  flash: {
+    label: 'Colour Flash',
+    params: [
+      { key: 'amount', label: 'Amount', min: 0, max: 1.5, step: 0.01, def: 0.6 },
+      { key: 'rate', label: 'Rate (Hz)', min: 0.25, max: 16, step: 0.25, def: 2 },
+      { key: 'decay', label: 'Decay', min: 1, max: 12, step: 0.1, def: 5 },
+      { key: 'hue', label: 'Hue', min: 0, max: 1, step: 0.005, def: 0.38 },
+      { key: 'white', label: 'White ↔ Hue', min: 0, max: 1, step: 0.01, def: 0.5 },
+    ],
+  },
   crt: {
     label: 'Broadcast / CRT',
     params: [
@@ -94,7 +174,7 @@ export function createEffect(type, overrides = {}) {
   };
 }
 
-const fx = (type, o) => ({ type, params: o });
+const fx = (type, o, bindings = {}) => ({ type, params: o, bindings });
 
 /** Built-in chain presets. Applying one appends fresh effect instances. */
 export const EFFECT_PRESETS = [
@@ -103,9 +183,19 @@ export const EFFECT_PRESETS = [
   { name: 'Root Bloom', chain: [fx('fluid', { amount: 0.09, scale: 2.8 }), fx('color', { tint: 0.5, contrast: 1.15, saturation: 0.6 }), fx('grain', { amount: 0.2 })] },
   { name: 'Dream Haze', chain: [fx('blur', { radius: 14 }), fx('noise', { amount: 0.35, green: 0.4 }), fx('color', { brightness: 0.05, saturation: 1.3 })] },
   { name: 'Night Photocopy', chain: [fx('color', { saturation: 0, contrast: 2, levels: 4 }), fx('grain', { amount: 0.5, size: 2.2, color: 0 })] },
+  { name: 'Mosh Pit', chain: [fx('mosh', { amount: 0.5, smear: 1.5 }), fx('chroma', { amount: 0.018 }), fx('film', { grain: 0.45, halation: 0.2 }), fx('color', { contrast: 1.2, saturation: 0.85 })] },
+  { name: 'Tour Tape (VHS)', chain: [fx('vhs', { tracking: 0.55 }), fx('chroma', { amount: 0.01, radial: 0.4 }), fx('bloom', { intensity: 0.4 }), fx('color', { saturation: 1.25, contrast: 1.1 })] },
+  { name: 'Halation 35mm', chain: [fx('film', { halation: 0.7, grain: 0.4 }), fx('bloom', { threshold: 0.7, intensity: 0.5, radius: 50 }), fx('chroma', { amount: 0.006 })] },
+  { name: 'Beat Punch (audio)', chain: [fx('shake', { amount: 0.004, zoom: 1.08 }, { amount: { source: 'beat', amount: 0.5 } }), fx('chroma', { amount: 0.004 }, { amount: { source: 'beat', amount: 0.5 } }), fx('flash', { amount: 0.0, white: 0.8 }, { amount: { source: 'beat', amount: 0.35 } })] },
+  { name: 'Acid Halftone', chain: [fx('halftone', { size: 9, contrast: 1.6 }), fx('color', { tint: 0.35, contrast: 1.3 }), fx('grain', { amount: 0.25 })] },
+  { name: 'Low-Res Rave', chain: [fx('pixel', { size: 10 }), fx('glitch', { amount: 0.4, rate: 8 }), fx('chroma', { amount: 0.02 }), fx('color', { levels: 6, contrast: 1.4 })] },
   { name: 'Wet Signal', chain: [fx('distort', { amount: 0.03, freq: 6 }), fx('glitch', { amount: 0.25, rate: 6 }), fx('color', { hue: -25, tint: 0.3 })] },
 ];
 
 export function instantiatePreset(preset) {
-  return preset.chain.map((e) => createEffect(e.type, e.params));
+  return preset.chain.map((e) => {
+    const effect = createEffect(e.type, e.params);
+    effect.bindings = structuredClone(e.bindings || {});
+    return effect;
+  });
 }

@@ -145,8 +145,8 @@ await step('effects: add chain + presets render visibly different output', async
     const grab = () => window.__grab(96, 54);
     const diff = (a, b) => a.reduce((s, v, i) => s + Math.abs(v - b[i]), 0) / a.length;
     const base = grab(); const out = {};
-    for (const type of ['glitch', 'grain', 'noise', 'distort', 'fluid', 'blur', 'color', 'crt']) {
-      store.mutate(() => c.effects.push(createEffect(type, type === 'color' ? { tint: 1, saturation: 0.2 } : type === 'blur' ? { radius: 20 } : { amount: type === 'distort' ? 0.08 : 0.9 })));
+    for (const type of ['glitch', 'grain', 'noise', 'distort', 'fluid', 'blur', 'color', 'crt', 'chroma', 'bloom', 'film', 'vhs', 'mosh', 'halftone', 'pixel', 'shake', 'flash']) {
+      store.mutate(() => c.effects.push(createEffect(type, ({ color: { tint: 1, saturation: 0.2 }, blur: { radius: 20 }, distort: { amount: 0.08 }, chroma: { amount: 0.07 }, bloom: { intensity: 2, threshold: 0.1 }, film: { grain: 1, vignette: 1 }, vhs: { noise: 1, tracking: 1 }, mosh: { amount: 1 }, halftone: {}, pixel: { size: 30 }, shake: { amount: 0.1, zoom: 1.4, roll: 8 }, flash: { amount: 1.5, rate: 0.5, decay: 1, white: 1 } })[type] || { amount: 0.9 })));
       await new Promise((r) => setTimeout(r, 250));
       out[type] = +diff(base, grab()).toFixed(2);
       store.mutate(() => c.effects.pop());
@@ -156,7 +156,7 @@ await step('effects: add chain + presets render visibly different output', async
     out.preset = +diff(base, grab()).toFixed(2); out.chain = c.effects.length;
     return out;
   });
-  for (const k of ['glitch', 'grain', 'noise', 'distort', 'fluid', 'blur', 'color', 'crt', 'preset']) assert.ok(r[k] > 0.4, `effect ${k} changed the image: ${JSON.stringify(r)}`);
+  for (const k of ['glitch', 'grain', 'noise', 'distort', 'fluid', 'blur', 'color', 'crt', 'chroma', 'bloom', 'film', 'vhs', 'mosh', 'halftone', 'pixel', 'shake', 'flash', 'preset']) assert.ok(r[k] > 0.4, `effect ${k} changed the image: ${JSON.stringify(r)}`);
   assert.equal(r.chain, 3);
   await shot('04-effects');
 });

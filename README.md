@@ -94,10 +94,10 @@ Legend: ✅ works and is covered by the automated tests · 🧪 prototype (works
 | Preview + transport | ✅ | play/pause/seek/frame-step/loop; playback is clock-driven with audio-element sync |
 | Multitrack timeline | ✅ | tracks add/mute/hide, place/move/trim/split/delete, snapping, zoom, undo/redo (100 steps) |
 | Project save / open | ✅ | `.hhlab` JSON, atomic write, validation, missing-media detection |
-| Effects: glitch, grain, cloud noise, wave distortion, fluid warp, blur, colour, CRT | ✅ | stack/reorder/enable/remove, 6 built-in + user presets (user presets stored in browser storage) |
-| Typography | ✅ / 🧪 | text clips with font/size/tracking/align/position/rotation/outline/plate and 8 animations ✅; fonts are typed or picked from a fixed list — no system font browser 🧪 |
+| Effects (17): glitch, grain, cloud noise, wave distortion, fluid warp, blur, colour, CRT, lens chromatic, bloom, film 35mm, VHS, mosh/smear, halftone, pixelate, camera shake/punch, colour flash | ✅ | stack/reorder/enable/remove; 12 built-in presets (some audio-bound, e.g. *Beat Punch*) + user presets (stored in browser storage) |
+| Typography | ✅ / 🧪 | text clips with font/size/tracking/align/position/rotation/outline/plate, chrome gradient fill, RGB split, shadow, glow and 11 animations (incl. slam, stutter, strobe) ✅; fonts are typed or picked from a fixed list — no system font browser 🧪 |
 | Keyframes | 🧪 | per-parameter keys with smooth interpolation, shown on timeline clips; no curve editor, no per-key easing choice, no dragging keys on the timeline |
-| Organic engine | 🧪 | three procedural generators, fully parameterised & keyframable; visual quality is a first pass |
+| Organic engine | 🧪 | three procedural generators (roots, topographic fluid, cell membrane) drawn as crisp constant-width lines with a keyframable *Growth* front, glow, overlay blend on footage; look is still being tuned |
 | Audio-reactive | ✅ / 🧪 | amplitude, 3 bands, beat detection and tempo estimate ✅; analysis is whole-mix only (no per-clip source choice), fixed 60 Hz, beats are simple spectral flux 🧪 |
 | Export | ✅ | H.264/AAC and VP9/Opus, 6 resolutions (+project), 24–60 fps, 3 quality levels, progress/ETA, cancel, errors surfaced, output re-probed before "success" |
 | Preview audio | 🧪 | each clip plays through its own media element; no master mixer, meters or waveforms |

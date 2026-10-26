@@ -133,6 +133,142 @@ vec4 effect(vec2 uv){
   if(u_invert > .5) v = 1.-clamp(v,0.,1.);
   return emit(v, c.a);
 }`),
+  chroma: wrap(`
+uniform float u_amount, u_radial, u_angle;
+vec4 effect(vec2 uv){
+  vec2 c = (uv-.5)*2.;
+  vec2 lin = vec2(cos(radians(u_angle)), sin(radians(u_angle)));
+  vec2 dir = mix(lin, c, u_radial) * u_amount;
+  vec3 acc = vec3(0.), ws = vec3(0.); float a = 0.;
+  const int N = 12;
+  for(int i=0;i<N;i++){
+    float t = float(i)/float(N-1);
+    vec4 s = src(uv + dir*(t-.5)*2.);
+    vec3 w = vec3(1.-t, 1.-abs(2.*t-1.), t);
+    acc += s.rgb*w; ws += w; a = max(a, s.a);
+  }
+  return emit(acc/ws, a);
+}`),
+  bloom: wrap(`
+uniform float u_threshold, u_intensity, u_radius;
+vec4 effect(vec2 uv){
+  vec4 c = src(uv);
+  float r = u_radius*(u_res.y/1080.);
+  float rot = hash12(floor(gl_FragCoord.xy))*6.2831;
+  vec3 acc = vec3(0.);
+  const int N = 40;
+  for(int i=0;i<N;i++){
+    float fi = float(i)+.5; float rad = sqrt(fi/float(N)); float ang = fi*2.39996323 + rot;
+    vec3 s = src(uv + vec2(cos(ang), sin(ang))*rad*r/u_res).rgb;
+    float b = max(0., luma(s)-u_threshold)/max(1.-u_threshold, .05);
+    acc += s*b;
+  }
+  return emit(c.rgb + acc/float(N)*u_intensity*3., c.a);
+}`),
+  film: wrap(`
+uniform float u_grain, u_halation, u_contrast, u_lift, u_vignette, u_weave;
+vec4 effect(vec2 uv){
+  float f = floor(u_time*24.);
+  vec2 p = uv + (vec2(hash11(f), hash11(f+7.))-.5)*u_weave*.004;
+  vec4 c = src(p); vec3 col = c.rgb;
+  float r = 16.*(u_res.y/1080.);
+  float rot = hash12(floor(gl_FragCoord.xy)+f)*6.2831;
+  vec3 h = vec3(0.);
+  const int N = 28;
+  for(int i=0;i<N;i++){
+    float fi = float(i)+.5; float rad = sqrt(fi/float(N)); float ang = fi*2.39996323 + rot;
+    vec3 s = src(p + vec2(cos(ang), sin(ang))*rad*r/u_res).rgb;
+    h += smoothstep(.5, 1., luma(s))*vec3(1., .5, .3);
+  }
+  col += h/float(N)*u_halation*3.2;
+  col = mix(col, col*col*(3.-2.*clamp(col,0.,1.)), u_contrast);
+  col = col*(1.-u_lift) + u_lift*.09;
+  vec2 gp = floor(uv*u_res/1.3);
+  float g = (hash12(gp+f*13.)+hash12(gp*1.7+f*31.)+hash12(gp*.6+f*5.))/3. - .5;
+  col += g*u_grain*.55*(1.25-abs(luma(col)-.5)*1.5);
+  col *= 1. - u_vignette*smoothstep(.3,.95,length((uv-.5)*vec2(u_res.x/u_res.y,1.)));
+  return emit(col, c.a);
+}`),
+  vhs: wrap(`
+uniform float u_jitter, u_bleed, u_noise, u_tracking;
+vec4 effect(vec2 uv){
+  float t = u_time;
+  float row = floor(uv.y*u_res.y/2.);
+  float f30 = floor(t*30.);
+  float band = fract(uv.y*.9 - t*.13);
+  float bandMask = smoothstep(0.,.03,band)*(1.-smoothstep(.03,.11,band));
+  float bot = smoothstep(.07,0.,uv.y);
+  float x = uv.x + (hash12(vec2(row,f30))-.5)*u_jitter*.012
+          + bandMask*u_tracking*.03*sin(uv.y*90.+t*25.)
+          + bot*u_tracking*(hash12(vec2(row,floor(t*60.)))-.5)*.14;
+  vec2 p = vec2(x, uv.y);
+  vec4 s0 = src(p); float l = luma(s0.rgb);
+  vec3 cs = vec3(0.);
+  for(int i=-4;i<=4;i++) cs += src(p + vec2(float(i)*u_bleed/4., 0.)).rgb;
+  cs /= 9.;
+  vec3 col = vec3(l) + (cs - luma(cs))*1.15;
+  float n = hash12(vec2(floor(uv.x*u_res.x/3.)+row*7., f30));
+  col += (n-.5)*u_noise*.22 + (bandMask+bot)*u_tracking*n*.35;
+  return emit(col, s0.a);
+}`),
+  mosh: wrap(`
+uniform float u_amount, u_block, u_hold, u_smear;
+vec4 effect(vec2 uv){
+  float bs = u_block*(u_res.y/1080.);
+  vec2 cell = floor(uv*u_res/bs);
+  float tick = floor(u_time*u_hold);
+  float act = step(1.-u_amount, hash12(cell*1.3 + tick*17.));
+  vec2 v = (hash22(cell + tick*3.1)-.5)*2.*.14*act;
+  v.y *= .6;
+  vec4 acc = vec4(0.); float ws = 0.;
+  const int N = 12;
+  for(int i=0;i<N;i++){ float t = float(i)/float(N-1); float w = 1.-t*.65; acc += src(uv - v*t*u_smear)*w; ws += w; }
+  vec4 r = acc/ws;
+  return emit(r.rgb, r.a);
+}`),
+  halftone: wrap(`
+uniform float u_size, u_angle, u_contrast, u_mix;
+vec4 effect(vec2 uv){
+  vec4 c0 = src(uv);
+  float a = radians(u_angle); mat2 R = mat2(cos(a), -sin(a), sin(a), cos(a));
+  float cell = u_size*(u_res.y/1080.);
+  vec2 q = R*(uv*u_res)/cell; vec2 g = floor(q)+.5;
+  vec2 centre = (transpose(R)*(g*cell))/u_res;
+  vec4 s = src(centre);
+  float l = clamp(luma(s.rgb)*u_contrast, 0., 1.);
+  float d = length(fract(q)-.5);
+  float rad = .72*sqrt(l);
+  float aa = .75/cell*1.4;
+  float dot_ = 1. - smoothstep(rad-aa, rad+aa, d);
+  vec3 ht = s.rgb/max(luma(s.rgb),.05)*l*dot_;
+  return emit(mix(c0.rgb, ht, u_mix), c0.a);
+}`),
+  pixel: wrap(`
+uniform float u_size, u_mix;
+vec4 effect(vec2 uv){
+  float s = max(1., u_size*(u_res.y/1080.));
+  vec2 p = (floor(uv*u_res/s)+.5)*s/u_res;
+  return mix(texture(u_tex, uv), texture(u_tex, p), u_mix);
+}`),
+  shake: wrap(`
+uniform float u_amount, u_speed, u_zoom, u_roll;
+vec4 effect(vec2 uv){
+  float t = u_time*u_speed; float asp = u_res.x/u_res.y;
+  vec2 o = vec2(vnoise(vec2(t*3.,1.3))-.5, vnoise(vec2(t*3.,7.9))-.5)*2.*u_amount;
+  float r = (vnoise(vec2(t*2.,3.1))-.5)*2.*radians(u_roll);
+  vec2 c = (uv-.5)*vec2(asp,1.);
+  c = vec2(cos(r)*c.x - sin(r)*c.y, sin(r)*c.x + cos(r)*c.y)/vec2(asp,1.);
+  return src(c/u_zoom + .5 + o);
+}`),
+  flash: wrap(`
+uniform float u_amount, u_rate, u_decay, u_hue, u_white;
+vec4 effect(vec2 uv){
+  vec4 c = src(uv);
+  float pulse = pow(1.-fract(u_time*u_rate), u_decay);
+  vec3 hue = .5+.5*cos(6.2831*(u_hue+vec3(0.,.33,.67)));
+  vec3 tint = mix(hue, vec3(1.), u_white);
+  return emit(1.-(1.-c.rgb)*(1.-tint*pulse*u_amount), c.a);
+}`),
   crt: wrap(`
 uniform float u_scan, u_lines, u_bleed, u_curve, u_vignette, u_flicker;
 vec4 effect(vec2 uv){
@@ -153,9 +289,8 @@ vec4 effect(vec2 uv){
 };
 
 export const GEN_FRAG = `${PRELUDE}
-uniform float u_density, u_movement, u_distortion, u_thickness, u_glow, u_green, u_seed, u_transparent;
+uniform float u_density, u_movement, u_distortion, u_thickness, u_glow, u_green, u_seed, u_transparent, u_growth;
 uniform int u_style;
-float ridge(vec2 p){ return 1. - abs(fbm(p)*2.-1.); }
 vec2 warp(vec2 p, float t){
   vec2 q = vec2(fbm(p*.9+vec2(0.,t)+u_seed), fbm(p*.9+vec2(5.2,1.3)-t+u_seed));
   return p + (q-.5)*u_distortion*3.2;
@@ -165,38 +300,48 @@ vec2 vor(vec2 p){ vec2 ip=floor(p), fp=fract(p); float d1=8., d2=8.;
     vec2 h = hash22(ip+g); h = .5+.5*sin(u_time*u_movement*.8 + 6.2831*h);
     float d = length(g+h-fp); if(d<d1){ d2=d1; d1=d; } else if(d<d2) d2=d; }
   return vec2(d1,d2); }
+// Crisp iso-line: f is zero on the line; fwidth turns it into a pixel distance, so widths stay constant on screen.
+vec2 iso(float f, float wpx){
+  float d = abs(f)/max(fwidth(f), 1e-5);
+  return vec2(1.-smoothstep(wpx-.75, wpx+.75, d), d);
+}
 void main(){
   vec2 uv = v_uv; float asp = u_res.x/u_res.y;
   vec2 p = (uv-.5)*vec2(asp,1.)*u_density*3.;
   float t = u_time*u_movement*.35;
-  float v;
-  if(u_style == 0){ // root network: layered ridged noise in domain-warped space
+  float px = u_res.y/1080.;
+  float W = max(.35, u_thickness*12.*px);
+  float m = 0., dmin = 1e3;
+  if(u_style == 0){ // roots: nested noise zero-sets = trunk, branch, hair
     vec2 w = warp(p, t);
-    float r1 = ridge(w), r2 = ridge(w*2.1+vec2(3.7,1.9)+t*.6), r3 = ridge(w*4.3+vec2(9.1,4.4)-t);
-    float th = u_thickness;
-    float main_ = smoothstep(1.-th*.55, 1., r1);
-    float sub = smoothstep(1.-th*.4, 1., r2)*.7;
-    float hair = smoothstep(1.-th*.3, 1., r3)*.4;
-    v = clamp(main_ + sub*(1.-main_*.6) + hair*.6, 0., 1.);
-    v += pow(r1, 9.)*u_glow*.55;
-  } else if(u_style == 1){ // fluid bands
+    vec2 a = iso((fbm(w)-.5)*2., W);
+    vec2 b = iso((fbm(w*2.3+vec2(7.1,3.3)+t*.5)-.5)*2., W*.62);
+    vec2 c = iso((fbm(w*5.1+vec2(2.2,9.1)-t)-.5)*2., W*.4);
+    m = max(a.x, max(b.x*.85, c.x*.65)); dmin = min(a.y, min(b.y, c.y));
+  } else if(u_style == 1){ // topographic fluid contours
     vec2 w = warp(p*.7, t);
-    float f = fbm(w + t*.4);
-    float bands = .5+.5*sin(f*(8.+u_density*10.) + t*3.);
-    v = smoothstep(.5-u_thickness, .5+u_thickness*.3, bands)*(.35+.65*f);
-    v += pow(bands, 6.)*u_glow*.4;
-  } else { // cell membrane
+    float f = fbm(w + t*.4)*(5.+u_density*7.);
+    float d = abs(fract(f+.5)-.5)/max(fwidth(f), 1e-5);
+    m = 1.-smoothstep(W*.6-.75, W*.6+.75, d); dmin = d;
+  } else { // cell membrane: voronoi edges, two scales
     vec2 w = warp(p*.8, t*.5);
-    vec2 d = vor(w*1.2);
-    float edge = d.y - d.x;
-    v = smoothstep(u_thickness*.9, 0., edge);
-    v += exp(-edge*8.)*u_glow*.35 + (1.-smoothstep(0.,.35,d.x))*.12;
+    vec2 v1 = vor(w*1.2); float e1 = v1.y - v1.x;
+    vec2 v2 = vor(w*2.9+3.7); float e2 = v2.y - v2.x;
+    float d1 = e1/max(fwidth(e1),1e-5)*.5, d2 = e2/max(fwidth(e2),1e-5)*.5;
+    m = max(1.-smoothstep(W*.8-.75, W*.8+.75, d1), (1.-smoothstep(W*.45-.75, W*.45+.75, d2))*.6);
+    dmin = min(d1, d2);
   }
-  v = clamp(v, 0., 1.);
-  float tone = fbm(p*.6 + u_seed*1.7 + t);
-  vec3 tint = mix(vec3(1.), mix(FOREST*2.0, vec3(.35,.95,.55), tone), u_green);
-  vec3 col = v * tint;
-  col += FOREST*.35*u_green*(1.-v)*fbm(p*.4 - t)*.5;
+  // growth front expands from the bottom-centre, ragged edge, bright tip
+  float age = length((uv-vec2(.5,-.1))*vec2(asp,1.)) + (fbm(p*.6+u_seed)-.5)*.6;
+  float g = u_growth*2.4 - age;
+  float reveal = smoothstep(0., .05, g);
+  float tip = exp(-abs(g)*22.)*step(u_growth, .999);
+  m *= reveal;
+  float halo = exp(-dmin*.2/px)*u_glow*reveal;
+  vec3 lineCol = mix(vec3(1.), vec3(.84,1.,.9), u_green*.5);
+  vec3 glowCol = mix(vec3(.85), vec3(.16,.62,.36), u_green);
+  vec3 col = m*lineCol + halo*glowCol*.5 + tip*m*vec3(.55,1.,.7)*1.4;
+  col += FOREST*.16*u_green*fbm(p*.5 - t)*reveal;
   vec3 c = clamp(col, 0., 1.);
   if(u_transparent < .5) o = vec4(c, 1.);
   else o = vec4(c, max(c.r, max(c.g, c.b))); // premultiplied: colour never exceeds alpha

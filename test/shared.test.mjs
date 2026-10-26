@@ -153,3 +153,15 @@ test('presets and registries are internally consistent', () => {
   for (const g of GEN_PRESETS) assert.ok(createGeneratorClip(g, 0).gen.params.density > 0);
   assert.notEqual(uid(), uid());
 });
+
+test('premium presets: audio-bound presets carry bindings; text fx and generator growth are wired', () => {
+  const punch = instantiatePreset(EFFECT_PRESETS.find((p) => p.name === 'Beat Punch (audio)'));
+  assert.equal(punch[0].bindings.amount.source, 'beat');
+  punch[0].bindings.amount.amount = 0; // instances must not share binding objects with the preset
+  assert.equal(instantiatePreset(EFFECT_PRESETS.find((p) => p.name === 'Beat Punch (audio)'))[0].bindings.amount.amount, 0.5);
+  for (const t of TEXT_PRESETS) assert.ok(createTextClip(t, 0).text.fx, t.name);
+  const g = createGeneratorClip(GEN_PRESETS[0], 0, 6);
+  assert.deepEqual(g.gen.keyframes.growth.map((k) => k.v), [0, 1]);
+  assert.equal(g.props.blend, 'screen');
+  assert.equal(Object.keys(EFFECTS).length, 17);
+});

@@ -39,11 +39,25 @@ export function drawTextClip(ctx, W, H, clip, t, p) {
       break;
     }
     case 'pulse': scale *= 1 + 0.08 * Math.sin(t * Math.PI * 2 * a.speed); break;
+    case 'slam': { // scale down from 1.7x with overshoot (easeOutBack), quick fade-in, tiny settle shake
+      const e = Math.min(1, u);
+      const back = 1 + 2.70158 * Math.pow(e - 1, 3) + 1.70158 * Math.pow(e - 1, 2);
+      scale *= 1.7 - 0.7 * back;
+      alpha *= Math.min(1, e * 6);
+      if (e < 1) { const k = Math.floor(t * 60); dx = (hash(k) - 0.5) * 0.012 * W * (1 - e); dy = (hash(k + 5) - 0.5) * 0.012 * H * (1 - e); }
+      break;
+    }
+    case 'stutter': { // rapid on/off + position stutter, then holds
+      if (t < dur) { const k = Math.floor(t * 24 * a.speed); alpha *= hash(k + 2) < 0.6 ? 1 : 0; dx = (hash(k) - 0.5) * 0.03 * W; }
+      break;
+    }
+    case 'strobe': alpha *= Math.floor(t * 12 * a.speed) % 2 === 0 ? 1 : 0.12; break;
     default: break;
   }
   if (alpha <= 0.001 || !content) return;
 
   const px = Math.max(4, T.size * H * scale);
+  const FX = { split: 0, shadow: 0, glow: 0, gradient: false, grad1: '#fff', grad2: '#888', ...(T.fx || {}) };
   ctx.save();
   ctx.font = fontString(T, px);
   ctx.letterSpacing = `${p.tracking * px}px`;
@@ -73,16 +87,35 @@ export function drawTextClip(ctx, W, H, clip, t, p) {
     ctx.fillStyle = T.bg.color;
     ctx.fillRect(-bw / 2, -blockH / 2 - pad * 0.6, bw, blockH + pad * 1.2);
   }
-  lines.forEach((l, i) => {
-    const y = (i - (lines.length - 1) / 2) * lh;
-    const x = T.align === 'left' ? -blockW / 2 : T.align === 'right' ? blockW / 2 - widths[i] : -widths[i] / 2;
-    if (T.strokeWidth > 0) {
-      ctx.lineWidth = T.strokeWidth * px;
-      ctx.strokeStyle = T.strokeColor;
-      ctx.strokeText(l, x, y);
-    }
-    ctx.fillStyle = T.color;
+  const lineX = (i) => (T.align === 'left' ? -blockW / 2 : T.align === 'right' ? blockW / 2 - widths[i] : -widths[i] / 2);
+  const lineY = (i) => (i - (lines.length - 1) / 2) * lh;
+  const pass = (paint, ox = 0) => lines.forEach((l, i) => paint(l, lineX(i) + ox, lineY(i)));
+
+  let fill = T.color;
+  if (FX.gradient) { // chrome-style vertical gradient with a bright band near the middle
+    const g = ctx.createLinearGradient(0, -blockH / 2, 0, blockH / 2);
+    g.addColorStop(0, FX.grad1); g.addColorStop(0.48, FX.grad2); g.addColorStop(0.52, FX.grad1); g.addColorStop(1, FX.grad2);
+    fill = g;
+  }
+  // glow (soft, coloured) underneath, then drop shadow for depth
+  if (FX.glow > 0) {
+    ctx.save(); ctx.shadowColor = T.strokeColor && T.strokeWidth > 0 ? T.strokeColor : '#55b982'; ctx.shadowBlur = px * 0.45 * FX.glow;
+    ctx.fillStyle = T.color; pass((l, x, y) => ctx.fillText(l, x, y)); ctx.restore();
+  }
+  if (FX.split > 0) { // RGB fringe: additive red/cyan copies behind the main fill
+    const off = FX.split * px * 0.07;
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = '#ff2a3d'; pass((l, x, y) => ctx.fillText(l, x, y), -off);
+    ctx.fillStyle = '#00e0ff'; pass((l, x, y) => ctx.fillText(l, x, y), off);
+    ctx.restore();
+  }
+  ctx.save();
+  if (FX.shadow > 0) { ctx.shadowColor = `rgba(0,0,0,${0.55 + 0.4 * FX.shadow})`; ctx.shadowBlur = px * 0.14 * FX.shadow; ctx.shadowOffsetY = px * 0.05 * FX.shadow; ctx.shadowOffsetX = px * 0.02 * FX.shadow; }
+  pass((l, x, y) => {
+    if (T.strokeWidth > 0) { ctx.lineWidth = T.strokeWidth * px; ctx.strokeStyle = T.strokeColor; ctx.strokeText(l, x, y); }
+    ctx.fillStyle = fill;
     ctx.fillText(l, x, y);
   });
+  ctx.restore();
   ctx.restore();
 }

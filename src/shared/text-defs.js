@@ -4,7 +4,7 @@ import { createEffect } from './effects-defs.js';
 
 export const FONTS = [
   'Helvetica Neue', 'Arial Black', 'Impact', 'Futura', 'Courier New', 'Menlo', 'Consolas',
-  'Georgia', 'Times New Roman', 'Hiragino Sans', 'Yu Gothic', 'Noto Sans JP', 'sans-serif', 'serif', 'monospace',
+  'Georgia', 'Times New Roman', 'Didot', 'Bodoni 72', 'Baskerville', 'Playfair Display', 'Hiragino Sans', 'Yu Gothic', 'Noto Sans JP', 'sans-serif', 'serif', 'monospace',
 ];
 
 export const TEXT_ANIMATIONS = {
@@ -16,6 +16,9 @@ export const TEXT_ANIMATIONS = {
   jitter: 'Glitch jitter',
   pulse: 'Pulse',
   ticker: 'Ticker scroll',
+  slam: 'Slam in (overshoot)',
+  stutter: 'Stutter cut-in',
+  strobe: 'Strobe',
 };
 
 export function defaultText() {
@@ -33,12 +36,30 @@ export function defaultText() {
     uppercase: false,
     bg: { enabled: false, color: '#1c4d33', pad: 0.25 },
     anim: { type: 'none', duration: 1, speed: 1 },
+    // premium finish: 0..1 strengths (split = RGB fringe, shadow/glow = depth), optional vertical gradient fill
+    fx: { split: 0, shadow: 0, glow: 0, gradient: false, grad1: '#ffffff', grad2: '#7d8f85' },
   };
 }
 
 const mk = (name, text, props, effects = []) => ({ name, text, props, effects });
 
 export const TEXT_PRESETS = [
+  mk('Chrome Slam',
+    { content: 'HIGH HUMAN', font: 'Arial Black', weight: 900, size: 0.24, uppercase: true, color: '#ffffff', lineHeight: 0.95,
+      anim: { type: 'slam', duration: 0.55, speed: 1 }, fx: { split: 0.5, shadow: 0.8, glow: 0.2, gradient: true, grad1: '#ffffff', grad2: '#6f8379' } },
+    { tracking: -0.03 }, [createEffect('film', { grain: 0.3, halation: 0.35 })]),
+  mk('Editorial Didot',
+    { content: 'Organic\nStructures', font: 'Didot', weight: 400, italic: true, size: 0.17, color: '#f4fff8', lineHeight: 0.9,
+      anim: { type: 'fade', duration: 1.4, speed: 1 }, fx: { shadow: 0.6, glow: 0.35, split: 0.12 } },
+    { tracking: -0.015 }, [createEffect('film', { grain: 0.35, halation: 0.5 })]),
+  mk('Stutter Stack',
+    { content: 'NO SIGNAL\nNO SIGNAL\nNO SIGNAL', font: 'Impact', weight: 400, size: 0.16, uppercase: true, color: '#ffffff', lineHeight: 0.88,
+      anim: { type: 'stutter', duration: 0.9, speed: 1 }, fx: { split: 0.7, shadow: 0.5 } },
+    { tracking: 0.01 }, [createEffect('glitch', { amount: 0.3, rate: 10 }), createEffect('chroma', { amount: 0.012 })]),
+  mk('Strobe Caption',
+    { content: 'LIVE FROM THE ROOTS', font: 'Helvetica Neue', weight: 900, size: 0.07, uppercase: true, color: '#7dff9f',
+      anim: { type: 'strobe', duration: 1, speed: 1 }, fx: { glow: 0.9, split: 0.3 } },
+    { tracking: 0.3, y: -0.3 }, [createEffect('bloom', { intensity: 0.6, threshold: 0.35 })]),
   mk('Broadcast Lower Third',
     { content: 'LIVE — HIGH HUMAN LAB', font: 'Menlo', weight: 700, size: 0.05, align: 'left', uppercase: true, color: '#ffffff',
       bg: { enabled: true, color: '#1c4d33', pad: 0.45 }, anim: { type: 'slide', duration: 0.6, speed: 1 } },
@@ -75,7 +96,7 @@ export const TEXT_PRESETS = [
 export function createTextClip(preset, start, duration = 4) {
   const base = defaultText();
   const t = preset?.text || {};
-  const text = { ...base, ...t, bg: { ...base.bg, ...(t.bg || {}) }, anim: { ...base.anim, ...(t.anim || {}) } };
+  const text = { ...base, ...t, bg: { ...base.bg, ...(t.bg || {}) }, anim: { ...base.anim, ...(t.anim || {}) }, fx: { ...base.fx, ...(t.fx || {}) } };
   return createClip({
     type: 'text',
     name: preset?.name || 'Text',
