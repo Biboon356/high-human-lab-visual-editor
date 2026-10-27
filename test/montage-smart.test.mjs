@@ -154,3 +154,17 @@ test('reframeFor: wide source fills a tall canvas and the offset follows the act
   assert.ok(Math.abs(reframeFor(src, cv, { x: 0, y: 0.5 }).x) <= (1920 * (1920 / 1080) / 1080 - 1) / 2 + 1e-6);
   assert.deepEqual(reframeFor({ width: 1080, height: 1920 }, cv, { x: 0.1, y: 0.1 }), { scale: 1, x: 0, y: 0 });
 });
+
+import { tempoAnalysis } from '../src/shared/music-structure.js';
+
+test('tempoAnalysis: a steady click is a valid "song" — even beats, flat medium energy, no drops, a montage can be planned on it', () => {
+  const a = tempoAnalysis(120, 20);
+  assert.equal(a.duration, 20); assert.ok(Math.abs(a.beats[1] - a.beats[0] - 0.5) < 1e-6 && a.beats.at(-1) < 20);
+  const m = musicStructure(a);
+  assert.ok(m.bars.every((b) => Math.abs(b.energy - 0.5) < 1e-9), 'flat energy is medium, not stretched noise');
+  assert.deepEqual(m.drops, []);
+  const { segments } = planSmartMontage({ beats: a.beats, total: 20, structure: m, sources: SOURCES(), seed: 4 });
+  assert.ok(segments.length >= 8);
+  assert.ok(Math.abs(segments.at(-1).start + segments.at(-1).duration - 20) < 1e-6);
+  segments.forEach((s, i) => { if (i) assert.ok(a.beats.some((b) => Math.abs(b - s.start) < 1e-6), `cut ${s.start} is on the click`); });
+});

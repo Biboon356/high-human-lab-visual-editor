@@ -24,7 +24,9 @@ export function musicStructure(a, { barBeats = 4 } = {}) {
   const sorted = [...sm].sort((x, y) => x - y);
   const lo = sorted[Math.floor(sorted.length * 0.05)] ?? 0, hi = sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))] ?? 1;
   const span = Math.max(1e-6, hi - lo);
-  const bars = sm.map((v, i) => ({ start: edges[i], end: edges[i + 1], energy: clamp01((v - lo) / span) }));
+  // (almost) no dynamics at all, e.g. a steady metronome: call it medium energy instead of stretching noise to 0..1
+  const flat = hi - lo < 0.02;
+  const bars = sm.map((v, i) => ({ start: edges[i], end: edges[i + 1], energy: flat ? 0.5 : clamp01((v - lo) / span) }));
 
   // drops: a bar that is much fuller than the two before it
   const drops = [];
@@ -56,4 +58,13 @@ export function musicStructure(a, { barBeats = 4 } = {}) {
     return bars.at(-1).energy;
   };
   return { bars, sections, drops, energyAt };
+}
+
+/** A made-up analysis for "no music": a steady click at `bpm` for `seconds`, flat energy. musicStructure() reads it like any song. */
+export function tempoAnalysis(bpm, seconds, rate = 60) {
+  const n = Math.max(1, Math.round(seconds * rate)), beat = 60 / bpm;
+  const beats = [];
+  for (let t = beat; t < seconds - 0.05; t += beat) beats.push(Math.round(t * 1000) / 1000);
+  const flat = () => new Float32Array(n).fill(0.5);
+  return { rate, duration: seconds, rms: flat(), bass: flat(), mid: flat(), high: flat(), beat: new Float32Array(n), beats, bpm, synthetic: true };
 }

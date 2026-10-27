@@ -1,7 +1,10 @@
 // "Auto-montage" dialog: pick a style, let the app analyse footage and music, see what it decided and why, re-roll or undo.
 import { el, toast, fmtTime } from './dom.js';
 import { store } from '../store.js';
-import { runSmartMontage, buildPlan, applyPlan, MONTAGE_STYLES, MONTAGE_DEFAULTS } from '../engine/montage.js';
+import { runSmartMontage, buildPlan, applyPlan, suggestedSeconds, MONTAGE_STYLES, MONTAGE_DEFAULTS } from '../engine/montage.js';
+import { importResults } from './media-bin.js';
+import { addMediaClip } from '/shared/timeline.js';
+import { audioSources } from '/shared/export-plan.js';
 import { runAnalysis } from './reactive-ui.js';
 import { autoMontage } from './timeline-ui.js';
 
@@ -86,18 +89,42 @@ export function openMontageDialog() {
     drawStrip(canvas, r);
   };
 
+  /** Dead end → two ways out: bring in a song, or cut to a steady tempo. */
+  const noMusicHelp = (e) => {
+    const bpm = el('input', { type: 'number', min: 60, max: 200, step: 1, value: Math.round(store.analysis?.bpm || 120), id: 'mt-bpm', 'aria-label': 'Tempo in BPM' });
+    const secs = el('input', { type: 'number', min: 4, max: 120, step: 1, value: suggestedSeconds(), id: 'mt-seconds', 'aria-label': 'Length in seconds' });
+    const add = el('button', { id: 'mt-add-music', text: 'Add a music file…', onclick: async () => {
+      const results = await window.hh.pickMedia(); if (!results.length) return;
+      const before = new Set(store.project.media.map((m) => m.id));
+      await importResults(results);
+      const song = store.project.media.find((m) => !before.has(m.id) && m.kind === 'audio');
+      if (!song) { toast('That file has no audio I can use as music.', 'error'); return; }
+      const track = store.project.tracks.find((t) => t.kind === 'audio');
+      store.mutate((p) => addMediaClip(p, song.id, track.id, 0));
+      run.onclick();
+    } });
+    const tempo = el('button', { id: 'mt-tempo', class: 'primary', text: 'Cut to a steady tempo', onclick: () => { opts.tempo = { bpm: Math.max(60, Math.min(200, Number(bpm.value) || 120)), seconds: Math.max(4, Math.min(120, Number(secs.value) || 20)) }; run.onclick(); } });
+    return el('div', { class: 'mt-help' },
+      el('div', { class: 'errbox', text: e.message }),
+      el('div', { class: 'hint', text: 'The montage is cut to a beat. Pick one of these:' }),
+      el('div', { class: 'ae-actions' }, add),
+      el('div', { class: 'ae-row' }, el('label', { text: 'Or no music' }), el('div', { class: 'ae-ctl' }, bpm, el('span', { class: 'hint', text: 'BPM' }), secs, el('span', { class: 'hint', text: 'seconds' }), tempo)));
+  };
+
   run.onclick = async () => {
     busy = true; signal = { aborted: false };
     run.disabled = true; closeBtn.disabled = true; cancel.hidden = false; reroll.hidden = true; undo.hidden = true; steps.replaceChildren(); result.replaceChildren();
     try {
       opts.seed = (opts.seed + 1) % 1e6;
-      last = await runSmartMontage({ opts, signal, ensureAnalysis: () => runAnalysis({ quiet: true }), onStep: setStep });
+      const asked = opts.tempo; delete opts.tempo; // the steady-tempo choice applies to this run only
+      last = await runSmartMontage({ opts: asked ? { ...opts, tempo: asked } : opts, signal, ensureAnalysis: () => runAnalysis({ quiet: true }), onStep: setStep });
       steps.querySelectorAll('.ae-step').forEach((x) => { x.classList.add('done'); x.textContent = `✔ ${STEP[x.dataset.k] || x.dataset.k}`; });
       show(last); reroll.hidden = false; undo.hidden = false;
       toast(`Auto-montage: ${last.plan.summary.cuts} cuts on a new video track.`);
     } catch (e) {
       steps.querySelectorAll('.ae-step:not(.done)').forEach((x) => { x.textContent = `✖ ${STEP[x.dataset.k] || x.dataset.k}`; });
-      result.append(el('div', { class: 'errbox', text: e.message }));
+      if (e.code === 'NO_MUSIC' || e.code === 'NO_BEATS') result.append(noMusicHelp(e));
+      else result.append(el('div', { class: 'errbox', text: e.message }));
     } finally { busy = false; run.disabled = false; closeBtn.disabled = false; cancel.hidden = true; signal = null; }
   };
   reroll.onclick = () => {
@@ -113,10 +140,10 @@ export function openMontageDialog() {
   undo.onclick = () => { if (!last) return; store.undo(); last = null; result.replaceChildren(el('div', { class: 'hint', text: 'Undone — the project is back to how it was.' })); undo.hidden = true; reroll.hidden = true; };
   cancel.onclick = async () => { if (signal) signal.aborted = true; await window.hh.montageCancel(); };
 
-  const hasMusic = !!store.project.clips.find((c) => c.type === 'media' && store.project.media.find((m) => m.id === c.mediaId)?.kind === 'audio' || store.project.media.find((m) => m.id === c.mediaId)?.hasAudio);
+  const hasMusic = audioSources(store.project).length > 0;
   const body = el('div', { class: 'modal ae-modal', id: 'montage-modal' },
     el('h3', { text: 'AUTO-MONTAGE  ·  ตัดต่อตามจังหวะเพลง' }),
-    el('div', { class: 'hint', text: hasMusic ? 'Cuts follow the music; shots are chosen from what the footage actually looks like. Everything is analysed on your computer.' : 'Add a music track to the timeline first — the montage is cut to it.' }),
+    el('div', { class: 'hint', text: hasMusic ? 'Cuts follow the music; shots are chosen from what the footage actually looks like. Everything is analysed on your computer.' : 'No music on the timeline yet — you can add a song, or cut to a steady tempo.' }),
     el('section', { class: 'ae-sec' }, el('h4', { text: 'Style · สไตล์' }), styleBtns,
       el('div', { class: 'ae-row' }, el('label', { text: 'Cut rate' }), el('div', { class: 'ae-ctl' }, el('span', { class: 'hint', text: 'calmer' }), intensity, el('span', { class: 'hint', text: 'frantic' }))),
       el('label', { class: 'chk ae-chk' }, reframe, 'Crop wide footage to fit the canvas, following the action')),

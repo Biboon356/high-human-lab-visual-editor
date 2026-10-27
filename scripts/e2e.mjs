@@ -606,6 +606,24 @@ await step('smart montage: analyses footage + music, cuts on beats, explains its
   assert.ok(lit > 15, `the white subject is inside the 9:16 frame (${lit} bright cells)`);
 });
 
+await step('smart montage with no music: the dialog explains and offers a steady tempo (or a song) instead of a dead end', async () => {
+  const silent = path.join(dir, 'silent.mp4');
+  sh(FFMPEG, ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc2=size=320x180:rate=30:duration=12', '-pix_fmt', 'yuv420p', silent]);
+  await resetProject(); await ev((p) => window.__app.importPaths(p), [silent, pic]);
+  await page.click('#tl-montage'); await page.waitForSelector('#montage-modal');
+  await page.click('#mt-run'); await page.waitForSelector('#mt-tempo', { timeout: 30000 });
+  const msg = await ev(() => document.querySelector('#montage-modal .mt-help .errbox').textContent); assert.match(msg, /no music/i);
+  assert.ok(await ev(() => !!document.getElementById('mt-add-music')), 'offers to add a song');
+  await shot('20-montage-no-music');
+  await ev(() => { document.getElementById('mt-bpm').value = '120'; document.getElementById('mt-seconds').value = '10'; });
+  await page.click('#mt-tempo'); await page.waitForSelector('#montage-modal .mt-result', { timeout: 60000 });
+  const r = await ev(() => { const { store } = window.__app; const track = store.project.tracks.find((t) => t.kind === 'video' && store.project.clips.filter((c) => c.trackId === t.id).length >= 4);
+    return store.project.clips.filter((c) => c.trackId === track.id).sort((a, b) => a.start - b.start).map((c) => ({ s: c.start, d: c.duration })); });
+  assert.ok(r.length >= 4, `cuts: ${r.length}`); assert.ok(Math.abs(r.at(-1).s + r.at(-1).d - 10) < 0.05, 'runs for the chosen length');
+  for (const c of r.slice(1)) assert.ok(Math.abs(c.s / 0.5 - Math.round(c.s / 0.5)) < 1e-3, `cut at ${c.s} is on the 120 BPM click`);
+  await ev(() => [...document.querySelectorAll('.modal button')].find((b) => b.textContent === 'Close').click());
+});
+
 await step('cross-dissolve mixes the two pictures (and undoes in one step); the script title lockup draws in the bundled font', async () => {
   const red = path.join(dir, 'red.mp4'), blue = path.join(dir, 'blue.mp4');
   sh(FFMPEG, ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'color=c=0xff0000:s=320x180:r=30:d=6', '-pix_fmt', 'yuv420p', red]);

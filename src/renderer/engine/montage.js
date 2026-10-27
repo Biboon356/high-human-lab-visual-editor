@@ -2,7 +2,8 @@
 // and writes it into the project as ONE undoable step on a new video track.
 import { store } from '../store.js';
 import { addTrack, addMediaClip, dissolveInto } from '/shared/timeline.js';
-import { musicStructure } from '/shared/music-structure.js';
+import { musicStructure, tempoAnalysis } from '/shared/music-structure.js';
+import { audioSources } from '/shared/export-plan.js';
 import { planSmartMontage, MONTAGE_STYLES, reframeFor } from '/shared/smart-montage.js';
 import { EFFECT_PRESETS, instantiatePreset } from '/shared/effects-defs.js';
 
@@ -13,7 +14,12 @@ export const MONTAGE_DEFAULTS = { style: 'hype', intensity: 0.5, reframe: true, 
 export async function prepare({ project = store.project, analysis = store.analysis, onStep = () => {}, signal } = {}) {
   const media = project.media.filter((m) => (m.kind === 'video' || m.kind === 'image') && !m.missing);
   if (!media.length) throw new Error('Import some video clips or images first.');
-  if (!analysis?.beats?.length) throw new Error('No beats found — add a music track to the timeline first.');
+  if (!analysis?.beats?.length) {
+    const hasAudio = audioSources(project).length > 0;
+    const e = new Error(hasAudio ? "I couldn't find a beat in the audio that's on the timeline (speech or ambient sound has no steady pulse)." : 'There is no music on the timeline yet.');
+    e.code = hasAudio ? 'NO_BEATS' : 'NO_MUSIC';
+    throw e;
+  }
   onStep('footage', `Looking at ${media.length} clip${media.length === 1 ? '' : 's'}…`);
   const res = await window.hh.montageAnalyze(media.map((m) => ({ id: m.id, path: m.path, kind: m.kind })));
   if (signal?.aborted) throw new Error('Cancelled.');
@@ -63,9 +69,17 @@ export function applyPlan({ project, plan, opts, prep }) {
   return { track, clips: made };
 }
 
+/** Footage length as a default for "no music": every clip once, clamped to a sensible short-form range. */
+export function suggestedSeconds(project = store.project) {
+  const sum = project.media.filter((m) => (m.kind === 'video' || m.kind === 'image') && !m.missing).reduce((a, m) => a + (m.kind === 'image' ? 3 : m.duration || 0), 0);
+  return Math.max(8, Math.min(30, Math.round(sum)));
+}
+
 export async function runSmartMontage({ opts = {}, onStep = () => {}, signal, ensureAnalysis } = {}) {
-  if (ensureAnalysis && (!store.analysis || store.analysisStale)) { onStep('audio', 'Analysing the music…'); await ensureAnalysis(); }
-  const prep = await prepare({ onStep, signal });
+  let analysis = store.analysis;
+  if (opts.tempo) analysis = tempoAnalysis(opts.tempo.bpm, opts.tempo.seconds); // no music: cut to a steady click instead
+  else if (ensureAnalysis && (!store.analysis || store.analysisStale)) { onStep('audio', 'Analysing the music…'); analysis = await ensureAnalysis() || store.analysis; }
+  const prep = await prepare({ onStep, signal, analysis });
   onStep('plan', 'Choosing shots…');
   const plan = buildPlan({ prep, opts });
   if (!plan.segments.length) throw new Error('Could not build a montage from this material.');

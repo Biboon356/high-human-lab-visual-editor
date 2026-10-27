@@ -103,6 +103,8 @@ None of this has been measured against real Thai recordings yet (see status belo
 - **Wide footage on a tall canvas** is cropped to follow the action, not the centre.
 - The dialog shows what it decided and why (sections, drops, hero shot, unused clips) with an energy/cut strip; **Re-roll** gives different choices from the same analysis, **Undo** removes it in one step. Footage analysis is cached per file, so re-rolls are instant.
 
+**No music?** The dialog does not dead-end: *Add a music file…* brings in a song and builds straight away, or *Cut to a steady tempo* cuts to a metronome at a BPM and length you choose (flat energy, no drops).
+
 **Honest limits:** this is classical signal analysis plus a scoring planner — not a generative or "understanding" AI. It does not recognise faces, people, objects, emotions or what is being said in the footage, so it cannot know which shot is the "story"; it chooses by image quality, motion and music fit. The scoring weights are hand-tuned (unit-tested on synthetic footage and checked end-to-end, not tuned on a large set of real edits). *Classic random montage…* in the dialog keeps the old behaviour.
 
 ## Editorial title cards and cross-dissolves
@@ -167,7 +169,7 @@ Legend: ✅ works and is covered by the automated tests · 🧪 prototype (works
 
 ## Testing
 
-`npm test` runs 82 unit tests. `scripts/e2e.mjs` (48 checks) is a real end-to-end run of the Electron app (see table above): it
+`npm test` runs 83 unit tests. `scripts/e2e.mjs` (49 checks) is a real end-to-end run of the Electron app (see table above): it
 generates test media with ffmpeg, drives the app, reads pixels out of the compositor, and probes exported files.
 Native file dialogs are stubbed at the Electron main-process level; every other path is the production code.
 
