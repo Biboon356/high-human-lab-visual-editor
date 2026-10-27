@@ -10,6 +10,7 @@ import { mountProjectSettings } from './ui/project-settings.js';
 import { openExportDialog, isExporting } from './ui/export-dialog.js';
 import { renderProject } from './engine/exporter.js';
 import { startRoots } from './bg-roots.js';
+import { startAutosave, offerRecovery, writeNow } from './autosave.js';
 
 const $ = (id) => document.getElementById(id);
 const hh = window.hh;
@@ -97,6 +98,9 @@ mountReactive($('reactive'));
 mountProjectSettings($('project-settings'));
 startRoots($('bg-roots'), () => store.playing || isExporting());
 syncChrome();
+startAutosave();
+offersRecovery();
+async function offersRecovery() { try { await offerRecovery({ startup: true }); } catch { /* never block startup */ } }
 
 // ---- keyboard
 addEventListener('keydown', (e) => {
@@ -126,7 +130,7 @@ document.addEventListener('paste', (e) => { if (!inTextField() && store.clipboar
 
 // ---- automation hook (used by scripts/e2e.mjs; harmless in normal use)
 window.__app = {
-  store, preview, timeline, runAnalysis, cutOnBeats, autoMontage, importPaths: async (paths) => importResults(await hh.probePaths(paths)),
+  store, preview, timeline, autosave: { writeNow, offerRecovery }, runAnalysis, cutOnBeats, autoMontage, importPaths: async (paths) => importResults(await hh.probePaths(paths)),
   exportTo: async (outPath, overrides = {}) => {
     const s = store.project.settings;
     const settings = { width: s.width, height: s.height, fps: s.fps, quality: 'draft', format: outPath.endsWith('.webm') ? 'webm' : 'mp4', ...overrides, outPath };

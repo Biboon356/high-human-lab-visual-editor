@@ -93,13 +93,13 @@ Legend: ✅ works and is covered by the automated tests · 🧪 prototype (works
 | Import video / audio / image | ✅ | ffprobe metadata, drag & drop, auto H.264 proxy when Chromium can't decode |
 | Preview + transport | ✅ | play/pause/seek/frame-step/loop; playback is clock-driven with audio-element sync |
 | Multitrack timeline | ✅ | tracks add/mute/hide, place/move/trim/split/delete/duplicate, copy & paste, video thumbnails + audio waveforms, beat markers, snap to clips/playhead/beats, **Cut on beats**, zoom, undo/redo (100 steps) |
-| Project save / open | ✅ | `.hhlab` JSON, atomic write, validation, missing-media detection, relink |
+| Project save / open | ✅ | `.hhlab` JSON, atomic write, validation, missing-media detection, relink, **autosave + crash recovery** (offered on next start) |
 | Effects (23): glitch, grain, cloud noise, wave distortion, fluid warp, blur, colour, CRT, lens chromatic, bloom, film 35mm, VHS, mosh/smear, halftone, pixelate, camera shake/punch, colour flash, **gradient map (duotone), xerox threshold, solarize/channel swap, slice bars, shape mask (circle/rect/diamond/blob), die-cut sticker outline** | ✅ | stack/reorder/enable/remove; 19 built-in presets (Xerox Photocopy, Comic Flash, Die-Cut Sticker, Circle Window, …) (some audio-bound, e.g. *Beat Punch*) + user presets (stored in browser storage) |
 | Typography | ✅ / 🧪 | text clips with font/size/tracking/align/position/rotation/outline/plate, chrome gradient fill, RGB split, shadow, glow, hollow outline text, fit-to-width and 11 animations (incl. slam, stutter, strobe) ✅; fonts come from the installed-font list (typed or picked) — no live font preview 🧪 |
 | Keyframes | 🧪 | per-parameter keys with smooth interpolation, shown on timeline clips; no curve editor, no per-key easing choice, no dragging keys on the timeline |
-| Organic engine | 🧪 | three procedural generators (roots, topographic fluid, cell membrane) drawn as crisp constant-width lines with a keyframable *Growth* front, glow, overlay blend on footage; look is still being tuned |
+| Organic engine | 🧪 | **drawn root systems** (branching, tapering, growing from top/bottom/left/centre) plus contour, topographic-fluid, cell-membrane and dust generators; keyframable *Growth*, hand-drawn boil, overlay blend; look is still being tuned |
 | Audio-reactive | ✅ / 🧪 | amplitude, 3 bands, beat detection and tempo estimate ✅; analysis is whole-mix only (no per-clip source choice), fixed 60 Hz, beats are simple spectral flux 🧪 |
-| Clip speed, fades, auto-montage on beats | ✅ | constant speed with pitch kept; picture + sound fades; seeded beat-synced montage with random looks |
+| Clip speed, fades, cut-in transitions (flash/punch/glitch/whip), auto-montage on beats | ✅ | constant speed with pitch kept; picture + sound fades; seeded beat-synced montage with random looks |
 | Export | ✅ | H.264/AAC and VP9/Opus, 6 resolutions (+project), 24–60 fps, 3 quality levels, progress/ETA, cancel, errors surfaced, output re-probed before "success" |
 | Preview audio | 🧪 | each clip plays through its own media element; no master mixer, meters or waveforms |
 | Packaging for macOS/Windows | 🧪 | electron-builder config present; **not built or signed here** (needs each OS; no code-signing/notarization set up) |
@@ -117,7 +117,7 @@ Legend: ✅ works and is covered by the automated tests · 🧪 prototype (works
 
 ## Testing
 
-`npm test` runs 14 unit tests. `scripts/e2e.mjs` (34 checks) is a real end-to-end run of the Electron app (see table above): it
+`npm test` runs 17 unit tests. `scripts/e2e.mjs` (38 checks) is a real end-to-end run of the Electron app (see table above): it
 generates test media with ffmpeg, drives the app, reads pixels out of the compositor, and probes exported files.
 Native file dialogs are stubbed at the Electron main-process level; every other path is the production code.
 

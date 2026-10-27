@@ -193,6 +193,23 @@ function registerIpc() {
     return { filePath: file };
   });
 
+  // Crash recovery: the renderer pushes the project here while it has unsaved changes.
+  const autosavePath = () => path.join(app.getPath('userData'), 'autosave.hhlab');
+  ipcMain.handle('autosave:write', (_e, json) => {
+    const tmp = `${autosavePath()}.tmp`;
+    fs.writeFileSync(tmp, json);
+    fs.renameSync(tmp, autosavePath());
+    return true;
+  });
+  ipcMain.handle('autosave:read', (_e, opts) => {
+    if ((opts?.startup && process.env.HHLAB_E2E_NO_RECOVERY) || !fs.existsSync(autosavePath())) return null;
+    try {
+      const project = validateProject(JSON.parse(fs.readFileSync(autosavePath(), 'utf8')));
+      for (const m of project.media) { if (fs.existsSync(m.path)) allow(m.path); else m.missing = true; if (m.playPath && fs.existsSync(m.playPath)) allow(m.playPath); }
+      return { project, savedAt: fs.statSync(autosavePath()).mtimeMs };
+    } catch { return null; } // a corrupt autosave must never block startup
+  });
+  ipcMain.handle('autosave:clear', () => { fs.rmSync(autosavePath(), { force: true }); return true; });
   ipcMain.handle('audio:analyze', async (_e, project) => {
     const args = buildAnalysisArgs(project, 22050);
     if (!args) return null;
@@ -213,10 +230,16 @@ function registerIpc() {
     fs.mkdirSync(path.dirname(settings.outPath), { recursive: true });
     const total = Math.round(settings.duration * settings.fps);
     const args = buildExportArgs(project, settings);
+    if (process.env.HHLAB_DUMP_ARGS) fs.writeFileSync(process.env.HHLAB_DUMP_ARGS, JSON.stringify(args)); // debugging aid: capture the exact ffmpeg command
     closeDecoders();
     session = new ExportSession(args, settings.outPath, total, (p) => win?.webContents.send('export:progress', { encoded: Math.min(1, p) }));
     return { ffmpeg: FFMPEG };
   });
+  // Diagnostics for a stuck/slow export (used by the e2e watchdog and handy in bug reports).
+  ipcMain.handle('export:debug', () => ({
+    session: session ? { written: session.written, tail: session.tail.slice(-3), failed: session.failed?.message || null } : null,
+    decoders: [...decoders].map(([id, d]) => ({ id, queued: d.queue.length, ended: d.ended, waiting: d.waiters.length, got: !!d.last, err: d.error?.message || null })),
+  }));
   ipcMain.handle('export:openDecoder', (_e, o) => {
     if (!session) throw new Error('No export session.');
     if (!allowedMedia.has(path.resolve(o.path)) || !fs.existsSync(o.path)) throw new Error(`Source file is missing: ${o.path}`);
@@ -276,4 +299,12 @@ app.whenReady().then(() => {
   createWindow();
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
+// Never leave encoder/decoder processes running if the app quits (or the window is closed) mid-export.
+function killChildren() {
+  closeDecoders();
+  if (session) { session.proc.kill('SIGKILL'); session = null; }
+}
+app.on('before-quit', killChildren);
+process.on('exit', killChildren);
+for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { killChildren(); process.exit(0); });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });

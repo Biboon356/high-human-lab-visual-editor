@@ -31,10 +31,13 @@ export async function renderProject({ project, settings, analysis, onProgress, s
     for (let i = 0; i < total; i++) {
       if (signal.cancelled) throw new ExportCancelled('Export cancelled.');
       const t = i / fps;
+      globalThis.__exportState = { frame: i, total, t, phase: 'decode' };
       await sources.seekAll(project, t + 1e-4, fps);
+      globalThis.__exportState.phase = 'render';
       const r = comp.render({ project, t, sources, features: useReactive ? sampleFeatures(analysis, t) : null });
       if (r.missing.length) throw new Error(`No decoded video frame for "${r.missing[0]}" at ${t.toFixed(2)}s — refusing to export a gap.`);
       const pixels = comp.readPixels();
+      globalThis.__exportState.phase = 'write';
       await pending; // at most one frame in flight to the encoder
       pending = window.hh.exportFrame(pixels);
       pending.catch(() => {}); // observed again at the next `await pending`; this only stops a premature unhandled-rejection report

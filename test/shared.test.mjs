@@ -224,3 +224,9 @@ test('transitions: active only during the first seconds, decaying envelope, none
   assert.equal(ta({ transition: { type: 'none', duration: 1 } }, 0.1), null); assert.equal(ta({}, 0.1), null);
   for (const type of ['punch', 'glitch', 'whip']) { const r = ta({ transition: { type, duration: 0.3 } }, 0.05); assert.ok(r.effects.length >= 1 && r.scaleMul >= 1, type); }
 });
+
+test('export audio graph pads to a finite length (an unbounded apad makes the AAC encoder spin at 100% CPU)', () => {
+  const p = fixture(); addMediaClip(p, 'v', vTrack(p), 0); addMediaClip(p, 'a', aTrack(p), 2);
+  const g = buildAudioGraph(p).filter;
+  assert.match(g, /apad=whole_dur=\d/); assert.ok(!/apad,/.test(g), 'no bare apad');
+});

@@ -37,14 +37,18 @@ const only = process.env.HHLAB_ONLY ? new RegExp(process.env.HHLAB_ONLY, 'i') : 
 const step = async (name, fn) => {
   if (only && !only.test(name)) return;
   const t0 = Date.now();
-  try { await fn(); results.push([name, 'PASS', Date.now() - t0]); console.log(`PASS  ${name} (${Date.now() - t0}ms)`); }
-  catch (e) { results.push([name, 'FAIL', e.message]); console.log(`FAIL  ${name}\n      ${e.message.split('\n').join('\n      ')}`); }
+  // watchdog: if a step is suspiciously slow, dump the export pipeline state so a hang is diagnosable from the log
+  const dog = setInterval(async () => {
+    try { console.log(`      [slow step "${name.slice(0, 40)}" ${Math.round((Date.now() - t0) / 1000)}s] renderer=${JSON.stringify(await page.evaluate(() => globalThis.__exportState))} main=${JSON.stringify(await page.evaluate(() => window.hh.exportDebug()))}`); } catch { /* page busy */ }
+  }, 60000);
+  try { await fn(); clearInterval(dog); results.push([name, 'PASS', Date.now() - t0]); console.log(`PASS  ${name} (${Date.now() - t0}ms)`); }
+  catch (e) { clearInterval(dog); results.push([name, 'FAIL', e.message]); console.log(`FAIL  ${name}\n      ${e.message.split('\n').join('\n      ')}`); }
 };
 
 const app = await _electron.launch({
   executablePath: req('electron'),
   args: [root, '--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
-  env: { ...process.env, HHLAB_E2E: '1' },
+  env: { ...process.env, HHLAB_E2E: '1', HHLAB_E2E_NO_RECOVERY: '1' },
 });
 const page = await app.firstWindow();
 const logs = [];
@@ -581,6 +585,31 @@ await step('cut-in transitions: flash/punch/glitch/whip change only the first fr
   for (const [type, r] of Object.entries(res)) { assert.ok(r.early > 2, `${type} visibly alters the first frames: ${JSON.stringify(res)}`); assert.ok(r.late < 0.5, `${type} leaves later frames untouched: ${JSON.stringify(res)}`); }
 });
 
+await step('autosave: unsaved work is written to disk, restored after a "crash", cleared by saving', async () => {
+  await resetProject(); await ev((p) => window.__app.importPaths([p]), clip);
+  await ev(() => window.__app.store.mutate((p) => { p.name = 'crash-test'; }));
+  assert.equal(await ev(() => window.__app.autosave.writeNow()), true);
+  const ap = path.join(await app.evaluate(({ app: a }) => a.getPath('userData')), 'autosave.hhlab');
+  const stored = fs.readFileSync(ap, 'utf8');
+  assert.equal(JSON.parse(stored).name, 'crash-test'); assert.equal(JSON.parse(stored).clips.length, 1);
+  // simulate a restart: wipe state, accept the restore prompt
+  await ev(async () => { const { createProject } = await import('/shared/project.js'); window.__app.store.loadProject(createProject()); });
+  await ev(async () => { const a = window.hh; window.__saved = await a.autosaveRead(); });
+  // loadProject cleared the autosave (clean state) — write it back like a crashed session would have left it
+  fs.writeFileSync(ap, stored);
+  page.once('dialog', (d) => d.accept());
+  assert.equal(await ev(() => window.__app.autosave.offerRecovery()), true);
+  const r = await ev(() => ({ name: window.__app.store.project.name, clips: window.__app.store.project.clips.length, dirty: window.__app.store.dirty }));
+  assert.deepEqual(r, { name: 'crash-test', clips: 1, dirty: true });
+  await settle(900); assert.ok((await px()).lit > 0.3, 'restored project renders (media access re-granted)');
+  // saving makes the autosave obsolete
+  await ev((f) => window.hh.saveProject(window.__app.store.project, f, false), path.join(dir, 'after-restore.hhlab')); await ev(() => window.__app.store.setDirty(false)); await settle(300);
+  assert.equal(fs.existsSync(ap), false, 'autosave removed after a clean state');
+  // a corrupt autosave must not break startup
+  fs.writeFileSync(ap, '{not json');
+  assert.equal(await ev(() => window.__app.autosave.offerRecovery()), false);
+});
+
 await step('light theme + collapsible panels', async () => {
   await ev(() => { document.getElementById('toggle-theme').click(); document.getElementById('toggle-left').click(); });
   await settle(300); await shot('11-light-collapsed');
@@ -590,7 +619,21 @@ await step('light theme + collapsible panels', async () => {
 
 const bad = logs.filter((l) => !/GPU stall|swiftshader|GL Driver Message|Automatic fallback/i.test(l));
 await step('no unexpected console errors during the whole run', async () => { assert.deepEqual(bad, []); });
-await app.close();
+// Quitting mid-export must not leave ffmpeg processes behind (they would burn CPU forever).
+let orphanCheck = 'skipped';
+try {
+  const marker = `orphan-check-${Date.now()}`;
+  await resetProject(); await ev((p) => window.__app.importPaths([p]), clip);
+  ev((o) => window.__app.exportTo(o, { width: 1280, height: 720, fps: 30, quality: 'high' }), path.join(dir, `${marker}.mp4`)).catch(() => {});
+  await page.waitForTimeout(2500);
+  const alive = () => spawnSync('pgrep', ['-f', `${marker}`], { encoding: 'utf8' }).stdout.trim().split('\n').filter(Boolean).length;
+  const before = alive();
+  await app.close();
+  await new Promise((r) => setTimeout(r, 1500));
+  orphanCheck = before > 0 && alive() === 0 ? 'ok' : `before=${before} after=${alive()}`;
+} catch (e) { orphanCheck = `error: ${e.message.split('\n')[0]}`; }
+results.push(['no ffmpeg left running after quitting mid-export', orphanCheck === 'ok' ? 'PASS' : 'FAIL', orphanCheck]);
+console.log(orphanCheck === 'ok' ? 'PASS  no ffmpeg left running after quitting mid-export' : `FAIL  no ffmpeg left running after quitting mid-export\n      ${orphanCheck}`);
 const failed = results.filter((r) => r[1] === 'FAIL').length;
 console.log(`\n${results.length - failed}/${results.length} passed. Artifacts: ${dir}`);
 process.exit(failed ? 1 : 0);

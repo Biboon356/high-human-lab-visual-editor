@@ -58,7 +58,7 @@ export function buildAudioGraph(project, firstInput = 0, sampleRate = 48000) {
     labels.push(`[a${n}]`);
   });
   const total = Math.max(0.1, projectDuration(project));
-  parts.push(`${labels.join('')}amix=inputs=${labels.length}:normalize=0:duration=longest,apad,atrim=end=${total.toFixed(4)}[aout]`);
+  parts.push(`${labels.join('')}amix=inputs=${labels.length}:normalize=0:duration=longest,apad=whole_dur=${total.toFixed(4)},atrim=end=${total.toFixed(4)}[aout]`);
   return { inputs: srcs.map((s) => s.media.path), filter: parts.join(';'), mapLabel: '[aout]' };
 }
 
