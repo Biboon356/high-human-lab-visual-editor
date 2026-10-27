@@ -50,6 +50,7 @@ export function createClip(fields) {
     speed: 1, // playback rate of the source (media clips); duration is timeline time, so source span = duration * speed
     fadeIn: 0, // seconds (visual opacity + audio volume ramp)
     fadeOut: 0,
+    transition: { type: 'none', duration: 0.25 }, // look applied during the first `duration` seconds of the clip (cut transition)
     props: defaultProps(),
     keyframes: {}, // propKey -> [{t, v}]  (t is clip-relative seconds)
     bindings: {}, // propKey -> {source, amount}
@@ -86,6 +87,7 @@ export function validateProject(p) {
     c.speed = c.speed > 0 ? c.speed : 1;
     c.fadeIn ||= 0;
     c.fadeOut ||= 0;
+    c.transition ||= { type: 'none', duration: 0.25 };
     c.keyframes ||= {};
     c.bindings ||= {};
     c.effects ||= [];

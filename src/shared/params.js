@@ -52,3 +52,23 @@ export function fadeFactor(clip, t) {
   if (clip.fadeOut > 0) f = Math.min(f, Math.max(0, (clip.duration - t) / clip.fadeOut));
   return Math.min(1, f);
 }
+
+export const TRANSITIONS = { none: 'None', flash: 'Flash cut', punch: 'Zoom punch', glitch: 'Glitch burst', whip: 'Whip slices' };
+
+/**
+ * Transition-in envelope for a clip at clip-relative time t. Returns null when inactive, otherwise
+ * {scaleMul, effects:[{type, params}]} to apply on top of the clip's own look. e decays 1 → 0 over the duration.
+ */
+export function transitionAt(clip, t) {
+  const tr = clip.transition;
+  if (!tr || tr.type === 'none' || !(tr.duration > 0) || t < 0 || t >= tr.duration) return null;
+  const e = 1 - t / tr.duration;
+  const fx = (type, params) => ({ type, enabled: true, params, keyframes: {}, bindings: {} });
+  switch (tr.type) {
+    case 'flash': return { scaleMul: 1 + 0.04 * e, effects: [fx('color', { brightness: 1.3 * e * e })] };
+    case 'punch': return { scaleMul: 1 + 0.22 * e * e, effects: [fx('chroma', { amount: 0.03 * e, radial: 1 })] };
+    case 'glitch': return { scaleMul: 1, effects: [fx('glitch', { amount: 0.9 * e, split: 0.03 * e, rate: 20, blocks: 0.06 }), fx('chroma', { amount: 0.02 * e })] };
+    case 'whip': return { scaleMul: 1 + 0.08 * e, effects: [fx('slices', { bands: 7, shift: 0.45 * e, black: 0, rate: 30, split: 0.02 * e })] };
+    default: return null;
+  }
+}

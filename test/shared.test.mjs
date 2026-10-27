@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createProject, uid, validateProject, createClip } from '../src/shared/project.js';
 import { setSpeed, addMediaClip, moveClip, trimStart, trimEnd, splitClip, deleteClip, activeVisualClips, projectDuration, addClipRaw, overlaps } from '../src/shared/timeline.js';
 import { evalTrack, setKey, removeKey } from '../src/shared/keyframes.js';
-import { resolveParam } from '../src/shared/params.js';
+import { transitionAt, resolveParam } from '../src/shared/params.js';
 import { analyze, sampleFeatures } from '../src/shared/audio-analysis.js';
 import { tempoChain, fadeFilters, buildExportArgs, buildAudioGraph, validateExportSettings, buildAnalysisArgs } from '../src/shared/export-plan.js';
 import { buildRoots } from '../src/shared/roots.js';
@@ -213,4 +213,14 @@ test('roots: deterministic, bounded, tapered, births normalised, branching incre
   assert.ok(buildRoots({ seed: 5, density: 3 }).count > buildRoots({ seed: 5, density: 0.4 }).count, 'denser -> more segments');
   for (const origin of [0, 1, 2, 3]) assert.ok(buildRoots({ origin }).count > 20, `origin ${origin}`);
   const depths = new Set(); for (let i = 0; i < a.count; i++) depths.add(a.segs[i * 8 + 7]); assert.ok(depths.size >= 3, 'trunk + several branch orders');
+});
+
+test('transitions: active only during the first seconds, decaying envelope, none is inert', async () => {
+  const { transitionAt: ta } = await import('../src/shared/params.js');
+  const c = { transition: { type: 'flash', duration: 0.4 } };
+  const a = ta(c, 0), b = ta(c, 0.2), e = ta(c, 0.39);
+  assert.ok(a.effects[0].params.brightness > b.effects[0].params.brightness && b.effects[0].params.brightness > e.effects[0].params.brightness, 'flash decays');
+  assert.equal(ta(c, 0.4), null); assert.equal(ta(c, 2), null); assert.equal(ta(c, -1), null);
+  assert.equal(ta({ transition: { type: 'none', duration: 1 } }, 0.1), null); assert.equal(ta({}, 0.1), null);
+  for (const type of ['punch', 'glitch', 'whip']) { const r = ta({ transition: { type, duration: 0.3 } }, 0.05); assert.ok(r.effects.length >= 1 && r.scaleMul >= 1, type); }
 });

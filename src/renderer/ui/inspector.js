@@ -5,7 +5,7 @@ import { findMedia } from '/shared/project.js';
 import { setSpeed, MIN_SPEED, MAX_SPEED } from '/shared/timeline.js';
 import { toast } from './dom.js';
 import { EFFECTS, EFFECT_PRESETS, createEffect, instantiatePreset } from '/shared/effects-defs.js';
-import { CLIP_PROPS, TEXT_PROPS, BLEND_MODES } from '/shared/params.js';
+import { CLIP_PROPS, TEXT_PROPS, BLEND_MODES, TRANSITIONS } from '/shared/params.js';
 import { TEXT_ANIMATIONS } from '/shared/text-defs.js';
 import { ensureFontList } from './fonts.js';
 import { GEN_PARAMS, GEN_STYLES } from '/shared/organic-defs.js';
@@ -63,6 +63,12 @@ export function mountInspector(root) {
       return flatRow(label, field(i, 'input', (n) => { clip[key] = Number(n.value); }));
     };
     body.push(fadeRow('Fade in (s)', 'fadeIn'), fadeRow('Fade out (s)', 'fadeOut'));
+    if (clip.type !== 'media' || media?.kind !== 'audio') {
+      clip.transition ||= { type: 'none', duration: 0.25 };
+      const tsel = field(el('select', {}, Object.entries(TRANSITIONS).map(([k, v]) => el('option', { value: k, text: v, ...(k === clip.transition.type ? { selected: true } : {}) }))), 'change', (i) => { clip.transition.type = i.value; });
+      const tdur = field(el('input', { type: 'range', min: 0.05, max: 1.5, step: 0.05, value: clip.transition.duration }), 'input', (i) => { clip.transition.duration = Number(i.value); });
+      body.push(flatRow('Cut-in look', tsel), flatRow('Cut-in length', tdur));
+    }
     if (media?.hasAudio) {
       const vol = el('input', { type: 'range', min: 0, max: 1.5, step: 0.01, value: clip.volume ?? 1 });
       body.push(flatRow('Volume', field(vol, 'input', (i) => { clip.volume = Number(i.value); }, { structural: true })));

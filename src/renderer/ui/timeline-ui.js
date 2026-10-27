@@ -234,6 +234,7 @@ export async function cutOnBeats(n = 4) {
   return made;
 }
 
+const MONTAGE_TRANSITIONS = ['flash', 'punch', 'glitch', 'none', 'whip', 'punch'];
 const MONTAGE_LOOKS = [null, 'Xerox Photocopy', 'Comic Flash (red/yellow)', null, 'Midnight Purple', 'Neon Solarize', 'Halftone Print (B&W)', 'Tour Tape (VHS)'];
 
 /** Fills a fresh video track with the imported clips/images, cut on the beat grid of the music. */
@@ -253,6 +254,7 @@ export async function autoMontage({ every = 2, looks = true, seed = Date.now() %
     clip.duration = seg.duration; clip.in = seg.in; clip.start = seg.start;
     const look = looks ? MONTAGE_LOOKS[Math.abs((seed >> 3) + i * 5 + (i >> 1)) % MONTAGE_LOOKS.length] : null;
     if (look) clip.effects = instantiatePreset(EFFECT_PRESETS.find((p) => p.name === look));
+    if (looks && i > 0) clip.transition = { type: MONTAGE_TRANSITIONS[Math.abs((seed >> 5) + i * 3) % MONTAGE_TRANSITIONS.length], duration: 0.2 };
   });
   store.touch('project');
   toast(`Auto-montage: ${plan.length} cuts on ${every === 1 ? 'every beat' : `every ${every}th beat`}, on a new video track (drag it down or hide the old one).`);

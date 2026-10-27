@@ -568,6 +568,19 @@ await step('root system generator: branching roots grow over time in preview and
   const d = fs.readFileSync(raw); let n = 0; for (const x of d) if (x > 120) n++; assert.ok(n / d.length > 0.04, `exported frame shows the roots (${(n / d.length).toFixed(3)})`);
 });
 
+await step('cut-in transitions: flash/punch/glitch/whip change only the first frames of a clip', async () => {
+  await resetProject(); await ev((p) => window.__app.importPaths([p]), clip);
+  const grabAt = async (t) => { await ev((t) => window.__app.store.setPlayhead(t), t); await settle(450); return ev(() => window.__grab(48, 27)); };
+  const diff = (a, b) => a.reduce((s, v, i) => s + Math.abs(v - b[i]), 0) / a.length;
+  const base0 = await grabAt(0.04), base1 = await grabAt(1.5);
+  const res = {};
+  for (const type of ['flash', 'punch', 'glitch', 'whip']) {
+    await ev((type) => { const { store } = window.__app; store.mutate((p) => { p.clips[0].transition = { type, duration: 0.4 }; }); }, type);
+    res[type] = { early: +diff(base0, await grabAt(0.04)).toFixed(2), late: +diff(base1, await grabAt(1.5)).toFixed(2) };
+  }
+  for (const [type, r] of Object.entries(res)) { assert.ok(r.early > 2, `${type} visibly alters the first frames: ${JSON.stringify(res)}`); assert.ok(r.late < 0.5, `${type} leaves later frames untouched: ${JSON.stringify(res)}`); }
+});
+
 await step('light theme + collapsible panels', async () => {
   await ev(() => { document.getElementById('toggle-theme').click(); document.getElementById('toggle-left').click(); });
   await settle(300); await shot('11-light-collapsed');

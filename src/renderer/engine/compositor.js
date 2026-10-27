@@ -6,7 +6,7 @@ import { activeVisualClips } from '/shared/timeline.js';
 import { findMedia } from '/shared/project.js';
 import { EFFECTS } from '/shared/effects-defs.js';
 import { GEN_PARAMS } from '/shared/organic-defs.js';
-import { resolveParam, resolveClipProps, fadeFactor } from '/shared/params.js';
+import { resolveParam, resolveClipProps, fadeFactor, transitionAt } from '/shared/params.js';
 import { drawTextClip } from './text-renderer.js';
 import { drawRoots } from './roots-renderer.js';
 
@@ -213,6 +213,8 @@ export class Compositor {
       const tl = t - clip.start;
       const props = resolveClipProps(clip, tl, features);
       props.opacity *= fadeFactor(clip, tl);
+      const trans = transitionAt(clip, tl);
+      if (trans) props.scale *= trans.scaleMul;
       let ready = false;
 
       if (clip.type === 'media') {
@@ -245,7 +247,8 @@ export class Compositor {
       if (!ready) continue;
 
       let cur = this.fbos.a, other = this.fbos.b;
-      for (const fx of clip.effects) {
+      const chain = trans ? [...clip.effects, ...trans.effects] : clip.effects;
+      for (const fx of chain) {
         if (!fx.enabled || !EFFECTS[fx.type]) continue;
         this._runEffect(fx, cur, other, clip, tl, features, t);
         [cur, other] = [other, cur];
