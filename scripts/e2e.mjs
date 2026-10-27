@@ -531,6 +531,31 @@ await step('preview honours speed: while playing, the video element runs at 2x t
   assert.equal(r.rate, 2); assert.ok(Math.abs(r.vt - 2 * r.t) < 0.5, `video time ${r.vt} ≈ 2 × timeline ${r.t}`);
 });
 
+await step('auto-montage: fills a new track on the beat grid from imported media, random looks applied, exports real video', async () => {
+  await resetProject(); await ev(async ([a, b, c]) => { await window.__app.importPaths([a, b, c]); const { store } = window.__app; const { addMediaClip } = await import('/shared/timeline.js');
+    store.mutate((p) => addMediaClip(p, p.media.find((m) => m.kind === 'audio').id, p.tracks.find((t) => t.kind === 'audio').id, 0)); }, [clip, pic, kick]);
+  await ev(() => document.getElementById('tl-beat-n').value = '2'); await ev(() => window.__app.runAnalysis({ quiet: true }));
+  const n = await ev(() => window.__app.autoMontage({ every: 2, looks: true, seed: 3 }));
+  assert.ok(n >= 6, `cuts created: ${n}`);
+  const r = await ev(() => { const { store } = window.__app; const track = store.project.tracks.find((t) => t.kind === 'video' && store.project.clips.filter((c) => c.trackId === t.id).length >= 6);
+    const cs = store.project.clips.filter((c) => c.trackId === track.id).sort((a, b) => a.start - b.start); return { cs: cs.map((c) => ({ s: c.start, d: c.duration, m: c.mediaId, fx: c.effects.length })), beats: store.analysis.beats, dur: store.analysis.duration }; });
+  for (let i = 1; i < r.cs.length; i++) assert.ok(Math.abs(r.cs[i].s - (r.cs[i - 1].s + r.cs[i - 1].d)) < 1e-6, 'gapless');
+  for (const c of r.cs.slice(1)) assert.ok(r.beats.some((b) => Math.abs(b - c.s) < 0.01), `cut at ${c.s.toFixed(2)} is on a beat`);
+  assert.ok(r.cs.some((c) => c.fx > 0), 'some cuts got a look'); assert.ok(new Set(r.cs.map((c) => c.m)).size === 2, 'both video and image used');
+  assert.ok(Math.abs(r.cs.at(-1).s + r.cs.at(-1).d - r.dur) < 0.05, 'runs to the end of the music');
+  const out = path.join(dir, 'montage.mp4'); await ev((o) => window.__app.exportTo(o, { width: 320, height: 180, fps: 15 }), out);
+  const v = probe(out); assert.ok(Math.abs(Number(v.format.duration) - r.dur) < 0.3 && v.streams.some((s) => s.codec_type === 'audio'), 'rendered montage has the music and its length');
+});
+
+await step('export dialog: platform preset sets 9:16 / fps / quality', async () => {
+  await resetProject(); await ev((p) => window.__app.importPaths([p]), clip);
+  await page.click('[data-act="export"]'); await page.waitForSelector('.modal');
+  await page.selectOption('.modal select >> nth=0', 'tiktok');
+  const v = await ev(() => [...document.querySelectorAll('.modal select')].map((s) => s.value));
+  assert.deepEqual(v.slice(0, 4), ['tiktok', 'vertical-1080', '30', 'high']);
+  await ev(() => [...document.querySelectorAll('.modal button')].find((b) => b.textContent === 'Close').click());
+});
+
 await step('light theme + collapsible panels', async () => {
   await ev(() => { document.getElementById('toggle-theme').click(); document.getElementById('toggle-left').click(); });
   await settle(300); await shot('11-light-collapsed');

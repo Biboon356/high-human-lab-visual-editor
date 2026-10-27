@@ -2,7 +2,7 @@ import { store } from './store.js';
 import { toast } from './ui/dom.js';
 import { createProject } from '/shared/project.js';
 import { mountPreview } from './ui/preview.js';
-import { mountTimeline, splitSelected, deleteSelected, duplicateSelected, copySelected, pasteClip, cutOnBeats } from './ui/timeline-ui.js';
+import { mountTimeline, splitSelected, deleteSelected, duplicateSelected, copySelected, pasteClip, cutOnBeats, autoMontage } from './ui/timeline-ui.js';
 import { mountInspector } from './ui/inspector.js';
 import { mountMediaBin, importResults } from './ui/media-bin.js';
 import { mountReactive, runAnalysis } from './ui/reactive-ui.js';
@@ -126,7 +126,7 @@ document.addEventListener('paste', (e) => { if (!inTextField() && store.clipboar
 
 // ---- automation hook (used by scripts/e2e.mjs; harmless in normal use)
 window.__app = {
-  store, preview, timeline, runAnalysis, cutOnBeats, importPaths: async (paths) => importResults(await hh.probePaths(paths)),
+  store, preview, timeline, runAnalysis, cutOnBeats, autoMontage, importPaths: async (paths) => importResults(await hh.probePaths(paths)),
   exportTo: async (outPath, overrides = {}) => {
     const s = store.project.settings;
     const settings = { width: s.width, height: s.height, fps: s.fps, quality: 'draft', format: outPath.endsWith('.webm') ? 'webm' : 'mp4', ...overrides, outPath };

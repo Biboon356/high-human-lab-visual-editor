@@ -21,6 +21,14 @@ export function openExportDialog() {
   if (![24, 25, 30, 50, 60].includes(s.fps)) fps.prepend(el('option', { value: s.fps, text: `${s.fps} fps`, selected: true }));
   const quality = el('select', {}, Object.keys(QUALITY).map((q) => el('option', { value: q, text: q, ...(q === 'standard' ? { selected: true } : {}) })));
   const format = sel(Object.fromEntries(Object.entries(FORMATS).map(([k, v]) => [k, v.label])), 'mp4');
+  const PLATFORMS = {
+    custom: { label: 'Custom' },
+    tiktok: { label: 'TikTok / Reels / Shorts — 1080×1920 (9:16)', res: 'vertical-1080', fps: 30, quality: 'high', format: 'mp4' },
+    youtube: { label: 'YouTube — 1080p', res: '1080p', fps: 30, quality: 'high', format: 'mp4' },
+    feed: { label: 'Instagram feed — 1080×1350 (4:5)', res: 'portrait-4x5', fps: 30, quality: 'high', format: 'mp4' },
+  };
+  const platform = el('select', {}, Object.entries(PLATFORMS).map(([k, v]) => el('option', { value: k, text: v.label })));
+  platform.addEventListener('change', () => { const p = PLATFORMS[platform.value]; if (!p.res) return; res.value = p.res; fps.value = p.fps; if (![...fps.options].some((o) => o.value === String(p.fps))) fps.prepend(el('option', { value: p.fps, text: `${p.fps} fps` })); fps.value = p.fps; quality.value = p.quality; format.value = p.format; });
   const pathIn = el('input', { type: 'text', readonly: true, placeholder: 'Choose output file…' });
   const pick = el('button', { text: 'Choose…', onclick: async () => {
     const p = await window.hh.pickExportPath(store.project.name || 'export', format.value);
@@ -36,7 +44,7 @@ export function openExportDialog() {
 
   const modal = el('div', { class: 'modal-back' }, el('div', { class: 'modal' },
     el('h3', { text: 'EXPORT VIDEO' }),
-    el('div', { class: 'grid' }, 'Resolution', res, 'Frame rate', fps, 'Quality', quality, 'Format', format, 'Output', el('div', { style: 'display:flex;gap:6px' }, pathIn, pick)),
+    el('div', { class: 'grid' }, 'Preset', platform, 'Resolution', res, 'Frame rate', fps, 'Quality', quality, 'Format', format, 'Output', el('div', { style: 'display:flex;gap:6px' }, pathIn, pick)),
     el('div', { class: 'hint', text: `Duration ${projectDuration(store.project).toFixed(2)}s. Frames are rendered offline with the same engine as the preview, then encoded by ffmpeg.` }),
     bar, status, el('div', { class: 'actions' }, cancel, close, start)));
   root.replaceChildren(modal);

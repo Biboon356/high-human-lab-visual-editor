@@ -6,6 +6,7 @@ import { evalTrack, setKey, removeKey } from '../src/shared/keyframes.js';
 import { resolveParam } from '../src/shared/params.js';
 import { analyze, sampleFeatures } from '../src/shared/audio-analysis.js';
 import { tempoChain, fadeFilters, buildExportArgs, buildAudioGraph, validateExportSettings, buildAnalysisArgs } from '../src/shared/export-plan.js';
+import { planMontage } from '../src/shared/montage.js';
 import { createEffect, EFFECT_PRESETS, instantiatePreset, EFFECTS } from '../src/shared/effects-defs.js';
 import { createTextClip, TEXT_PRESETS } from '../src/shared/text-defs.js';
 import { createGeneratorClip, GEN_PRESETS } from '../src/shared/organic-defs.js';
@@ -183,4 +184,19 @@ test('speed: duration follows source span, trims/splits respect it, tempo chains
   const g = buildAudioGraph(q).filter;
   assert.ok(g.includes('atrim=start=0.0000:end=8.0000') && g.includes('atempo=2.00000') && g.includes('afade=t=in:st=0:d=0.500') && g.includes('afade=t=out:st=3.000:d=1.000'), g);
   assert.equal(fadeFilters({ duration: 2, fadeIn: 0, fadeOut: 0 }), '');
+});
+
+test('montage planner: contiguous, beat-aligned, within source bounds, deterministic, uses every clip before repeating', () => {
+  const beats = Array.from({ length: 16 }, (_, i) => 0.5 + i * 0.5); // 120 bpm
+  const media = [{ id: 'a', kind: 'video', duration: 6 }, { id: 'b', kind: 'video', duration: 3 }, { id: 'c', kind: 'image', duration: 0 }];
+  const plan = planMontage({ beats, every: 2, total: 8.5, media, seed: 7 });
+  assert.equal(plan[0].start, 0);
+  for (let i = 1; i < plan.length; i++) assert.ok(Math.abs(plan[i].start - (plan[i - 1].start + plan[i - 1].duration)) < 1e-9, 'gapless');
+  assert.ok(Math.abs(plan.at(-1).start + plan.at(-1).duration - 8.5) < 1e-9, 'fills to the end of the music');
+  for (const s of plan) { const m = media.find((x) => x.id === s.mediaId); assert.ok(m.kind === 'image' || s.in + s.duration <= m.duration + 1e-9, `${s.mediaId} stays inside its source`); }
+  assert.deepEqual(plan.slice(1, -1).map((s) => +(s.start + s.duration).toFixed(2)).slice(0, 3), [1.5, 2.5, 3.5], 'cuts land on beats 0,2,4… (1s apart) — i.e. real beat times');
+  assert.deepEqual(plan, planMontage({ beats, every: 2, total: 8.5, media, seed: 7 }), 'same seed -> same plan');
+  assert.notDeepEqual(plan.map((s) => s.mediaId), planMontage({ beats, every: 2, total: 8.5, media, seed: 8 }).map((s) => s.mediaId));
+  assert.deepEqual(new Set(plan.slice(0, 3).map((s) => s.mediaId)).size, 3, 'first three cuts use three different sources');
+  assert.deepEqual(planMontage({ beats, every: 2, total: 8, media: [{ id: 'x', kind: 'audio', duration: 9 }] }), [], 'audio-only media is ignored');
 });

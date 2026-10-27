@@ -2,6 +2,8 @@
 import { el, toast } from './dom.js';
 import { runAnalysis } from './reactive-ui.js';
 import { visualsFor, drawVisuals } from '../engine/media-cache.js';
+import { planMontage } from '/shared/montage.js';
+import { EFFECT_PRESETS, instantiatePreset } from '/shared/effects-defs.js';
 import { store } from '../store.js';
 import { overlaps, trackEnd, canPlace, clipEnd, projectDuration, moveClip, trimStart, trimEnd, splitClip, deleteClip, addMediaClip, addTrack, clipKind } from '/shared/timeline.js';
 import { findMedia, findTrack, uid } from '/shared/project.js';
@@ -188,6 +190,7 @@ export function mountTimeline() {
   store.on('project', render);
   store.on('analysis', render);
   store.on('mediavis', render);
+  document.getElementById('tl-montage').onclick = () => autoMontage({ every: Number(document.getElementById('tl-beat-n').value), looks: document.getElementById('tl-montage-looks').checked });
   document.getElementById('tl-cut-beats').onclick = () => cutOnBeats(Number(document.getElementById('tl-beat-n').value));
   store.on('selection', () => { for (const n of content.querySelectorAll('.clip')) n.classList.toggle('sel', n.dataset.clip === store.selection); });
   store.on('playhead', () => { placePlayhead(); followPlayhead(); });
@@ -229,6 +232,31 @@ export async function cutOnBeats(n = 4) {
   store.touch('project');
   toast(`Cut into ${made + 1} pieces on every ${n === 1 ? '' : n + 'th '}beat.`);
   return made;
+}
+
+const MONTAGE_LOOKS = [null, 'Xerox Photocopy', 'Comic Flash (red/yellow)', null, 'Midnight Purple', 'Neon Solarize', 'Halftone Print (B&W)', 'Tour Tape (VHS)'];
+
+/** Fills a fresh video track with the imported clips/images, cut on the beat grid of the music. */
+export async function autoMontage({ every = 2, looks = true, seed = Date.now() % 1e6 } = {}) {
+  const media = store.project.media.filter((m) => (m.kind === 'video' || m.kind === 'image') && !m.missing);
+  if (!media.length) { toast('Import some video clips or images first.', 'error'); return 0; }
+  if (!store.analysis || store.analysisStale) await runAnalysis({ quiet: true });
+  const a = store.analysis;
+  if (!a?.beats.length) { toast('No beats found — add a music track to the timeline first.', 'error'); return 0; }
+  const plan = planMontage({ beats: a.beats, every, total: a.duration, media, seed });
+  if (!plan.length) return 0;
+  store.snapshot();
+  const track = addTrack(store.project, 'video');
+  plan.forEach((seg, i) => {
+    const clip = addMediaClip(store.project, seg.mediaId, track.id, seg.start);
+    if (!clip) return;
+    clip.duration = seg.duration; clip.in = seg.in; clip.start = seg.start;
+    const look = looks ? MONTAGE_LOOKS[Math.abs((seed >> 3) + i * 5 + (i >> 1)) % MONTAGE_LOOKS.length] : null;
+    if (look) clip.effects = instantiatePreset(EFFECT_PRESETS.find((p) => p.name === look));
+  });
+  store.touch('project');
+  toast(`Auto-montage: ${plan.length} cuts on ${every === 1 ? 'every beat' : `every ${every}th beat`}, on a new video track (drag it down or hide the old one).`);
+  return plan.length;
 }
 
 const fresh = (clip) => {
