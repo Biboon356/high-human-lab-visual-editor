@@ -99,10 +99,11 @@ Legend: ✅ works and is covered by the automated tests · 🧪 prototype (works
 | Keyframes | 🧪 | per-parameter keys with smooth interpolation, shown on timeline clips; no curve editor, no per-key easing choice, no dragging keys on the timeline |
 | Organic engine | 🧪 | three procedural generators (roots, topographic fluid, cell membrane) drawn as crisp constant-width lines with a keyframable *Growth* front, glow, overlay blend on footage; look is still being tuned |
 | Audio-reactive | ✅ / 🧪 | amplitude, 3 bands, beat detection and tempo estimate ✅; analysis is whole-mix only (no per-clip source choice), fixed 60 Hz, beats are simple spectral flux 🧪 |
+| Clip speed, fades, auto-montage on beats | ✅ | constant speed with pitch kept; picture + sound fades; seeded beat-synced montage with random looks |
 | Export | ✅ | H.264/AAC and VP9/Opus, 6 resolutions (+project), 24–60 fps, 3 quality levels, progress/ETA, cancel, errors surfaced, output re-probed before "success" |
 | Preview audio | 🧪 | each clip plays through its own media element; no master mixer, meters or waveforms |
 | Packaging for macOS/Windows | 🧪 | electron-builder config present; **not built or signed here** (needs each OS; no code-signing/notarization set up) |
-| Transitions, speed/reverse, audio fades, multi-select, ripple edit | ⛔ | |
+| Reverse playback, transitions, multi-select, ripple edit, speed ramps (variable speed) | ⛔ | constant speed (0.1–4×) and fade in/out are done |
 | Hardware-accelerated decode/encode for export | ⛔ | software decode + x264 only (see roadmap) |
 | AI features | ⛔ | intentionally deferred |
 
@@ -119,6 +120,10 @@ Legend: ✅ works and is covered by the automated tests · 🧪 prototype (works
 `npm test` runs 12 unit tests. `scripts/e2e.mjs` (30 checks) is a real end-to-end run of the Electron app (see table above): it
 generates test media with ffmpeg, drives the app, reads pixels out of the compositor, and probes exported files.
 Native file dialogs are stubbed at the Electron main-process level; every other path is the production code.
+
+## Recipes
+
+Step-by-step looks (xerox/halftone, die-cut stickers, hollow glitch type, beat-cut montage, 9:16 export) in Thai: [docs/RECIPES.th.md](docs/RECIPES.th.md).
 
 ## Roadmap
 
