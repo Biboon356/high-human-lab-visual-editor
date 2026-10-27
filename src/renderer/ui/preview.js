@@ -49,7 +49,7 @@ export function mountPreview() {
       console.error(e);
     }
   }
-  const show = (m) => { msg.hidden = !m; msg.textContent = m; };
+  const show = (m) => { msg.hidden = !m; msg.textContent = m; msg.classList.toggle('busy', /^Loading/.test(m)); };
 
   const duration = () => projectDuration(store.project);
   const fps = () => store.project.settings.fps;
@@ -59,7 +59,8 @@ export function mountPreview() {
     tc.textContent = fmtTime(store.playhead);
     dur.textContent = fmtTime(d);
     if (document.activeElement !== seek) seek.value = d > 0 ? Math.round((store.playhead / d) * 1000) : 0;
-    playBtn.textContent = store.playing ? '❚❚' : '▶';
+    const icon = store.playing ? '#i-pause' : '#i-play';
+    if (playBtn.dataset.icon !== icon) { playBtn.dataset.icon = icon; playBtn.querySelector('use').setAttribute('href', icon); }
   }
 
   function play() {

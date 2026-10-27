@@ -4,7 +4,7 @@ export function startRoots(canvas, isBusy) {
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   const ctx = canvas.getContext('2d');
   let w = 0, h = 0, tips = [], age = 0;
-  const resize = () => { w = canvas.width = innerWidth; h = canvas.height = innerHeight; reset(); };
+  const resize = () => { w = canvas.width = innerWidth + 48; h = canvas.height = innerHeight + 48; reset(); };
   const reset = () => {
     ctx.clearRect(0, 0, w, h);
     age = 0;
@@ -17,7 +17,7 @@ export function startRoots(canvas, isBusy) {
     requestAnimationFrame(step);
     if (document.hidden || isBusy() || now - last < 66) return;
     last = now;
-    const color = getComputedStyle(document.documentElement).getPropertyValue('--accent2').trim() || '#55b982';
+    const color = getComputedStyle(document.documentElement).getPropertyValue('--root-ink').trim() || '#93b57f';
     ctx.strokeStyle = color;
     const next = [];
     for (const t of tips) {

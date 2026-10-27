@@ -12,6 +12,7 @@ import { openAutoEdit } from './ui/autoedit-panel.js';
 import { renderProject } from './engine/exporter.js';
 import { renderStill } from './engine/still.js';
 import { startRoots } from './bg-roots.js';
+import { mountTooltips } from './ui/tooltip.js';
 import * as autoEditEngine from './engine/autoedit.js';
 import { startAutosave, offerRecovery, writeNow } from './autosave.js';
 
@@ -85,12 +86,27 @@ hh.onMenu((a) => actions[a]?.());
 // ---- project name + dirty
 const nameIn = $('project-name');
 nameIn.addEventListener('input', () => { store.project.name = nameIn.value; store.touch(); });
+const monEmpty = $('mon-empty'), monMeta = $('mon-meta');
 function syncChrome() {
   if (document.activeElement !== nameIn) nameIn.value = store.project.name;
   $('dirty-dot').hidden = !store.dirty;
+  const s = store.project.settings;
+  monMeta.textContent = `${s.width} × ${s.height} · ${s.fps} fps`;
+  monEmpty.hidden = store.project.clips.length > 0;
+  document.documentElement.dataset.empty = String(store.project.clips.length === 0);
   hh.setDirty(store.dirty, store.project.name || 'Untitled');
 }
 store.on('dirty', syncChrome); store.on('reset', syncChrome); store.on('project', syncChrome);
+mountTooltips();
+
+// Slow parallax: the root background drifts a few pixels against the pointer (skipped for reduced-motion, cheap: one rAF-throttled style write).
+if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  let raf = 0, px = 0, py = 0;
+  addEventListener('pointermove', (e) => {
+    px = (e.clientX / innerWidth - 0.5) * 2; py = (e.clientY / innerHeight - 0.5) * 2;
+    if (!raf) raf = requestAnimationFrame(() => { raf = 0; const st = document.documentElement.style; st.setProperty('--px', px.toFixed(3)); st.setProperty('--py', py.toFixed(3)); });
+  }, { passive: true });
+}
 
 // ---- mount modules
 const preview = mountPreview();

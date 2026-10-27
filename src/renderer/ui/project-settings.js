@@ -15,9 +15,10 @@ export function mountProjectSettings(root) {
     root.append(el('section', { class: 'card' }, el('h4', { text: 'Project settings' }), el('div', { class: 'body' },
       el('div', { class: 'row flat' }, el('label', { text: 'Canvas' }), res), el('div', { class: 'row flat' }, el('label', { text: 'Frame rate' }), fps),
       el('p', { class: 'hint', text: 'The first video imported into an empty project sets these automatically.' }))));
-    root.append(el('section', { class: 'card' }, el('h4', { text: 'Keyboard' }), el('div', { class: 'body hint' },
-      el('div', { text: 'Space  play / pause' }), el('div', { text: 'S  split at playhead' }), el('div', { text: 'Delete  remove clip' }),
-      el('div', { text: '← →  step one frame' }), el('div', { text: '+ −  timeline zoom' }), el('div', { text: 'Ctrl/Cmd Z / Shift Z  undo / redo' }))));
+    const kb = (keys, what) => el('div', { class: 'kb' }, el('span', { class: 'keys' }, ...keys.map((k) => el('kbd', { text: k }))), el('span', { text: what }));
+    root.append(el('section', { class: 'card' }, el('h4', { text: 'Keyboard' }), el('div', { class: 'body' },
+      kb(['Space'], 'play / pause'), kb(['S'], 'split at playhead'), kb(['Delete'], 'remove clip'), kb(['⇧', 'Delete'], 'remove and close the gap'),
+      kb(['←', '→'], 'step one frame'), kb(['+', '−'], 'timeline zoom'), kb(['Ctrl/Cmd', 'Z'], 'undo'), kb(['Ctrl/Cmd', '⇧', 'Z'], 'redo'))));
   };
   store.on('project', () => { if (!root.contains(document.activeElement)) render(); });
   store.on('reset', render);

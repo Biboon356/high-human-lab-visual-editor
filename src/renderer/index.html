@@ -5,50 +5,87 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self' hhlab:; img-src 'self' hhlab: data: blob:; media-src 'self' hhlab: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' hhlab:" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>HIGH HUMAN LAB — VISUAL EDITOR</title>
+  <link rel="stylesheet" href="fonts/fonts.css" />
   <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="brand.css" />
 </head>
 <body>
+  <!-- Icon + signature sprite. The HH mark is an "H" whose crossbar drops a root: two pillars (human systems), one organic stem (growth). -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <symbol id="hh-mark" viewBox="0 0 32 32"><g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="square"><path d="M7 3v26M25 3v26"/><path d="M7 12.5c3.6 0 5 2.6 9 2.6s5.4-2.6 9-2.6"/><path d="M16 15.1V29"/><path d="M16 21.5c-2.4-.2-4.1.8-5 3.2M16 21.5c2.4-.2 4.1.8 5 3.2"/><path d="M7 8 4 5M25 8l3-3"/></g></symbol>
+      <symbol id="i-play" viewBox="0 0 16 16"><path d="M4.5 2.5v11l9-5.5z" fill="currentColor"/></symbol>
+      <symbol id="i-pause" viewBox="0 0 16 16"><path d="M4 2.5h3v11H4zM9 2.5h3v11H9z" fill="currentColor"/></symbol>
+      <symbol id="i-start" viewBox="0 0 16 16"><path d="M3.5 2.5v11" stroke="currentColor" fill="none"/><path d="M13 2.5v11L5.5 8z" fill="currentColor"/></symbol>
+      <symbol id="i-end" viewBox="0 0 16 16"><path d="M12.5 2.5v11" stroke="currentColor" fill="none"/><path d="M3 2.5v11L10.5 8z" fill="currentColor"/></symbol>
+      <symbol id="i-prev" viewBox="0 0 16 16"><path d="M10.5 3 5 8l5.5 5" stroke="currentColor" fill="none"/></symbol>
+      <symbol id="i-next" viewBox="0 0 16 16"><path d="M5.5 3 11 8l-5.5 5" stroke="currentColor" fill="none"/></symbol>
+      <symbol id="i-split" viewBox="0 0 16 16"><path d="M2.5 5h4.2v6H2.5zM9.3 5h4.2v6H9.3z" stroke="currentColor" fill="none"/><path d="M8 1.5v13" stroke="currentColor" fill="none"/></symbol>
+      <symbol id="i-dup" viewBox="0 0 16 16"><path d="M5.5 5.5h8v8h-8z" stroke="currentColor" fill="none"/><path d="M10.5 5.5v-3h-8v8h3" stroke="currentColor" fill="none"/></symbol>
+      <symbol id="i-plus" viewBox="0 0 16 16"><path d="M8 3v10M3 8h10" stroke="currentColor" fill="none"/></symbol>
+      <symbol id="i-minus" viewBox="0 0 16 16"><path d="M3 8h10" stroke="currentColor" fill="none"/></symbol>
+      <symbol id="i-fit" viewBox="0 0 16 16"><path d="M1.5 8h4M10.5 8h4M4 5.5 1.5 8 4 10.5M12 5.5 14.5 8 12 10.5" stroke="currentColor" fill="none"/></symbol>
+      <symbol id="i-beat" viewBox="0 0 16 16"><path d="M6 12.5V3l6.5-1.2v9.2" stroke="currentColor" fill="none"/><path d="M3.5 12.5h2.5v1.5H3.5zM10 11h2.5v1.5H10z" fill="currentColor"/></symbol>
+      <symbol id="i-film" viewBox="0 0 16 16"><path d="M2.5 2.5h11v11h-11zM5.5 2.5v11M10.5 2.5v11M2.5 6h3M2.5 10h3M10.5 6h3M10.5 10h3" stroke="currentColor" fill="none"/></symbol>
+      <symbol id="i-frame" viewBox="0 0 16 16"><path d="M1.5 4.5h3l1-2h5l1 2h3v9h-13z" stroke="currentColor" fill="none"/><circle cx="8" cy="8.7" r="2.4" stroke="currentColor" fill="none"/></symbol>
+      <symbol id="i-safe" viewBox="0 0 16 16"><path d="M1.5 2.5h13v11h-13z" stroke="currentColor" fill="none"/><path d="M4 5h8v6H4z" stroke="currentColor" fill="none" stroke-dasharray="1.6 1.4"/></symbol>
+      <symbol id="i-undo" viewBox="0 0 16 16"><path d="M5.5 3 2.5 6l3 3" stroke="currentColor" fill="none"/><path d="M2.8 6h6.2a4 4 0 0 1 0 8H6" stroke="currentColor" fill="none"/></symbol>
+      <symbol id="i-redo" viewBox="0 0 16 16"><path d="m10.5 3 3 3-3 3" stroke="currentColor" fill="none"/><path d="M13.2 6H7a4 4 0 0 0 0 8h3" stroke="currentColor" fill="none"/></symbol>
+      <symbol id="i-pl" viewBox="0 0 16 16"><path d="M1.5 2.5h13v11h-13zM6 2.5v11" stroke="currentColor" fill="none"/></symbol>
+      <symbol id="i-pb" viewBox="0 0 16 16"><path d="M1.5 2.5h13v11h-13zM1.5 9.5h13" stroke="currentColor" fill="none"/></symbol>
+      <symbol id="i-pr" viewBox="0 0 16 16"><path d="M1.5 2.5h13v11h-13zM10 2.5v11" stroke="currentColor" fill="none"/></symbol>
+      <symbol id="i-aster" viewBox="0 0 16 16"><path d="M8 1.5v13M2.4 4.7l11.2 6.6M13.6 4.7 2.4 11.3" stroke="currentColor" fill="none"/></symbol>
+      <symbol id="i-ripple" viewBox="0 0 16 16"><path d="M2.5 4h4v8h-4zM9.5 4h4v8h-4z" stroke="currentColor" fill="none"/><path d="M7.5 8h1" stroke="currentColor" fill="none"/></symbol>
+      <symbol id="i-trash" viewBox="0 0 16 16"><path d="M2.5 4h11M6 4V2.5h4V4M4 4l.6 9.5h6.8L12 4" stroke="currentColor" fill="none"/></symbol>
+    </defs>
+  </svg>
+
   <canvas id="bg-roots" aria-hidden="true"></canvas>
+
   <div id="app" class="app">
     <header class="topbar">
       <div class="brand">
-        <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 30V17M16 17C16 11 10 10 6 4M16 17c0-5 5-6 9-12M16 22c-3-2-6-2-9-5M16 24c3-2 6-2 9-6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
-        <div><b>HIGH HUMAN LAB</b><span>VISUAL EDITOR · ビジュアル研究室</span></div>
+        <svg class="mark" aria-hidden="true"><use href="#hh-mark"/></svg>
+        <div class="wordmark"><b>HIGH HUMAN LAB</b><span>visual editor <i lang="ja">ビジュアル研究室</i></span></div>
       </div>
-      <div class="project-name"><input id="project-name" spellcheck="false" aria-label="Project name" /><em id="dirty-dot" hidden>●</em></div>
+      <div class="project-name"><input id="project-name" spellcheck="false" aria-label="Project name" /><em id="dirty-dot" hidden title="Unsaved changes">●</em></div>
       <div class="top-actions">
         <button data-act="new" title="New project (Ctrl/Cmd+N)">New</button>
         <button data-act="open" title="Open project (Ctrl/Cmd+O)">Open</button>
         <button data-act="save" title="Save (Ctrl/Cmd+S)">Save</button>
         <span class="sep"></span>
-        <button data-act="undo" title="Undo (Ctrl/Cmd+Z)">↶</button>
-        <button data-act="redo" title="Redo (Ctrl/Cmd+Shift+Z)">↷</button>
+        <button data-act="undo" class="icon" title="Undo (Ctrl/Cmd+Z)" aria-label="Undo"><svg class="ic"><use href="#i-undo"/></svg></button>
+        <button data-act="redo" class="icon" title="Redo (Ctrl/Cmd+Shift+Z)" aria-label="Redo"><svg class="ic"><use href="#i-redo"/></svg></button>
         <span class="sep"></span>
-        <button id="toggle-left" class="icon" title="Toggle left panel">◧</button>
-        <button id="toggle-timeline" class="icon" title="Toggle timeline">⬓</button>
-        <button id="toggle-right" class="icon" title="Toggle right panel">◨</button>
+        <button id="toggle-left" class="icon" title="Toggle left panel" aria-label="Toggle left panel"><svg class="ic"><use href="#i-pl"/></svg></button>
+        <button id="toggle-timeline" class="icon" title="Toggle timeline" aria-label="Toggle timeline"><svg class="ic"><use href="#i-pb"/></svg></button>
+        <button id="toggle-right" class="icon" title="Toggle right panel" aria-label="Toggle right panel"><svg class="ic"><use href="#i-pr"/></svg></button>
         <button id="toggle-theme" title="Light / dark theme">Theme</button>
-        <button data-act="autoedit" id="btn-autoedit" class="accent" title="Transcribe Thai speech, cut silences, add captions, frame for 9:16 — in one go">✨ TikTok Auto-Edit</button>
-        <button data-act="export" class="primary" title="Export video (Ctrl/Cmd+E)">Export ▸</button>
+        <span class="sep"></span>
+        <button data-act="autoedit" id="btn-autoedit" class="accent" title="Transcribe Thai speech, cut silences, add captions, frame for 9:16 — in one go (Ctrl/Cmd+Shift+A)"><svg class="ic"><use href="#i-aster"/></svg>TikTok Auto-Edit</button>
+        <button data-act="export" class="primary" title="Export video (Ctrl/Cmd+E)">Export <svg class="ic"><use href="#i-next"/></svg></button>
       </div>
     </header>
 
     <aside class="panel left" id="panel-left">
       <nav class="tabs" data-tabs="left">
-        <button data-tab="media" class="on">01 Media</button>
-        <button data-tab="type">02 Type</button>
-        <button data-tab="organic">03 Organic</button>
+        <button data-tab="media" class="on"><i>01</i>Media</button>
+        <button data-tab="type"><i>02</i>Type</button>
+        <button data-tab="organic"><i>03</i>Organic</button>
       </nav>
       <section data-pane="media" class="pane on">
-        <div class="pane-actions"><button data-act="import" class="primary">+ Import</button><span class="hint">or drop files here</span></div>
+        <header class="pane-head"><h2>Library</h2><span>Footage, sound, stills</span></header>
+        <div class="pane-actions"><button data-act="import" class="primary"><svg class="ic"><use href="#i-plus"/></svg>Import</button><span class="hint">or drop files here</span></div>
         <div id="media-list" class="media-list"></div>
       </section>
       <section data-pane="type" class="pane">
-        <div class="pane-actions"><button id="add-text">+ Text clip</button></div>
+        <header class="pane-head"><h2>Typography</h2><span>Lettering as material</span></header>
+        <div class="pane-actions"><button id="add-text"><svg class="ic"><use href="#i-plus"/></svg>Text clip</button></div>
         <p class="hint pad">Presets add a text clip at the playhead.</p>
         <div id="text-presets" class="preset-list"></div>
       </section>
       <section data-pane="organic" class="pane">
+        <header class="pane-head"><h2>Organic</h2><span>Roots, mycelium, terrain</span></header>
         <p class="hint pad">Procedural generators render live in the compositor. Add one, then shape it in the inspector.</p>
         <div id="gen-presets" class="preset-list"></div>
       </section>
@@ -56,22 +93,29 @@
 
     <main class="stage" id="stage">
       <div class="preview-wrap" id="preview-wrap">
+        <div class="mon-meta" aria-hidden="true"><span>Fig. 01 — Monitor</span><span id="mon-meta">—</span></div>
         <canvas id="preview" width="960" height="540"></canvas>
         <div id="preview-msg" class="preview-msg" hidden></div>
         <div class="corner tl"></div><div class="corner tr"></div><div class="corner bl"></div><div class="corner br"></div>
+        <div id="mon-empty" class="mon-empty">
+          <svg class="root-draw" viewBox="0 0 200 120" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round"><path pathLength="1" d="M100 0V46"/><path pathLength="1" d="M100 46C100 62 84 66 72 82S52 104 38 118"/><path pathLength="1" d="M100 46C100 62 116 68 126 84S146 102 164 118"/><path pathLength="1" d="M100 46C98 70 100 92 100 118"/><path pathLength="1" d="M72 82C64 80 54 82 44 76"/><path pathLength="1" d="M126 84c8-4 18-4 28-12"/><path pathLength="1" d="M100 84c-8 2-14 8-18 16"/></g></svg>
+          <h1>Nothing in the lab yet.</h1>
+          <p>Drop footage anywhere, or import to begin.</p>
+          <button data-act="import" class="primary"><svg class="ic"><use href="#i-plus"/></svg>Import footage</button>
+        </div>
       </div>
       <div class="transport">
-        <button id="t-start" title="Go to start (Home)">⏮</button>
-        <button id="t-back" title="Back 1 frame (←)">◂</button>
-        <button id="t-play" class="primary" title="Play / pause (Space)">▶</button>
-        <button id="t-fwd" title="Forward 1 frame (→)">▸</button>
-        <button id="t-end" title="Go to end (End)">⏭</button>
+        <button id="t-start" class="icon" title="Go to start (Home)" aria-label="Go to start"><svg class="ic"><use href="#i-start"/></svg></button>
+        <button id="t-back" class="icon" title="Back 1 frame (←)" aria-label="Back one frame"><svg class="ic"><use href="#i-prev"/></svg></button>
+        <button id="t-play" class="primary icon" title="Play / pause (Space)" aria-label="Play / pause"><svg class="ic"><use href="#i-play"/></svg></button>
+        <button id="t-fwd" class="icon" title="Forward 1 frame (→)" aria-label="Forward one frame"><svg class="ic"><use href="#i-next"/></svg></button>
+        <button id="t-end" class="icon" title="Go to end (End)" aria-label="Go to end"><svg class="ic"><use href="#i-end"/></svg></button>
         <span id="timecode" class="tc">00:00:00.00</span>
         <input id="seek" type="range" min="0" max="1000" value="0" aria-label="Seek" />
         <span id="duration" class="tc dim">00:00:00.00</span>
         <label class="chk"><input type="checkbox" id="loop" /> loop</label>
-        <button id="t-safe" title="Show TikTok / Reels safe zone (where the app UI covers the picture)">▣ Safe zone</button>
-        <button id="t-still" title="Save the current frame as a full-resolution PNG">📷 Frame</button>
+        <button id="t-safe" title="Show TikTok / Reels safe zone (where the app UI covers the picture)"><svg class="ic"><use href="#i-safe"/></svg>Safe zone</button>
+        <button id="t-still" title="Save the current frame as a full-resolution PNG"><svg class="ic"><use href="#i-frame"/></svg>Frame</button>
       </div>
     </main>
 
@@ -88,24 +132,24 @@
 
     <section class="timeline" id="timeline-panel">
       <div class="tl-toolbar">
-        <button id="tl-split" title="Split at playhead (S)">✂ Split</button>
-        <button id="tl-duplicate" title="Duplicate selected clip (Ctrl/Cmd+D)">⧉ Duplicate</button>
-        <button id="tl-delete" title="Delete selected clips (Delete)">Delete</button>
-        <button id="tl-ripple" title="Delete and close the gap (Shift+Delete)">Ripple delete</button>
+        <button id="tl-split" title="Split at playhead (S)"><svg class="ic"><use href="#i-split"/></svg>Split</button>
+        <button id="tl-duplicate" title="Duplicate selected clip (Ctrl/Cmd+D)"><svg class="ic"><use href="#i-dup"/></svg>Duplicate</button>
+        <button id="tl-delete" title="Delete selected clips (Delete)"><svg class="ic"><use href="#i-trash"/></svg>Delete</button>
+        <button id="tl-ripple" title="Delete and close the gap (Shift+Delete)"><svg class="ic"><use href="#i-ripple"/></svg>Ripple</button>
         <span class="sep"></span>
-        <button id="tl-zoom-out" title="Zoom out (−)">−</button>
+        <button id="tl-zoom-out" class="icon" title="Zoom out (−)" aria-label="Zoom out"><svg class="ic"><use href="#i-minus"/></svg></button>
         <input id="tl-zoom" type="range" min="10" max="400" value="60" aria-label="Timeline zoom" />
-        <button id="tl-zoom-in" title="Zoom in (+)">+</button>
-        <button id="tl-fit" title="Fit project to view">Fit</button>
+        <button id="tl-zoom-in" class="icon" title="Zoom in (+)" aria-label="Zoom in"><svg class="ic"><use href="#i-plus"/></svg></button>
+        <button id="tl-fit" title="Fit project to view"><svg class="ic"><use href="#i-fit"/></svg>Fit</button>
         <span class="sep"></span>
-        <button id="tl-add-v">+ Video track</button>
-        <button id="tl-add-a">+ Audio track</button>
+        <button id="tl-add-v"><svg class="ic"><use href="#i-plus"/></svg>Video track</button>
+        <button id="tl-add-a"><svg class="ic"><use href="#i-plus"/></svg>Audio track</button>
         <label class="chk"><input type="checkbox" id="tl-snap" checked /> snap</label>
         <label class="chk" title="Also snap to detected beats (run Audio-Reactive → Analyze first)"><input type="checkbox" id="tl-snap-beats" checked /> beats</label>
         <span class="sep"></span>
-        <button id="tl-cut-beats" title="Split the selected clip on detected beats">♪ Cut on beats</button>
+        <button id="tl-cut-beats" title="Split the selected clip on detected beats"><svg class="ic"><use href="#i-beat"/></svg>Cut on beats</button>
         <select id="tl-beat-n" title="Cut every N-th beat"><option value="1">every beat</option><option value="2">every 2</option><option value="4" selected>every 4 (bar)</option><option value="8">every 8</option></select>
-        <button id="tl-montage" title="Fill a new video track with your imported clips/images, cut on the beat grid">🎞 Auto-montage</button>
+        <button id="tl-montage" title="Fill a new video track with your imported clips/images, cut on the beat grid"><svg class="ic"><use href="#i-film"/></svg>Auto-montage</button>
         <label class="chk" title="Give each cut a random look (xerox, comic, purple, solarize, VHS…)"><input type="checkbox" id="tl-montage-looks" checked /> random looks</label>
         <span class="grow"></span>
         <span class="hint" id="tl-hint">Space play · S split · Del delete · Shift-click multi-select · drag edges to trim</span>
@@ -115,6 +159,7 @@
   </div>
   <div id="toasts" class="toasts" aria-live="polite"></div>
   <div id="modal-root"></div>
+  <div id="tip" class="tip" role="tooltip" hidden></div>
   <script type="module" src="app.js"></script>
 </body>
 </html>

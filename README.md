@@ -85,6 +85,13 @@ Select a clip with someone speaking, press **✨ TikTok Auto-Edit** (or `Ctrl/Cm
 
 **Honest status:** the silence cutting, Thai word segmentation, captions, reframing, loudness and export are tested end-to-end (including on real synthetic Thai speech, measured from the exported file). The **Whisper transcription itself has not been run against a real model in the development sandbox** (the model host is blocked there): the native binding loads and its error handling is tested, but Thai *accuracy* on real recordings is unverified — try *Balanced* or *Best* for noisy or fast speech, and use the `.srt` import as a fallback.
 
+## Visual identity
+
+The interface follows a written art direction — soot-black and bone with forest/moss greens, italic-serif headlines, a root-line motif,
+restrained motion that stops during playback and respects reduced-motion — and keeps the editing surfaces neutral and dense.
+See [`docs/DESIGN.md`](docs/DESIGN.md) for the tokens, type, motif, motion rules and where each piece lives. Fonts are bundled
+(SIL OFL, `src/renderer/fonts/LICENSES.txt`).
+
 ## Using it
 
 1. **Import** media (button, ⌘/Ctrl+I, or drop files on the left panel). The first video into an empty project
@@ -133,7 +140,7 @@ Legend: ✅ works and is covered by the automated tests · 🧪 prototype (works
 
 ## Testing
 
-`npm test` runs 54 unit tests. `scripts/e2e.mjs` (45 checks) is a real end-to-end run of the Electron app (see table above): it
+`npm test` runs 56 unit tests. `scripts/e2e.mjs` (45 checks) is a real end-to-end run of the Electron app (see table above): it
 generates test media with ffmpeg, drives the app, reads pixels out of the compositor, and probes exported files.
 Native file dialogs are stubbed at the Electron main-process level; every other path is the production code.
 

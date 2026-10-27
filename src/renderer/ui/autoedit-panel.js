@@ -1,4 +1,4 @@
-// "✨ TikTok Auto-Edit" dialog: choose options, download the speech model if needed, run, show what happened.
+// "TikTok Auto-Edit" dialog: choose options, download the speech model if needed, run, show what happened.
 import { el, toast, fmtTime } from './dom.js';
 import { store } from '../store.js';
 import { runAutoEdit, pickSourceClip, DEFAULTS, LOOKS } from '../engine/autoedit.js';
@@ -91,7 +91,7 @@ export async function openAutoEdit() {
     n.textContent = `… ${text || STEP_LABELS[key]}`;
   };
   const result = el('div');
-  const run = el('button', { class: 'primary', id: 'ae-run', text: '✨ Run Auto-Edit' });
+  const run = el('button', { class: 'primary', id: 'ae-run', text: 'Run Auto-Edit' });
   const cancel = el('button', { text: 'Cancel', hidden: true });
   const close = el('button', { text: 'Close', onclick: () => { if (!busy) { open = false; root.replaceChildren(); } } });
 
@@ -123,7 +123,7 @@ export async function openAutoEdit() {
 
   const modelSel = select('model', Object.fromEntries(Object.entries(status?.models || {}).map(([k, m]) => [k, `${m.label}${m.installed ? ' ✔' : ` · ${m.approxMB} MB`}`])), renderModel);
   const body = el('div', { class: 'modal ae-modal' },
-    el('h3', { text: '✨ TIKTOK AUTO-EDIT  ·  ตัดต่อ TikTok อัตโนมัติ' }),
+    el('h3', { text: 'TIKTOK AUTO-EDIT  ·  ตัดต่อ TikTok อัตโนมัติ' }),
     el('div', { class: 'hint' }, clip ? `Editing: ${clip.name || media?.name} · ${fmtTime(clip.duration)}` : el('span', { class: 'warn', text: 'No clip with audio found — import a video with speech and select it on the timeline.' })),
     el('section', { class: 'ae-sec' }, el('h4', { text: 'Speech · เสียงพูด' }),
       row('Language', select('language', { th: 'ไทย (Thai)', en: 'English', auto: 'Auto-detect' })),
