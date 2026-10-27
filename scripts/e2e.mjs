@@ -45,10 +45,14 @@ const step = async (name, fn) => {
   catch (e) { clearInterval(dog); results.push([name, 'FAIL', e.message]); console.log(`FAIL  ${name}\n      ${e.message.split('\n').join('\n      ')}`); }
 };
 
+// local stand-in for the model host (the real one is huggingface.co): serves 160 MB of zeros for any path
+import http from 'node:http';
+const modelServer = http.createServer((q, r) => { const total = 160e6; r.writeHead(200, { 'Content-Length': total }); const chunk = Buffer.alloc(1 << 20); let sent = 0; const pump = () => { while (sent < total) { const n = Math.min(chunk.length, total - sent); sent += n; if (!r.write(n === chunk.length ? chunk : chunk.subarray(0, n))) return r.once('drain', pump); } r.end(); }; pump(); }).listen(0, '127.0.0.1');
+await new Promise((res) => modelServer.once('listening', res));
 const app = await _electron.launch({
   executablePath: req('electron'),
   args: [root, '--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
-  env: { ...process.env, HHLAB_E2E: '1', HHLAB_E2E_NO_RECOVERY: '1' },
+  env: { ...process.env, HHLAB_E2E: '1', HHLAB_E2E_NO_RECOVERY: '1', HHLAB_MODEL_BASE: `http://127.0.0.1:${modelServer.address().port}` },
 });
 const page = await app.firstWindow();
 const logs = [];
@@ -698,6 +702,60 @@ await step('TikTok Auto-Edit on real (synthetic) Thai speech: cuts silences, Tha
   const raw = path.join(dir, 'cap.raw'); sh(FFMPEG, ['-v', 'error', '-y', '-ss', '2.0', '-i', out, '-frames:v', '1', '-vf', 'crop=360:200:0:300,scale=72:40,format=gray', '-f', 'rawvideo', raw]);
   const g = fs.readFileSync(raw); let white = 0; for (const b of g) if (b > 235) white++;
   assert.ok(white > 20, `caption text pixels present in the exported frame (${white})`);
+});
+
+await step('Auto-Edit dialog: friendly no-model message, subtitle-file path, results, SRT export, TikTok export preset', async () => {
+  const speech = path.join(root, 'test/fixtures/th-speech.ogg'); const src = path.join(dir, 'speech-ui.mp4');
+  sh(FFMPEG, ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc2=size=1280x720:rate=30:duration=17', '-i', speech, '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-shortest', src]);
+  await resetProject(); await ev((p) => window.__app.importPaths([p]), src);
+  await page.click('#btn-autoedit'); await page.waitForSelector('.ae-modal');
+  assert.match(await ev(() => document.querySelector('.ae-modal h3').textContent), /TIKTOK AUTO-EDIT/);
+  await page.click('#ae-run'); await page.waitForSelector('.ae-modal .errbox', { timeout: 30000 });
+  const err = await ev(() => document.querySelector('.ae-modal .errbox').textContent); assert.match(err, /not downloaded yet/); assert.match(err, /subtitle file/);
+  assert.equal(await ev(() => window.__app.store.project.clips.length), 1, 'a failed run changes nothing');
+  // use a subtitle file (Thai cues placed on the real speech)
+  const srt = path.join(dir, 'th.srt');
+  fs.writeFileSync(srt, '1\n00:00:00,000 --> 00:00:05,900\nสวัสดีครับ วันนี้เรามาทำคลิปติ๊กต็อกกันนะครับ\n\n2\n00:00:07,200 --> 00:00:10,900\nตัดต่อง่ายมากเลย แค่กดไม่กี่ปุ่ม\n\n3\n00:00:12,400 --> 00:00:16,400\nใครอยากรู้วิธีทำ ติดตามไว้เลยนะ\n');
+  await stubDialog('showOpenDialog', { canceled: false, filePaths: [srt] });
+  await page.click('.ae-modal button:has-text("subtitle file")'); await page.waitForFunction(() => document.querySelector('.ae-model')?.textContent.includes('th.srt'));
+  await page.click('#ae-run'); await page.waitForSelector('.ae-modal .okbox', { timeout: 60000 });
+  const ok = await ev(() => document.querySelector('.ae-modal .okbox').textContent); assert.match(ok, /one undoable step/); assert.match(ok, /3 clips/);
+  const st = await ev(() => { const p = window.__app.store.project; return { main: p.clips.filter((c) => c.type === 'media').length, caps: p.clips.filter((c) => c.type === 'text').length, w: p.settings.width, h: p.settings.height }; });
+  assert.deepEqual([st.main, st.w, st.h], [3, 1080, 1920]); assert.ok(st.caps >= 3);
+  await shot('15-autoedit-dialog');
+  // captions as .srt
+  const out = path.join(dir, 'captions-out.srt'); await stubDialog('showSaveDialog', { canceled: false, filePath: out });
+  await page.click('.ae-modal button:has-text("Export captions")'); await page.waitForFunction((f) => document.querySelector('.toast')?.textContent.includes('Saved'), out, { timeout: 15000 });
+  const text = fs.readFileSync(out, 'utf8'); assert.match(text, /^1\n\d\d:\d\d:\d\d,\d{3} --> /); assert.match(text, /[\u0E00-\u0E7F]{3}/);
+  // straight into the export dialog with the TikTok preset
+  await page.click('.ae-modal button:has-text("Export for TikTok")'); await page.waitForSelector('.modal select');
+  const v = await ev(() => [...document.querySelectorAll('.modal select')].map((s) => s.value)); assert.deepEqual(v.slice(0, 4), ['tiktok', 'vertical-1080', '30', 'high']);
+  await ev(() => [...document.querySelectorAll('.modal button')].find((b) => b.textContent === 'Close').click());
+});
+
+await step('Auto-Edit model download: progress, ready state, a bad model file is reported clearly, removal', async () => {
+  await resetProject(); await ev((p) => window.__app.importPaths([p]), path.join(dir, 'speech-ui.mp4'));
+  await page.click('#btn-autoedit'); await page.waitForSelector('.ae-modal');
+  await page.selectOption('.ae-modal .ae-ctl select >> nth=1', 'fast');
+  await page.click('.ae-modal button:has-text("Download")');
+  await page.waitForFunction(() => document.querySelector('.ae-model')?.textContent.includes('ready'), null, { timeout: 90000 });
+  const ud = await app.evaluate(({ app: a }) => a.getPath('userData')); const mf = path.join(ud, 'models', 'ggml-small-q5_1.bin');
+  assert.ok(fs.existsSync(mf) && fs.statSync(mf).size === 160e6, 'model file downloaded completely');
+  await page.click('#ae-run'); await page.waitForSelector('.ae-modal .errbox', { timeout: 60000 });
+  const err = await ev(() => document.querySelector('.ae-modal .errbox').textContent);
+  assert.match(err, /speech model could not be opened|Transcription failed|speech engine could not be loaded/, `a corrupt model is explained: ${err}`);
+  assert.equal(await ev(() => window.__app.store.project.clips.length), 1, 'project untouched');
+  await page.click('.ae-modal button:has-text("Remove model")'); await page.waitForFunction(() => document.querySelector('.ae-model')?.textContent.includes('Download'));
+  assert.equal(fs.existsSync(mf), false, 'model removed from disk');
+  await ev(() => [...document.querySelectorAll('.ae-modal button')].find((b) => b.textContent === 'Close').click());
+});
+
+await step('safe-zone guide toggles and follows the 9:16 canvas', async () => {
+  await ev(async () => { const { createProject } = await import('/shared/project.js'); const p = createProject(); p.settings.width = 1080; p.settings.height = 1920; window.__app.store.loadProject(p); });
+  await page.click('#t-safe'); await settle(200);
+  const r = await ev(() => { const z = document.querySelector('.safe-zone'); const b = z.getBoundingClientRect(); return { hidden: z.hidden, ratio: b.width / b.height }; });
+  assert.equal(r.hidden, false); assert.ok(Math.abs(r.ratio - 9 / 16) < 0.01, `overlay has the canvas aspect (${r.ratio})`);
+  await page.click('#t-safe'); assert.equal(await ev(() => document.querySelector('.safe-zone').hidden), true);
 });
 
 await step('light theme + collapsible panels', async () => {

@@ -70,6 +70,21 @@ editing `export-plan.js`.
 **Security.** The renderer is sandboxed with no Node access. Local media is served through a custom `hhlab://`
 protocol that only serves files the user imported or opened (an allow-list in the main process).
 
+## ✨ TikTok Auto-Edit (Thai speech → finished vertical clip)
+
+Select a clip with someone speaking, press **✨ TikTok Auto-Edit** (or `Ctrl/Cmd+Shift+A`), pick options, press **Run**. In one undoable step it:
+
+1. reads the clip's audio and finds where speech actually is,
+2. **transcribes Thai** locally with Whisper (whisper.cpp, no cloud, nothing is uploaded) — or reads an `.srt`/`.vtt` file you provide,
+3. **jump-cuts silences** and hesitation words (เอ่อ / อืม / อ่า …), with alternating punch-in zoom to hide the cuts,
+4. builds **Thai word-by-word captions** (real Thai word segmentation, never breaking inside a word, 2 lines max, kept clear of TikTok's UI), in 4 styles,
+5. reframes **16:9 → 9:16** (fill or blurred-background), applies a light look, and normalises loudness to −14 LUFS,
+6. leaves everything editable on the timeline; **Export for TikTok…** is one click away, and captions can be saved as `.srt`.
+
+*Speech models* (Whisper small / medium / large-v3-turbo, 190–575 MB) are downloaded on first use into the app-data folder from Hugging Face; Balanced (medium) is the default.
+
+**Honest status:** the silence cutting, Thai word segmentation, captions, reframing, loudness and export are tested end-to-end (including on real synthetic Thai speech, measured from the exported file). The **Whisper transcription itself has not been run against a real model in the development sandbox** (the model host is blocked there): the native binding loads and its error handling is tested, but Thai *accuracy* on real recordings is unverified — try *Balanced* or *Best* for noisy or fast speech, and use the `.srt` import as a fallback.
+
 ## Using it
 
 1. **Import** media (button, ⌘/Ctrl+I, or drop files on the left panel). The first video into an empty project
@@ -100,6 +115,7 @@ Legend: ✅ works and is covered by the automated tests · 🧪 prototype (works
 | Organic engine | 🧪 | **drawn root systems** (branching, tapering, growing from top/bottom/left/centre) plus contour, topographic-fluid, cell-membrane and dust generators; keyframable *Growth*, hand-drawn boil, overlay blend; look is still being tuned |
 | Audio-reactive | ✅ / 🧪 | amplitude, 3 bands, beat detection and tempo estimate ✅; analysis is whole-mix only (no per-clip source choice), fixed 60 Hz, beats are simple spectral flux 🧪 |
 | Clip speed, fades, cut-in transitions (flash/punch/glitch/whip), auto-montage on beats | ✅ | constant speed with pitch kept; picture + sound fades; seeded beat-synced montage with random looks |
+| TikTok Auto-Edit (Thai captions, jump cuts, 9:16, loudness) | ✅ / 🧪 | everything except live Whisper transcription is tested end-to-end; transcription accuracy on real Thai speech needs your feedback 🧪 |
 | Export | ✅ | H.264/AAC and VP9/Opus, 6 resolutions (+project), 24–60 fps, 3 quality levels, progress/ETA, cancel, errors surfaced, output re-probed before "success" |
 | Preview audio | 🧪 | each clip plays through its own media element; no master mixer, meters or waveforms |
 | Packaging for macOS/Windows | 🧪 | electron-builder config present; **not built or signed here** (needs each OS; no code-signing/notarization set up) |
@@ -117,7 +133,7 @@ Legend: ✅ works and is covered by the automated tests · 🧪 prototype (works
 
 ## Testing
 
-`npm test` runs 18 unit tests. `scripts/e2e.mjs` (41 checks) is a real end-to-end run of the Electron app (see table above): it
+`npm test` runs 53 unit tests. `scripts/e2e.mjs` (47 checks) is a real end-to-end run of the Electron app (see table above): it
 generates test media with ffmpeg, drives the app, reads pixels out of the compositor, and probes exported files.
 Native file dialogs are stubbed at the Electron main-process level; every other path is the production code.
 

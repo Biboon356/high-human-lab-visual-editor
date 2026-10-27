@@ -9,7 +9,7 @@ import { runAnalysis } from './reactive-ui.js';
 let busy = false;
 export const isExporting = () => busy;
 
-export function openExportDialog() {
+export function openExportDialog({ preset } = {}) {
   if (busy) return;
   if (projectDuration(store.project) <= 0) { toast('Nothing to export yet — add clips to the timeline.', 'error'); return; }
   const s = store.project.settings;
@@ -48,6 +48,7 @@ export function openExportDialog() {
     el('div', { class: 'hint', text: `Duration ${projectDuration(store.project).toFixed(2)}s. Frames are rendered offline with the same engine as the preview, then encoded by ffmpeg.` }),
     bar, status, el('div', { class: 'actions' }, cancel, close, start)));
   root.replaceChildren(modal);
+  if (preset && PLATFORMS[preset]) { platform.value = preset; platform.dispatchEvent(new Event('change')); }
 
   const signal = { cancelled: false };
   cancel.onclick = () => { signal.cancelled = true; status.textContent = 'Cancelling…'; };

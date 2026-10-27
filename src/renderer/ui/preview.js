@@ -111,6 +111,25 @@ export function mountPreview() {
   document.getElementById('t-back').onclick = () => { pause(); store.setPlayhead(store.playhead - 1 / fps()); };
   document.getElementById('t-fwd').onclick = () => { pause(); store.setPlayhead(store.playhead + 1 / fps()); };
 
+  // Safe-zone guide: hatched bands where TikTok's own interface covers the picture (bottom ~20%, right ~14%, top ~8%)
+  const safe = document.createElement('div');
+  safe.className = 'safe-zone'; safe.hidden = true;
+  safe.innerHTML = '<i style="left:0;right:0;bottom:0;height:20%">CAPTION / UI ZONE</i><i style="top:0;right:0;width:14%;height:80%;top:20%"></i><i style="left:0;right:0;top:0;height:8%"></i>';
+  document.getElementById('preview-wrap').append(safe);
+  const placeSafe = () => {
+    const wrap = document.getElementById('preview-wrap'), { width, height } = store.project.settings;
+    const cw = wrap.clientWidth - 32, ch = wrap.clientHeight - 32, k = Math.min(cw / width, ch / height);
+    const w = width * k, h = height * k;
+    Object.assign(safe.style, { width: `${w}px`, height: `${h}px`, left: `${16 + (cw - w) / 2}px`, top: `${16 + (ch - h) / 2}px` });
+  };
+  let safeOn = false;
+  try { safeOn = localStorage.getItem('hhlab.safezone') === '1'; } catch { /* storage unavailable */ }
+  const showSafe = () => { safe.hidden = !safeOn; document.getElementById('t-safe').classList.toggle('on', safeOn); if (safeOn) placeSafe(); };
+  document.getElementById('t-safe').onclick = () => { safeOn = !safeOn; try { localStorage.setItem('hhlab.safezone', safeOn ? '1' : '0'); } catch { /* ignore */ } showSafe(); };
+  addEventListener('resize', () => safeOn && placeSafe());
+  store.on('project', () => safeOn && placeSafe());
+  showSafe();
+
   fitSize(); updateUI();
   requestAnimationFrame(frame);
   return { play, pause, toggle, sources, comp, stats, forceDraw: draw };

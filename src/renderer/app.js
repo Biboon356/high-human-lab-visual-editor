@@ -8,6 +8,7 @@ import { mountMediaBin, importResults } from './ui/media-bin.js';
 import { mountReactive, runAnalysis } from './ui/reactive-ui.js';
 import { mountProjectSettings } from './ui/project-settings.js';
 import { openExportDialog, isExporting } from './ui/export-dialog.js';
+import { openAutoEdit } from './ui/autoedit-panel.js';
 import { renderProject } from './engine/exporter.js';
 import { renderStill } from './engine/still.js';
 import { startRoots } from './bg-roots.js';
@@ -75,7 +76,7 @@ async function openProject() {
 
 const actions = {
   new: newProject, open: openProject, save: () => save(false), saveAs: () => save(true),
-  import: importMedia, export: openExportDialog,
+  import: importMedia, export: openExportDialog, autoedit: openAutoEdit,
   undo: () => store.undo(), redo: () => store.redo(), duplicate: duplicateSelected,
 };
 document.querySelectorAll('[data-act]').forEach((b) => b.addEventListener('click', () => actions[b.dataset.act]()));

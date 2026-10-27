@@ -112,6 +112,7 @@ function buildMenu() {
       { label: 'Duplicate Clip', accelerator: 'CmdOrCtrl+D', click: send('duplicate') },
       { type: 'separator' }, { role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { role: 'selectAll' },
     ] },
+    { label: 'Tools', submenu: [{ label: '✨ TikTok Auto-Edit…', accelerator: 'CmdOrCtrl+Shift+A', click: send('autoedit') }] },
     { label: 'View', submenu: [{ role: 'reload' }, { role: 'toggleDevTools' }, { role: 'togglefullscreen' }] },
   ];
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));

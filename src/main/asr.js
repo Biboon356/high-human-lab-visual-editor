@@ -1,6 +1,7 @@
 // Speech recognition: model catalogue + download management + whisper.cpp (via @fugood/whisper.node). No Electron imports,
 // so everything here can be unit-tested; main.js wires it to IPC.
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { downloadFile } from './model-download.js';
 
@@ -53,7 +54,7 @@ export async function transcribePcm({ pcm, modelPath, language = 'th', prompt, o
     catch (e) { throw new Error(`The speech model could not be opened (${e.message}). Delete it in the Auto-Edit panel and download it again.`); }
   }
   const { stop, promise } = cache.ctx.transcribeData(pcm.buffer.slice(pcm.byteOffset, pcm.byteOffset + pcm.byteLength), {
-    language, temperature: 0, temperatureInc: 0.2, beamSize: 5, maxThreads: threads || Math.max(2, Math.min(8, (globalThis.navigator?.hardwareConcurrency ?? 4))),
+    language, temperature: 0, temperatureInc: 0.2, beamSize: 5, maxThreads: threads || Math.max(2, Math.min(8, (os.availableParallelism?.() ?? os.cpus().length) - 1)),
     prompt, onProgress,
   });
   if (signal) signal.stop = stop;
