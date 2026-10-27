@@ -5,7 +5,7 @@ import { visualsFor, drawVisuals } from '../engine/media-cache.js';
 import { planMontage } from '/shared/montage.js';
 import { EFFECT_PRESETS, instantiatePreset } from '/shared/effects-defs.js';
 import { store } from '../store.js';
-import { overlaps, trackEnd, canPlace, clipEnd, projectDuration, moveClip, trimStart, trimEnd, splitClip, deleteClip, addMediaClip, addTrack, clipKind } from '/shared/timeline.js';
+import { moveClips, deleteClips, overlaps, trackEnd, canPlace, clipEnd, projectDuration, moveClip, trimStart, trimEnd, splitClip, deleteClip, addMediaClip, addTrack, clipKind } from '/shared/timeline.js';
 import { findMedia, findTrack, uid } from '/shared/project.js';
 
 const LABEL_W = 118;
@@ -79,7 +79,7 @@ export function mountTimeline() {
     const keyTimes = new Set();
     for (const owner of [clip, clip.gen, ...(clip.effects || [])]) for (const keys of Object.values(owner?.keyframes || {})) for (const k of keys) keyTimes.add(Math.round(k.t * 100) / 100);
     for (const t of keyTimes) kfs.push(el('i', { style: `left:${px(t) - 2}px` }));
-    const n = el('div', { class: `clip ${kind} ${store.selection === clip.id ? 'sel' : ''}`, 'data-clip': clip.id, style: `left:${px(clip.start)}px;width:${Math.max(4, px(clip.duration))}px`, title: clip.name },
+    const n = el('div', { class: `clip ${kind} ${store.multi.has(clip.id) ? 'sel' : ''}`, 'data-clip': clip.id, style: `left:${px(clip.start)}px;width:${Math.max(4, px(clip.duration))}px`, title: clip.name },
       el('span', { class: 'nm', text: clip.name || (media?.name ?? clip.type) }),
       fxCount ? el('span', { class: 'badge', text: `fx${fxCount}` }) : null,
       media?.missing ? el('span', { class: 'badge', text: '⚠ missing' }) : null,
@@ -127,7 +127,9 @@ export function mountTimeline() {
   function beginDrag(e, clip, node) {
     if (e.button !== 0) return;
     e.stopPropagation();
-    store.select(clip.id);
+    if (e.shiftKey || e.metaKey || e.ctrlKey) { store.toggleSelect(clip.id); return; } // build a multi-selection, no drag
+    const group = store.multi.has(clip.id) && store.multi.size > 1 && !e.target.dataset.h;
+    if (!group) store.select(clip.id); else { store.selection = clip.id; store.emit('selection'); }
     const mode = e.target.dataset.h || 'move';
     const startX = e.clientX;
     const orig = { start: clip.start, duration: clip.duration, in: clip.in, trackId: clip.trackId };
@@ -137,7 +139,10 @@ export function mountTimeline() {
       const dt = (ev.clientX - startX) / store.zoom;
       if (Math.abs(ev.clientX - startX) < 3 && !snapped) return;
       ensure();
-      if (mode === 'move') {
+      if (mode === 'move' && group) {
+        // move the whole selection together on its own tracks; snapping follows the clip being dragged
+        moveClips(store.project, [...store.multi], snap(orig.start + dt, clip.id, [clip.duration]) - clip.start);
+      } else if (mode === 'move') {
         const target = document.elementFromPoint(ev.clientX, ev.clientY)?.closest?.('.tl-lane');
         const trackId = target?.dataset.track || clip.trackId;
         let s = snap(orig.start + dt, clip.id, [clip.duration]);
@@ -184,6 +189,7 @@ export function mountTimeline() {
   document.getElementById('tl-add-v').onclick = () => store.mutate((p) => addTrack(p, 'video'));
   document.getElementById('tl-add-a').onclick = () => store.mutate((p) => addTrack(p, 'audio'));
   document.getElementById('tl-delete').onclick = () => deleteSelected();
+  document.getElementById('tl-ripple').onclick = () => deleteSelected({ ripple: true });
   document.getElementById('tl-split').onclick = () => splitSelected();
   document.getElementById('tl-duplicate').onclick = () => duplicateSelected();
 
@@ -192,7 +198,7 @@ export function mountTimeline() {
   store.on('mediavis', render);
   document.getElementById('tl-montage').onclick = () => autoMontage({ every: Number(document.getElementById('tl-beat-n').value), looks: document.getElementById('tl-montage-looks').checked });
   document.getElementById('tl-cut-beats').onclick = () => cutOnBeats(Number(document.getElementById('tl-beat-n').value));
-  store.on('selection', () => { for (const n of content.querySelectorAll('.clip')) n.classList.toggle('sel', n.dataset.clip === store.selection); });
+  store.on('selection', () => { for (const n of content.querySelectorAll('.clip')) n.classList.toggle('sel', store.multi.has(n.dataset.clip)); });
   store.on('playhead', () => { placePlayhead(); followPlayhead(); });
   render();
   addEventListener('resize', render);
@@ -308,10 +314,11 @@ export function pasteClip() {
   return true;
 }
 
-export function deleteSelected() {
-  const id = store.selection;
-  if (!id) return false;
-  store.mutate((p) => deleteClip(p, id));
+/** Deletes the whole selection; `ripple` closes the gaps it leaves on each track. */
+export function deleteSelected({ ripple = false } = {}) {
+  const ids = store.multi.size ? [...store.multi] : store.selection ? [store.selection] : [];
+  if (!ids.length) return false;
+  store.mutate((p) => deleteClips(p, ids, { ripple }));
   store.select(null);
   return true;
 }

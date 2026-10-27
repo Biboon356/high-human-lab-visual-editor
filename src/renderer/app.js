@@ -111,7 +111,7 @@ addEventListener('keydown', (e) => {
   switch (e.key) {
     case ' ': e.preventDefault(); preview.toggle(); break;
     case 's': case 'S': splitSelected(); break;
-    case 'Delete': case 'Backspace': e.preventDefault(); deleteSelected(); break;
+    case 'Delete': case 'Backspace': e.preventDefault(); deleteSelected({ ripple: e.shiftKey }); break;
     case 'ArrowLeft': e.preventDefault(); preview.pause(); store.setPlayhead(store.playhead - (e.shiftKey ? 1 : 1 / fps)); break;
     case 'ArrowRight': e.preventDefault(); preview.pause(); store.setPlayhead(store.playhead + (e.shiftKey ? 1 : 1 / fps)); break;
     case 'Home': store.setPlayhead(0); break;

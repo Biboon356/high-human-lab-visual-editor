@@ -610,6 +610,26 @@ await step('autosave: unsaved work is written to disk, restored after a "crash",
   assert.equal(await ev(() => window.__app.autosave.offerRecovery()), false);
 });
 
+await step('multi-select: shift-click, group drag, Delete, Undo, and Ripple delete close the gap', async () => {
+  await resetProject(); await ev((p) => window.__app.importPaths([p]), pic);
+  await ev(async () => { const { store } = window.__app; const { addMediaClip } = await import('/shared/timeline.js');
+    store.mutate((p) => { p.clips.length = 0; const v2 = p.tracks.find((t) => t.name === 'V2').id; const m = p.media[0].id; [['A', 0], ['B', 3], ['C', 6]].forEach(([id, s]) => { const c = addMediaClip(p, m, v2, s); c.id = id; c.start = s; c.duration = 2; }); }); store.select(null); });
+  await page.click('.clip[data-clip="A"]'); await page.click('.clip[data-clip="C"]', { modifiers: ['Shift'] });
+  assert.equal(await ev(() => document.querySelectorAll('.clip.sel').length), 2, 'two clips highlighted');
+  const box = await ev(() => { const r = document.querySelector('.clip[data-clip="A"]').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
+  await page.mouse.move(box.x, box.y); await page.mouse.down(); await page.mouse.move(box.x + 36, box.y, { steps: 6 }); await page.mouse.up();
+  let r = await ev(() => Object.fromEntries(window.__app.store.project.clips.map((c) => [c.id, +c.start.toFixed(2)])));
+  assert.ok(r.A > 0.4 && r.A < 0.8 && Math.abs(r.C - (6 + r.A)) < 0.02 && r.B === 3, `A and C moved together, B stayed: ${JSON.stringify(r)}`);
+  await page.keyboard.press('Delete'); await settle(150);
+  assert.deepEqual(await ev(() => window.__app.store.project.clips.map((c) => c.id)), ['B'], 'Delete removes the whole selection');
+  await ev(() => window.__app.store.undo()); assert.equal(await ev(() => window.__app.store.project.clips.length), 3, 'one Undo restores both');
+  const before = await ev(() => Object.fromEntries(window.__app.store.project.clips.map((c) => [c.id, c.start])));
+  await page.click('.clip[data-clip="A"]'); await page.click('#tl-ripple'); await settle(150);
+  r = await ev(() => Object.fromEntries(window.__app.store.project.clips.map((c) => [c.id, c.start])));
+  assert.equal(r.A, undefined, 'A removed');
+  assert.ok(Math.abs(r.B - (before.B - 2)) < 1e-6 && Math.abs(r.C - (before.C - 2)) < 1e-6, `later clips slid left by A's length (2s): ${JSON.stringify({ before, after: r })}`);
+});
+
 await step('light theme + collapsible panels', async () => {
   await ev(() => { document.getElementById('toggle-theme').click(); document.getElementById('toggle-left').click(); });
   await settle(300); await shot('11-light-collapsed');

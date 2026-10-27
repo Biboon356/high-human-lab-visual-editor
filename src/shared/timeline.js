@@ -137,6 +137,37 @@ export function splitClip(project, clipId, t) {
   return right;
 }
 
+/** Move several clips by the same time delta. All-or-nothing; delta is clamped so nothing goes before 0.
+ *  Rejects (returns false) if any moved clip would overlap a clip that is *not* part of the move. */
+export function moveClips(project, ids, delta) {
+  const set = new Set(ids);
+  const clips = ids.map((id) => findClip(project, id)).filter(Boolean);
+  if (!clips.length) return false;
+  delta = Math.max(delta, -Math.min(...clips.map((c) => c.start)));
+  for (const c of clips) {
+    const ns = c.start + delta;
+    const clash = project.clips.some((o) => !set.has(o.id) && o.trackId === c.trackId && ns < clipEnd(o) - 1e-6 && ns + c.duration > o.start + 1e-6);
+    if (clash) return false;
+  }
+  for (const c of clips) c.start += delta;
+  return true;
+}
+
+/** Delete several clips. With `ripple`, later clips on each affected track slide left to close the gaps. */
+export function deleteClips(project, ids, { ripple = false } = {}) {
+  const set = new Set(ids);
+  const removed = project.clips.filter((c) => set.has(c.id));
+  if (!removed.length) return 0;
+  project.clips = project.clips.filter((c) => !set.has(c.id));
+  if (ripple) {
+    for (const c of project.clips) {
+      const shift = removed.filter((r) => r.trackId === c.trackId && clipEnd(r) <= c.start + 1e-6).reduce((a, r) => a + r.duration, 0);
+      if (shift) c.start = Math.max(0, c.start - shift);
+    }
+  }
+  return removed.length;
+}
+
 export const MIN_SPEED = 0.1;
 export const MAX_SPEED = 4;
 

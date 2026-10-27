@@ -9,7 +9,8 @@ class Store {
     this.project = createProject();
     this.filePath = null;
     this.dirty = false;
-    this.selection = null; // clip id
+    this.selection = null; // primary clip id (what the Inspector shows)
+    this.multi = new Set(); // every selected clip id (always includes the primary)
     this.playhead = 0;
     this.playing = false;
     this.zoom = 60; // px per second
@@ -69,6 +70,8 @@ class Store {
   _restore(json) {
     this.project = JSON.parse(json);
     if (this.selection && !findClip(this.project, this.selection)) this.selection = null;
+    this.multi = new Set([...this.multi].filter((id) => findClip(this.project, id)));
+    if (this.selection) this.multi.add(this.selection);
     this.analysisStale = this.audioSignature() !== this.analysisSig;
     this.setDirty(true);
     this.emit('project', 'selection', 'render');
@@ -88,6 +91,7 @@ class Store {
     this.project = validateProject(project);
     this.filePath = filePath;
     this.selection = null;
+    this.multi = new Set();
     this.playhead = 0;
     this.playing = false;
     this.undoStack = []; this.redoStack = [];
@@ -97,8 +101,16 @@ class Store {
   }
 
   select(id) {
-    if (this.selection === id) return;
+    const same = this.selection === id && this.multi.size === (id ? 1 : 0);
     this.selection = id;
+    this.multi = new Set(id ? [id] : []);
+    if (!same) this.emit('selection', 'render');
+  }
+
+  /** Shift/Ctrl-click: add or remove a clip from the selection. */
+  toggleSelect(id) {
+    if (this.multi.has(id)) { this.multi.delete(id); if (this.selection === id) this.selection = [...this.multi].pop() ?? null; }
+    else { this.multi.add(id); this.selection = id; }
     this.emit('selection', 'render');
   }
   setPlayhead(t) {

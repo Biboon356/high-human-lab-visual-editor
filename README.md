@@ -92,7 +92,7 @@ Legend: ✅ works and is covered by the automated tests · 🧪 prototype (works
 |---|---|---|
 | Import video / audio / image | ✅ | ffprobe metadata, drag & drop, auto H.264 proxy when Chromium can't decode |
 | Preview + transport | ✅ | play/pause/seek/frame-step/loop; playback is clock-driven with audio-element sync |
-| Multitrack timeline | ✅ | tracks add/mute/hide, place/move/trim/split/delete/duplicate, copy & paste, video thumbnails + audio waveforms, beat markers, snap to clips/playhead/beats, **Cut on beats**, zoom, undo/redo (100 steps) |
+| Multitrack timeline | ✅ | tracks add/mute/hide, place/move/trim/split/delete/duplicate, copy & paste, shift-click multi-select with group move, ripple delete, video thumbnails + audio waveforms, beat markers, snap to clips/playhead/beats, **Cut on beats**, zoom, undo/redo (100 steps) |
 | Project save / open | ✅ | `.hhlab` JSON, atomic write, validation, missing-media detection, relink, **autosave + crash recovery** (offered on next start) |
 | Effects (23): glitch, grain, cloud noise, wave distortion, fluid warp, blur, colour, CRT, lens chromatic, bloom, film 35mm, VHS, mosh/smear, halftone, pixelate, camera shake/punch, colour flash, **gradient map (duotone), xerox threshold, solarize/channel swap, slice bars, shape mask (circle/rect/diamond/blob), die-cut sticker outline** | ✅ | stack/reorder/enable/remove; 19 built-in presets (Xerox Photocopy, Comic Flash, Die-Cut Sticker, Circle Window, …) (some audio-bound, e.g. *Beat Punch*) + user presets (stored in browser storage) |
 | Typography | ✅ / 🧪 | text clips with font/size/tracking/align/position/rotation/outline/plate, chrome gradient fill, RGB split, shadow, glow, hollow outline text, fit-to-width and 11 animations (incl. slam, stutter, strobe) ✅; fonts come from the installed-font list (typed or picked) — no live font preview 🧪 |
@@ -103,7 +103,7 @@ Legend: ✅ works and is covered by the automated tests · 🧪 prototype (works
 | Export | ✅ | H.264/AAC and VP9/Opus, 6 resolutions (+project), 24–60 fps, 3 quality levels, progress/ETA, cancel, errors surfaced, output re-probed before "success" |
 | Preview audio | 🧪 | each clip plays through its own media element; no master mixer, meters or waveforms |
 | Packaging for macOS/Windows | 🧪 | electron-builder config present; **not built or signed here** (needs each OS; no code-signing/notarization set up) |
-| Reverse playback, transitions, multi-select, ripple edit, speed ramps (variable speed) | ⛔ | constant speed (0.1–4×) and fade in/out are done |
+| Reverse playback, speed ramps (variable speed), crossfade transitions between overlapping clips | ⛔ | constant speed (0.1–4×) and fade in/out are done |
 | Hardware-accelerated decode/encode for export | ⛔ | software decode + x264 only (see roadmap) |
 | AI features | ⛔ | intentionally deferred |
 

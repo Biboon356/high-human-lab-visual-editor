@@ -87,7 +87,8 @@
       <div class="tl-toolbar">
         <button id="tl-split" title="Split at playhead (S)">✂ Split</button>
         <button id="tl-duplicate" title="Duplicate selected clip (Ctrl/Cmd+D)">⧉ Duplicate</button>
-        <button id="tl-delete" title="Delete selected clip (Delete)">Delete</button>
+        <button id="tl-delete" title="Delete selected clips (Delete)">Delete</button>
+        <button id="tl-ripple" title="Delete and close the gap (Shift+Delete)">Ripple delete</button>
         <span class="sep"></span>
         <button id="tl-zoom-out" title="Zoom out (−)">−</button>
         <input id="tl-zoom" type="range" min="10" max="400" value="60" aria-label="Timeline zoom" />
@@ -104,7 +105,7 @@
         <button id="tl-montage" title="Fill a new video track with your imported clips/images, cut on the beat grid">🎞 Auto-montage</button>
         <label class="chk" title="Give each cut a random look (xerox, comic, purple, solarize, VHS…)"><input type="checkbox" id="tl-montage-looks" checked /> random looks</label>
         <span class="grow"></span>
-        <span class="hint" id="tl-hint">Space play · S split · Del delete · drag edges to trim</span>
+        <span class="hint" id="tl-hint">Space play · S split · Del delete · Shift-click multi-select · drag edges to trim</span>
       </div>
       <div class="tl-scroll" id="tl-scroll"><div class="tl-content" id="tl-content"></div></div>
     </section>

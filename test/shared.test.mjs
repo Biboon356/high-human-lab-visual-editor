@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createProject, uid, validateProject, createClip } from '../src/shared/project.js';
-import { setSpeed, addMediaClip, moveClip, trimStart, trimEnd, splitClip, deleteClip, activeVisualClips, projectDuration, addClipRaw, overlaps } from '../src/shared/timeline.js';
+import { moveClips, deleteClips, setSpeed, addMediaClip, moveClip, trimStart, trimEnd, splitClip, deleteClip, activeVisualClips, projectDuration, addClipRaw, overlaps } from '../src/shared/timeline.js';
 import { evalTrack, setKey, removeKey } from '../src/shared/keyframes.js';
 import { transitionAt, resolveParam } from '../src/shared/params.js';
 import { analyze, sampleFeatures } from '../src/shared/audio-analysis.js';
@@ -229,4 +229,20 @@ test('export audio graph pads to a finite length (an unbounded apad makes the AA
   const p = fixture(); addMediaClip(p, 'v', vTrack(p), 0); addMediaClip(p, 'a', aTrack(p), 2);
   const g = buildAudioGraph(p).filter;
   assert.match(g, /apad=whole_dur=\d/); assert.ok(!/apad,/.test(g), 'no bare apad');
+});
+
+test('multi-select: group move is atomic and clamped; delete and ripple close gaps per track', () => {
+  const p = fixture();
+  const v1 = vTrack(p), v2 = p.tracks.find((t) => t.name === 'V2').id;
+  const mk = (id, track, start, dur) => { const c = addMediaClip(p, 'i', track, start); c.id = id; c.start = start; c.duration = dur; return c; };
+  const a = mk('A', v1, 0, 2), b = mk('B', v1, 2, 2), c = mk('C', v1, 4, 2), d = mk('D', v2, 1, 2);
+  assert.equal(moveClips(p, ['A', 'D'], 1), false, 'A would land on B (not part of the move)'); assert.equal(a.start, 0); assert.equal(d.start, 1);
+  assert.ok(moveClips(p, ['A', 'B', 'C'], 3)); assert.deepEqual([a.start, b.start, c.start], [3, 5, 7], 'whole block moved together');
+  assert.ok(moveClips(p, ['A', 'B', 'C', 'D'], -10)); assert.deepEqual([a.start, b.start, c.start, d.start], [2, 4, 6, 0], 'clamped so the earliest clip in the group (D) stops at 0 and the rest keep their spacing');
+  assert.equal(deleteClips(p, ['B'], { ripple: true }), 1); assert.equal(c.start, 4, 'ripple pulled C left by B\'s length (6 -> 4)'); assert.equal(d.start, 0, 'other tracks untouched');
+  const q = fixture(); const v = vTrack(q);
+  const x = addMediaClip(q, 'i', v, 0), y = addMediaClip(q, 'i', v, 5), z = addMediaClip(q, 'i', v, 10);
+  deleteClips(q, [x.id, y.id], { ripple: true }); assert.equal(z.start, 10 - 10, 'both removed lengths accumulate'); 
+  const r = fixture(); const rx = addMediaClip(r, 'i', vTrack(r), 0), ry = addMediaClip(r, 'i', vTrack(r), 5);
+  deleteClips(r, [rx.id]); assert.equal(ry.start, 5, 'plain delete leaves the gap');
 });
