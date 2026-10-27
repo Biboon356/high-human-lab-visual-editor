@@ -1,10 +1,10 @@
 {
   "name": "high-human-lab-visual-editor",
   "productName": "HIGH HUMAN LAB — VISUAL EDITOR",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Experimental video editing workstation for musicians and visual artists.",
   "type": "module",
-  "main": "src/main/main.js",
+  "main": "src/main/boot.js",
   "private": true,
   "scripts": {
     "start": "electron .",

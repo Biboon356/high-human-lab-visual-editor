@@ -5,6 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { downloadFile } from './model-download.js';
 import { composePrompt } from '../shared/asr-plan.js';
+import { pathToFileURL } from 'node:url';
+import { appRequire } from './app-root.js';
 
 /** ggml models published at huggingface.co/ggerganov/whisper.cpp. Quantised builds keep downloads small. */
 export const MODELS = {
@@ -35,7 +37,7 @@ const BLANK = /^\s*(\[[A-Z_ ]+\]|\(.*\)|♪+|\*.*\*)\s*$/i;
 
 let cache = null; // {modelPath, ctx}
 async function loadEngine(loader) {
-  try { return await (loader ? loader() : import('@fugood/whisper.node')); }
+  try { return await (loader ? loader() : import(pathToFileURL(appRequire.resolve('@fugood/whisper.node')).href)); }
   catch (e) { throw new Error(`The speech engine could not be loaded on this computer (${e.code || e.message}).`); }
 }
 

@@ -9,6 +9,7 @@ import { validateProject } from '../shared/project.js';
 import { MODELS, DEFAULT_MODEL, modelStatus, ensureModel, transcribePcm, transcribeChunks, releaseEngine } from './asr.js';
 import { rmsEnvelope } from '../shared/audio-analysis.js';
 import { analyzeFile, killFootage } from './footage.js';
+import { mountUpdates } from './update.js';
 import { buildAnalysisArgs, buildExportArgs, validateExportSettings, FORMATS } from '../shared/export-plan.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -80,6 +81,8 @@ function createWindow() {
     webPreferences: { preload: path.join(here, 'preload.cjs'), contextIsolation: true, sandbox: true, nodeIntegration: false },
   });
   win.loadURL('hhlab://local/app/index.html');
+  // an update counts as good only once its window has actually loaded (boot.js rolls back otherwise)
+  win.webContents.once('did-finish-load', () => globalThis.__hhUpdate?.markGood?.());
   win.on('close', (e) => {
     if (!dirty || process.env.HHLAB_E2E) return;
     const choice = dialog.showMessageBoxSync(win, {
@@ -113,7 +116,7 @@ function buildMenu() {
       { label: 'Duplicate Clip', accelerator: 'CmdOrCtrl+D', click: send('duplicate') },
       { type: 'separator' }, { role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { role: 'selectAll' },
     ] },
-    { label: 'Tools', submenu: [{ label: '✨ TikTok Auto-Edit…', accelerator: 'CmdOrCtrl+Shift+A', click: send('autoedit') }] },
+    { label: 'Tools', submenu: [{ label: 'TikTok Auto-Edit…', accelerator: 'CmdOrCtrl+Shift+A', click: send('autoedit') }, { label: 'Captions & Vocabulary…', click: send('captions') }, { type: 'separator' }, { label: 'Check for Updates…', click: send('checkUpdates') }] },
     { label: 'View', submenu: [{ role: 'reload' }, { role: 'toggleDevTools' }, { role: 'togglefullscreen' }] },
   ];
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
@@ -386,6 +389,8 @@ app.whenReady().then(() => {
   electronSession.defaultSession.setPermissionCheckHandler((_wc, permission) => permission === 'local-fonts');
   handleProtocol();
   registerIpc();
+  mountUpdates({ getWindow: () => win });
+  ipcMain.handle('app:info', () => ({ version: globalThis.__hhUpdate?.version || app.getVersion(), installed: globalThis.__hhUpdate?.bundledVersion || app.getVersion(), updated: !!globalThis.__hhUpdate?.active }));
   buildMenu();
   createWindow();
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });

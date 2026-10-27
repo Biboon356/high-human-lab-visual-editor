@@ -1,6 +1,7 @@
 import { el } from './dom.js';
 import { store } from '../store.js';
 import { RESOLUTIONS } from '/shared/project.js';
+import { updateCard } from './updates.js';
 
 export function mountProjectSettings(root) {
   const render = () => {
@@ -15,6 +16,7 @@ export function mountProjectSettings(root) {
     root.append(el('section', { class: 'card' }, el('h4', { text: 'Project settings' }), el('div', { class: 'body' },
       el('div', { class: 'row flat' }, el('label', { text: 'Canvas' }), res), el('div', { class: 'row flat' }, el('label', { text: 'Frame rate' }), fps),
       el('p', { class: 'hint', text: 'The first video imported into an empty project sets these automatically.' }))));
+    root.append(updateCard());
     const kb = (keys, what) => el('div', { class: 'kb' }, el('span', { class: 'keys' }, ...keys.map((k) => el('kbd', { text: k }))), el('span', { text: what }));
     root.append(el('section', { class: 'card' }, el('h4', { text: 'Keyboard' }), el('div', { class: 'body' },
       kb(['Space'], 'play / pause'), kb(['S'], 'split at playhead'), kb(['Delete'], 'remove clip'), kb(['⇧', 'Delete'], 'remove and close the gap'),

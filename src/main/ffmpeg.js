@@ -1,10 +1,10 @@
 // ffmpeg / ffprobe wrapper. Prefers bundled static binaries, falls back to PATH.
 import { spawn } from 'node:child_process';
-import { createRequire } from 'node:module';
+import { appRequire } from './app-root.js';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const require = createRequire(import.meta.url);
+const require = appRequire; // dependencies come from the installed app even when this file runs from an update
 
 function unpacked(p) {
   // Inside a packaged app, binaries are unpacked from the asar archive.

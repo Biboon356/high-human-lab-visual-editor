@@ -11,6 +11,7 @@ import { openExportDialog, isExporting } from './ui/export-dialog.js';
 import { openAutoEdit } from './ui/autoedit-panel.js';
 import { openCaptionEditor, applyCaptionEdits } from './ui/caption-editor.js';
 import { openMontageDialog } from './ui/montage-panel.js';
+import { mountUpdateButton, checkNow } from './ui/updates.js';
 import * as smartMontage from './engine/montage.js';
 import { renderProject } from './engine/exporter.js';
 import { renderStill } from './engine/still.js';
@@ -80,7 +81,7 @@ async function openProject() {
 
 const actions = {
   new: newProject, open: openProject, save: () => save(false), saveAs: () => save(true),
-  import: importMedia, export: openExportDialog, autoedit: openAutoEdit, captions: openCaptionEditor,
+  import: importMedia, export: openExportDialog, autoedit: openAutoEdit, captions: openCaptionEditor, checkUpdates: () => checkNow(),
   undo: () => store.undo(), redo: () => store.redo(), duplicate: duplicateSelected,
 };
 document.querySelectorAll('[data-act]').forEach((b) => b.addEventListener('click', () => actions[b.dataset.act]()));
@@ -101,6 +102,7 @@ function syncChrome() {
 }
 store.on('dirty', syncChrome); store.on('reset', syncChrome); store.on('project', syncChrome);
 mountTooltips();
+mountUpdateButton();
 // bundled faces must be loaded before the canvas draws with them; redraw once they are ready
 Promise.all(['400 40px "Pinyon Script"', '400 40px "Instrument Serif"', 'italic 400 40px "Instrument Serif"', '500 40px "Inter Tight"', '400 40px "DM Mono"'].map((f) => document.fonts.load(f)))
   .then(() => store.emit('render')).catch(() => {});

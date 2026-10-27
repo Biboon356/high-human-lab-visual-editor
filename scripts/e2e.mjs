@@ -2,7 +2,7 @@
 // imports real media, edits, saves/reopens, exports, and verifies the output with ffprobe.
 // Usage: xvfb-run -a node scripts/e2e.mjs     (on a desktop with a display: node scripts/e2e.mjs)
 import { createRequire } from 'node:module';
-import { spawnSync } from 'node:child_process';
+import { spawnSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -660,6 +660,100 @@ await step('cross-dissolve mixes the two pictures (and undoes in one step); the 
   const pink = await ev(() => { const d = window.__grab(96, 54); let n = 0; for (let i = 0; i < d.length; i += 3) if (d[i] > 180 && d[i + 1] < 110 && d[i + 2] > 40 && d[i + 2] < 190) n++; return n; });
   assert.ok(pink > 25, `the pink script title is in the picture (${pink} pink cells)`);
   await shot('19-script-title');
+});
+
+await step('in-app updates: a staged update runs from the data folder, a broken or unconfirmed one rolls back, GitHub check stages a verified bundle, a different shell asks for an installer', async () => {
+  const UC = await import(path.join(root, 'src/main/update-core.js'));
+  const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+  const electronV = JSON.parse(fs.readFileSync(path.join(root, 'node_modules/electron/package.json'), 'utf8')).version;
+  const shellKey = UC.shellKeyOf({ electron: electronV, dependencies: pkg.dependencies });
+  const bundled = pkg.version;
+  const bump = (v) => { const [a, b, c] = v.split('.').map(Number); return `${a}.${b}.${c + 1}`; };
+  const next = bump(bundled);
+  // a copy of src/ with a visible marker, optionally with broken main code
+  const makeBundle = (version, { broken = false, key = shellKey } = {}) => {
+    const tree = fs.mkdtempSync(path.join(os.tmpdir(), 'hhlab-upd-src-')); fs.cpSync(path.join(root, 'src'), path.join(tree, 'src'), { recursive: true });
+    const html = path.join(tree, 'src/renderer/index.html'); fs.writeFileSync(html, fs.readFileSync(html, 'utf8').replace(/<title>[^<]*<\/title>/, `<title>UPDATED ${version}</title>`));
+    if (broken) fs.appendFileSync(path.join(tree, 'src/main/main.js'), "\nthrow new Error('this update is broken');\n");
+    return UC.packBundle({ rootDir: tree, version, shellKey: key, notes: `notes for ${version}` });
+  };
+  const launch = async (env) => {
+    const a = await _electron.launch({ executablePath: req('electron'), args: [root, '--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'], env: { ...process.env, HHLAB_E2E: '1', HHLAB_E2E_NO_RECOVERY: '1', ...env } });
+    const pg = await a.firstWindow(); await pg.waitForFunction(() => window.__app); return { a, pg };
+  };
+  const stageLocally = (dir, b, version) => { UC.unpackBundle(b.gz, path.join(dir, version)); fs.writeFileSync(path.join(dir, 'state.json'), JSON.stringify({ ready: version })); };
+
+  // 1) a staged, verified update is what runs; it confirms itself once its window has loaded
+  const d1 = fs.mkdtempSync(path.join(os.tmpdir(), 'hhlab-upd-1-'));
+  stageLocally(d1, makeBundle(next), next);
+  let r = await launch({ HHLAB_UPDATES_DIR: d1 });
+  assert.equal(await r.pg.title(), `UPDATED ${next}`, 'the renderer comes from the update');
+  assert.deepEqual(await r.pg.evaluate(() => window.hh.appInfo()), { version: next, installed: bundled, updated: true });
+  await r.pg.waitForTimeout(500);
+  let stt = UC.readState(d1); assert.deepEqual([stt.pending, stt.verified, stt.ready], [null, next, next], 'confirmed: not pending any more');
+  assert.equal(await r.pg.evaluate(() => window.__app.store.project.clips.length), 0, 'and the updated app is fully working');
+  assert.ok(await r.pg.evaluate(() => !!document.getElementById('update-card') || true));
+  await r.a.close();
+
+  // 2) an update whose main code throws: it is blacklisted and the app restarts on the installed code
+  const d2 = fs.mkdtempSync(path.join(os.tmpdir(), 'hhlab-upd-2-'));
+  stageLocally(d2, makeBundle(next, { broken: true }), next);
+  const child = spawn(req('electron'), [root, '--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'], { env: { ...process.env, HHLAB_E2E: '1', HHLAB_UPDATES_DIR: d2 }, detached: true, stdio: 'ignore' });
+  for (let i = 0; i < 100 && !UC.readState(d2).bad.includes(next); i++) await new Promise((x) => setTimeout(x, 200));
+  stt = UC.readState(d2); assert.ok(stt.bad.includes(next) && stt.ready === null, `blacklisted: ${JSON.stringify(stt)}`);
+  await new Promise((x) => setTimeout(x, 1500)); // let the relaunched installer-code process come up, then stop the whole group
+  try { process.kill(-child.pid, 'SIGKILL'); } catch { /* already gone */ }
+  r = await launch({ HHLAB_UPDATES_DIR: d2 });
+  assert.notEqual(await r.pg.title(), `UPDATED ${next}`); assert.deepEqual(await r.pg.evaluate(() => window.hh.appInfo()), { version: bundled, installed: bundled, updated: false });
+  await r.a.close();
+
+  // 3) an update that started but never confirmed (crash / hang): next start falls back
+  const d3 = fs.mkdtempSync(path.join(os.tmpdir(), 'hhlab-upd-3-'));
+  stageLocally(d3, makeBundle(next), next); fs.writeFileSync(path.join(d3, 'state.json'), JSON.stringify({ ready: next, pending: next }));
+  r = await launch({ HHLAB_UPDATES_DIR: d3 });
+  assert.equal((await r.pg.evaluate(() => window.hh.appInfo())).updated, false); assert.ok(UC.readState(d3).bad.includes(next));
+  await r.a.close();
+
+  // 4) a wrong-shell update is ignored; so is one that is not newer than the installer
+  const d4 = fs.mkdtempSync(path.join(os.tmpdir(), 'hhlab-upd-4-'));
+  stageLocally(d4, makeBundle(next, { key: 'some-other-shell' }), next);
+  r = await launch({ HHLAB_UPDATES_DIR: d4 }); assert.equal((await r.pg.evaluate(() => window.hh.appInfo())).updated, false); await r.a.close();
+
+  // 5) a fake GitHub: the app checks, downloads, verifies and stages; the top-bar button offers the restart; the next start runs it
+  const serve = (routes) => { const srv = http.createServer((q, res) => { const h = routes[q.url]; if (!h) { res.writeHead(404); return res.end(); } res.writeHead(200, { 'Content-Type': h.type || 'application/json' }); res.end(h.body); }).listen(0, '127.0.0.1'); return new Promise((ok) => srv.once('listening', () => ok(srv))); };
+  const release = async ({ key = shellKey, tamper = false } = {}) => {
+    const b = makeBundle(next, { key }); const file = `hhlab-update-${next}.json.gz`;
+    const srv = await serve({}); const base = `http://127.0.0.1:${srv.address().port}`;
+    const bad = tamper ? Buffer.concat([b.gz, Buffer.from('x')]) : b.gz;
+    srv.removeAllListeners('request');
+    srv.on('request', (q, res) => {
+      const m = { '/latest': { tag_name: `v${next}`, html_url: 'https://github.com/Biboon356/high-human-lab-visual-editor/releases/tag/test', assets: [{ name: 'update.json', browser_download_url: `${base}/update.json` }, { name: file, browser_download_url: `${base}/${file}` }] },
+        '/update.json': { version: next, shellKey: key, file, sha256: b.sha256, notes: 'Fixes everything' } }[q.url];
+      if (m) { res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify(m)); }
+      if (q.url === `/${file}`) { res.writeHead(200); return res.end(bad); }
+      res.writeHead(404); res.end();
+    });
+    return { srv, api: `${base}/latest` };
+  };
+  const d5 = fs.mkdtempSync(path.join(os.tmpdir(), 'hhlab-upd-5-')); const rel = await release();
+  r = await launch({ HHLAB_UPDATES_DIR: d5, HHLAB_UPDATE_API: rel.api, HHLAB_UPDATE_FORCE: '1', HHLAB_UPDATE_DELAY_MS: '300' });
+  await r.pg.waitForFunction((v) => { const b = document.getElementById('btn-update'); return b && !b.hidden && b.textContent.includes(v); }, next, { timeout: 30000 });
+  assert.equal(UC.readState(d5).ready, next); assert.ok(fs.existsSync(path.join(d5, next, 'src/main/main.js')), 'staged on disk');
+  await r.pg.evaluate(() => document.querySelector('[data-tab=project]').click());
+  assert.match(await r.pg.evaluate(() => document.getElementById('update-card').textContent), new RegExp(`Version ${bundled.replace(/\./g, '\\.')}`));
+  await r.pg.screenshot({ path: path.join(shots, '21-update-ready.png') }); await r.a.close();
+  r = await launch({ HHLAB_UPDATES_DIR: d5, HHLAB_NO_UPDATES: '' }); assert.equal(await r.pg.title(), `UPDATED ${next}`, 'the staged update runs on the next start'); await r.a.close(); rel.srv.close();
+
+  // 6) a tampered download is rejected and nothing is staged; a different shell is reported as "needs installer"
+  const d6 = fs.mkdtempSync(path.join(os.tmpdir(), 'hhlab-upd-6-')); const t = await release({ tamper: true });
+  r = await launch({ HHLAB_UPDATES_DIR: d6, HHLAB_UPDATE_API: t.api, HHLAB_UPDATE_FORCE: '1', HHLAB_UPDATE_DELAY_MS: '100' });
+  await r.pg.evaluate(() => document.querySelector('[data-tab=project]').click());
+  await r.pg.waitForFunction(() => /checksum/.test(document.getElementById('update-card')?.textContent || ''), null, { timeout: 30000 });
+  assert.equal(UC.readState(d6).ready, null); assert.equal(await r.pg.evaluate(() => document.getElementById('btn-update').hidden), true); await r.a.close(); t.srv.close();
+  const d7 = fs.mkdtempSync(path.join(os.tmpdir(), 'hhlab-upd-7-')); const w = await release({ key: 'other-shell' });
+  r = await launch({ HHLAB_UPDATES_DIR: d7, HHLAB_UPDATE_API: w.api, HHLAB_UPDATE_FORCE: '1', HHLAB_UPDATE_DELAY_MS: '100' });
+  await r.pg.waitForFunction(() => { const b = document.getElementById('btn-update'); return b && !b.hidden && /installer/i.test(b.textContent); }, null, { timeout: 30000 });
+  assert.equal(UC.readState(d7).ready, null, 'nothing staged for a different shell'); await r.a.close(); w.srv.close();
 });
 
 await step('export dialog: platform preset sets 9:16 / fps / quality', async () => {

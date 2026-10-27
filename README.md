@@ -112,6 +112,16 @@ None of this has been measured against real Thai recordings yet (see status belo
 - **Title lockup** (Type tab): a small serif kicker over a hot-pink formal-script title, in the bundled *Pinyon Script* (OFL). Both are ordinary text clips: edit the words, colour, animation, or swap the font for any installed one.
 - **Dissolve** (timeline toolbar): select a clip that starts where another picture clip ends, press **Dissolve** with a length (0.25–1.5 s). The incoming clip moves onto its own track directly above the outgoing one and overlaps it, so the pictures really mix (and the sound crossfades); it uses the incoming clip's spare head footage so the dissolve finishes on the cut, or the outgoing clip's tail if there is none. One Undo reverts. The *Cinematic* montage style uses it on calm cuts.
 
+## Updating without reinstalling
+
+From version 0.2.0 the app updates itself **in place**: on start (and every few hours) it asks GitHub for the latest release, downloads a small checksummed bundle of the app's own code (`src/**`, a few hundred KB), and shows **Update x.y.z · Restart** in the top bar. Nothing is applied until you press it; the next start then runs the new code from the app's data folder. *Project → Updates* shows the version and has a manual *Check for updates* (also *Tools → Check for Updates…*).
+
+- **Safe by construction** (all unit/e2e tested): the bundle must match the SHA-256 in the release, must be built for the *same shell* (same Electron version and native dependencies, otherwise the top bar says **New installer** and opens the download page), may only contain files under `src/`, and an update that did not finish starting is blacklisted — the app restarts on the code from the installer.
+- **What it cannot update:** anything native (Electron itself, ffmpeg, the Whisper binding). Those need a new installer, which is rare. You need to install 0.2.0 once; earlier builds have no updater.
+- **How a release is made:** push a tag `vX.Y.Z`. CI builds the installers (version taken from the tag) and `scripts/make-update.mjs` builds `update.json` + `hhlab-update-X.Y.Z.json.gz`; all of it is attached to the GitHub Release, and installed apps pick it up.
+- **Trust:** the checksum protects against corrupt downloads, not against a compromised repository — the update is exactly as trusted as the release it comes from. No code signing is involved (there is no Developer ID), so macOS does not treat the swapped-in code as a new app.
+- **Not yet verified on real installs:** the mechanism is tested end-to-end with Electron on Linux (staged update runs, broken update rolls back, tampered download rejected, GitHub check against a local fake). It has not been run from a macOS/Windows installer. Set `HHLAB_NO_UPDATES=1` to turn it off.
+
 ## Visual identity
 
 The interface follows a written art direction — soot-black and bone with forest/moss greens, italic-serif headlines, a root-line motif,
@@ -169,7 +179,7 @@ Legend: ✅ works and is covered by the automated tests · 🧪 prototype (works
 
 ## Testing
 
-`npm test` runs 83 unit tests. `scripts/e2e.mjs` (49 checks) is a real end-to-end run of the Electron app (see table above): it
+`npm test` runs 91 unit tests. `scripts/e2e.mjs` (50 checks) is a real end-to-end run of the Electron app (see table above): it
 generates test media with ffmpeg, drives the app, reads pixels out of the compositor, and probes exported files.
 Native file dialogs are stubbed at the Electron main-process level; every other path is the production code.
 
