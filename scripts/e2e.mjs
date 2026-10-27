@@ -492,6 +492,13 @@ await step('timeline shows video thumbnails and audio waveforms drawn from the r
   await shot('13-thumbs-waveforms');
 });
 
+await step('typography: installed system fonts are listed in the font picker', async () => {
+  const r = await ev(async () => { const { systemFonts, ensureFontList } = await import('/app/ui/fonts.js'); const list = await systemFonts(); ensureFontList(); await new Promise((r) => setTimeout(r, 300));
+    return { n: list.length, sample: list.slice(0, 3), options: document.querySelectorAll('#font-list option').length }; });
+  assert.ok(r.n > 0, `system fonts enumerated: ${JSON.stringify(r)}`);
+  assert.ok(r.options >= r.n, 'datalist populated with the system fonts');
+});
+
 await step('light theme + collapsible panels', async () => {
   await ev(() => { document.getElementById('toggle-theme').click(); document.getElementById('toggle-left').click(); });
   await settle(300); await shot('11-light-collapsed');

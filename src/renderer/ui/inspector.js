@@ -4,7 +4,8 @@ import { paramRow, flatRow, rowUpdaters } from './param-row.js';
 import { findMedia } from '/shared/project.js';
 import { EFFECTS, EFFECT_PRESETS, createEffect, instantiatePreset } from '/shared/effects-defs.js';
 import { CLIP_PROPS, TEXT_PROPS, BLEND_MODES } from '/shared/params.js';
-import { FONTS, TEXT_ANIMATIONS } from '/shared/text-defs.js';
+import { TEXT_ANIMATIONS } from '/shared/text-defs.js';
+import { ensureFontList } from './fonts.js';
 import { GEN_PARAMS, GEN_STYLES } from '/shared/organic-defs.js';
 
 const USER_PRESET_KEY = 'hhlab.userEffectPresets';
@@ -70,7 +71,7 @@ export function mountInspector(root) {
     T.fx = { split: 0, shadow: 0, glow: 0, gradient: false, grad1: '#ffffff', grad2: '#7d8f85', ...(T.fx || {}) };
     const ta = field(el('textarea', { rows: 3, spellcheck: false }), 'input', (i) => { T.content = i.value; });
     ta.value = T.content;
-    const fontList = el('datalist', { id: 'font-list' }, FONTS.map((f) => el('option', { value: f })));
+    ensureFontList();
     const font = field(el('input', { type: 'text', value: T.font, list: 'font-list' }), 'input', (i) => { T.font = i.value; });
     const weight = field(el('select', {}, [300, 400, 500, 700, 900].map((w) => el('option', { value: w, text: w, ...(w === T.weight ? { selected: true } : {}) }))), 'change', (i) => { T.weight = Number(i.value); });
     const size = field(el('input', { type: 'range', min: 0.01, max: 0.5, step: 0.005, value: T.size }), 'input', (i) => { T.size = Number(i.value); });
@@ -94,7 +95,7 @@ export function mountInspector(root) {
     const gradOn = field(el('input', { type: 'checkbox', checked: T.fx.gradient }), 'change', (i) => { T.fx.gradient = i.checked; });
     const g1 = field(el('input', { type: 'color', value: T.fx.grad1 }), 'input', (i) => { T.fx.grad1 = i.value; });
     const g2 = field(el('input', { type: 'color', value: T.fx.grad2 }), 'input', (i) => { T.fx.grad2 = i.value; });
-    return card('Typography', [ta, fontList, flatRow('Font', font), flatRow('Weight', weight, el('label', { class: 'chk' }, italic, 'italic')),
+    return card('Typography', [ta, flatRow('Font', font), flatRow('Weight', weight, el('label', { class: 'chk' }, italic, 'italic')),
       flatRow('Size', size), flatRow('Fit width', fit), flatRow('Align', align, el('label', { class: 'chk' }, upper, 'CAPS')), flatRow('Fill', color),
       flatRow('Outline', stroke, strokeC), flatRow('Hollow', hollow, fillA), flatRow('Plate', bgOn, bgC, bgPad),
       flatRow('Chrome fill', gradOn, g1, g2), flatRow('RGB split', sl('split')), flatRow('Shadow', sl('shadow')), flatRow('Glow', sl('glow')),

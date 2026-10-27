@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu, dialog, ipcMain, protocol, net, shell } from 'electron';
+import { app, BrowserWindow, Menu, dialog, ipcMain, protocol, net, shell, session as electronSession } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
@@ -267,6 +267,9 @@ function registerIpc() {
 }
 
 app.whenReady().then(() => {
+  // The only permission the app ever needs is listing installed fonts for the Typography Lab.
+  electronSession.defaultSession.setPermissionRequestHandler((_wc, permission, cb) => cb(permission === 'local-fonts'));
+  electronSession.defaultSession.setPermissionCheckHandler((_wc, permission) => permission === 'local-fonts');
   handleProtocol();
   registerIpc();
   buildMenu();

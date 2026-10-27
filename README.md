@@ -92,31 +92,31 @@ Legend: ✅ works and is covered by the automated tests · 🧪 prototype (works
 |---|---|---|
 | Import video / audio / image | ✅ | ffprobe metadata, drag & drop, auto H.264 proxy when Chromium can't decode |
 | Preview + transport | ✅ | play/pause/seek/frame-step/loop; playback is clock-driven with audio-element sync |
-| Multitrack timeline | ✅ | tracks add/mute/hide, place/move/trim/split/delete, snapping, zoom, undo/redo (100 steps) |
-| Project save / open | ✅ | `.hhlab` JSON, atomic write, validation, missing-media detection |
+| Multitrack timeline | ✅ | tracks add/mute/hide, place/move/trim/split/delete/duplicate, copy & paste, video thumbnails + audio waveforms, beat markers, snap to clips/playhead/beats, **Cut on beats**, zoom, undo/redo (100 steps) |
+| Project save / open | ✅ | `.hhlab` JSON, atomic write, validation, missing-media detection, relink |
 | Effects (23): glitch, grain, cloud noise, wave distortion, fluid warp, blur, colour, CRT, lens chromatic, bloom, film 35mm, VHS, mosh/smear, halftone, pixelate, camera shake/punch, colour flash, **gradient map (duotone), xerox threshold, solarize/channel swap, slice bars, shape mask (circle/rect/diamond/blob), die-cut sticker outline** | ✅ | stack/reorder/enable/remove; 19 built-in presets (Xerox Photocopy, Comic Flash, Die-Cut Sticker, Circle Window, …) (some audio-bound, e.g. *Beat Punch*) + user presets (stored in browser storage) |
-| Typography | ✅ / 🧪 | text clips with font/size/tracking/align/position/rotation/outline/plate, chrome gradient fill, RGB split, shadow, glow, hollow outline text, fit-to-width and 11 animations (incl. slam, stutter, strobe) ✅; fonts are typed or picked from a fixed list — no system font browser 🧪 |
+| Typography | ✅ / 🧪 | text clips with font/size/tracking/align/position/rotation/outline/plate, chrome gradient fill, RGB split, shadow, glow, hollow outline text, fit-to-width and 11 animations (incl. slam, stutter, strobe) ✅; fonts come from the installed-font list (typed or picked) — no live font preview 🧪 |
 | Keyframes | 🧪 | per-parameter keys with smooth interpolation, shown on timeline clips; no curve editor, no per-key easing choice, no dragging keys on the timeline |
 | Organic engine | 🧪 | three procedural generators (roots, topographic fluid, cell membrane) drawn as crisp constant-width lines with a keyframable *Growth* front, glow, overlay blend on footage; look is still being tuned |
 | Audio-reactive | ✅ / 🧪 | amplitude, 3 bands, beat detection and tempo estimate ✅; analysis is whole-mix only (no per-clip source choice), fixed 60 Hz, beats are simple spectral flux 🧪 |
 | Export | ✅ | H.264/AAC and VP9/Opus, 6 resolutions (+project), 24–60 fps, 3 quality levels, progress/ETA, cancel, errors surfaced, output re-probed before "success" |
 | Preview audio | 🧪 | each clip plays through its own media element; no master mixer, meters or waveforms |
 | Packaging for macOS/Windows | 🧪 | electron-builder config present; **not built or signed here** (needs each OS; no code-signing/notarization set up) |
-| Thumbnails / waveforms on timeline | ⛔ | clips are coloured bars |
-| Transitions, speed/reverse, audio fades, multi-select, copy/paste, ripple edit | ⛔ | |
+| Transitions, speed/reverse, audio fades, multi-select, ripple edit | ⛔ | |
 | Hardware-accelerated decode/encode for export | ⛔ | software decode + x264 only (see roadmap) |
 | AI features | ⛔ | intentionally deferred |
 
 ### Known limitations
 
 * Export decodes sources with ffmpeg (sequential frames, original file) and renders through WebGL; speed is then bounded by GPU readback + IPC. On the software-GL test sandbox 640×360 renders at roughly 10–20 frames/s; real GPUs are faster.
-* A project's media must stay at the same path; re-linking is not built (re-import to replace).
+* If media moves, use **Relink…** on the missing item in the media bin.
+* Timeline thumbnails use keyframes only (fast), so sparse-keyframe files show repeated thumbnails.
 * Proxies are used for *preview* of files Chromium can't decode; exports always read the original file.
 * Audio is mixed at 48 kHz stereo on export; mono/surround sources are up/down-mixed.
 
 ## Testing
 
-`npm test` runs 11 unit tests. `scripts/e2e.mjs` (21 checks) is a real end-to-end run of the Electron app (see table above): it
+`npm test` runs 11 unit tests. `scripts/e2e.mjs` (30 checks) is a real end-to-end run of the Electron app (see table above): it
 generates test media with ffmpeg, drives the app, reads pixels out of the compositor, and probes exported files.
 Native file dialogs are stubbed at the Electron main-process level; every other path is the production code.
 
