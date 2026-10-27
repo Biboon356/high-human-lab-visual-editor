@@ -118,7 +118,7 @@ Legend: ✅ works and is covered by the automated tests · 🧪 prototype (works
 | TikTok Auto-Edit (Thai captions, jump cuts, 9:16, loudness) | ✅ / 🧪 | everything except live Whisper transcription is tested end-to-end; transcription accuracy on real Thai speech needs your feedback 🧪 |
 | Export | ✅ | H.264/AAC and VP9/Opus, 6 resolutions (+project), 24–60 fps, 3 quality levels, progress/ETA, cancel, errors surfaced, output re-probed before "success" |
 | Preview audio | 🧪 | each clip plays through its own media element; no master mixer, meters or waveforms |
-| Packaging for macOS/Windows | 🧪 | electron-builder config present; **not built or signed here** (needs each OS; no code-signing/notarization set up) |
+| Packaging for macOS/Windows | 🧪 | Built by GitHub Actions for macOS arm64/x64 and Windows. macOS app is **ad-hoc signed** (no Developer ID/notarization), so the first launch needs right-click → Open. If macOS says it is "damaged": `xattr -cr "/Applications/HIGH HUMAN LAB - VISUAL EDITOR.app"`. Not yet confirmed running on a real Mac |
 | Reverse playback, speed ramps (variable speed), crossfade transitions between overlapping clips | ⛔ | constant speed (0.1–4×) and fade in/out are done |
 | Hardware-accelerated decode/encode for export | ⛔ | software decode + x264 only (see roadmap) |
 | AI features | ⛔ | intentionally deferred |

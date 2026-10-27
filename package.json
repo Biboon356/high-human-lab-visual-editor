@@ -1,6 +1,6 @@
 {
   "name": "high-human-lab-visual-editor",
-  "productName": "HIGH HUMAN LAB \u2014 VISUAL EDITOR",
+  "productName": "HIGH HUMAN LAB — VISUAL EDITOR",
   "version": "0.1.0",
   "description": "Experimental video editing workstation for musicians and visual artists.",
   "type": "module",
@@ -60,7 +60,8 @@
       "output": "dist",
       "buildResources": "build"
     },
-    "artifactName": "HIGH-HUMAN-LAB-${version}-${os}-${arch}.${ext}"
+    "artifactName": "HIGH-HUMAN-LAB-${version}-${os}-${arch}.${ext}",
+    "afterPack": "scripts/after-pack.cjs"
   },
   "engines": {
     "node": ">=20"
