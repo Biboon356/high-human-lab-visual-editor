@@ -9,6 +9,7 @@ import { mountReactive, runAnalysis } from './ui/reactive-ui.js';
 import { mountProjectSettings } from './ui/project-settings.js';
 import { openExportDialog, isExporting } from './ui/export-dialog.js';
 import { renderProject } from './engine/exporter.js';
+import { renderStill } from './engine/still.js';
 import { startRoots } from './bg-roots.js';
 import { startAutosave, offerRecovery, writeNow } from './autosave.js';
 
@@ -101,6 +102,14 @@ syncChrome();
 startAutosave();
 offersRecovery();
 async function offersRecovery() { try { await offerRecovery({ startup: true }); } catch { /* never block startup */ } }
+
+$('t-still').onclick = async () => {
+  try {
+    const blob = await renderStill(structuredClone(store.project), store.playhead, store.analysis);
+    const file = await hh.savePng(await blob.arrayBuffer(), `${store.project.name || 'frame'}-${store.playhead.toFixed(2)}s`);
+    if (file) toast(`Saved ${file}`);
+  } catch (e) { toast(`Could not save the frame: ${e.message}`, 'error'); }
+};
 
 // ---- keyboard
 addEventListener('keydown', (e) => {

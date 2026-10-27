@@ -644,6 +644,18 @@ await step('kinetic type: letters rise one by one, wave moves, scramble decodes 
   assert.notEqual(s0.sig, none.sig, 'scrambled glyphs differ from the final text'); assert.equal(s2.sig, none.sig, 'once decoded the picture is identical to plain text');
 });
 
+await step('save frame: full-resolution PNG of the current frame, effects included', async () => {
+  await resetProject(); await ev((p) => window.__app.importPaths([p]), clip);
+  await ev(async () => { const { store } = window.__app; const { createEffect } = await import('/shared/effects-defs.js'); store.mutate((p) => { p.settings.width = 1280; p.settings.height = 720; p.clips[0].effects.push(createEffect('color', { saturation: 0 })); }); store.setPlayhead(1.5); });
+  await settle(600);
+  const png = path.join(dir, 'still.png'); await stubDialog('showSaveDialog', { canceled: false, filePath: png });
+  await page.click('#t-still'); await page.waitForFunction(() => document.querySelector('.toast')?.textContent.includes('Saved'), null, { timeout: 30000 });
+  const v = probe(png).streams[0]; assert.equal(v.width, 1280); assert.equal(v.height, 720);
+  const raw = path.join(dir, 'still.raw'); sh(FFMPEG, ['-v', 'error', '-y', '-i', png, '-vf', 'scale=64:36', '-pix_fmt', 'rgb24', '-f', 'rawvideo', raw]);
+  const d = fs.readFileSync(raw); let chroma = 0, lit = 0; for (let i = 0; i < d.length; i += 3) { chroma += Math.max(d[i], d[i + 1], d[i + 2]) - Math.min(d[i], d[i + 1], d[i + 2]); if (d[i] + d[i + 1] + d[i + 2] > 60) lit++; }
+  assert.ok(lit / (d.length / 3) > 0.5, 'frame has picture content'); assert.ok(chroma / (d.length / 3) < 6, `the saturation-0 effect is baked in (mean chroma ${(chroma / (d.length / 3)).toFixed(1)})`);
+});
+
 await step('light theme + collapsible panels', async () => {
   await ev(() => { document.getElementById('toggle-theme').click(); document.getElementById('toggle-left').click(); });
   await settle(300); await shot('11-light-collapsed');

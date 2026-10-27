@@ -218,6 +218,13 @@ function registerIpc() {
     return { sampleRate: 22050, pcm: pcm.buffer.slice(pcm.byteOffset, pcm.byteOffset + pcm.byteLength) };
   });
 
+  ipcMain.handle('file:savePng', async (_e, { bytes, name }) => {
+    const r = await dialog.showSaveDialog(win, { title: 'Save frame', defaultPath: `${name}.png`, filters: [{ name: 'PNG image', extensions: ['png'] }] });
+    if (r.canceled) return null;
+    const file = r.filePath.endsWith('.png') ? r.filePath : `${r.filePath}.png`;
+    fs.writeFileSync(file, Buffer.from(bytes));
+    return file;
+  });
   ipcMain.handle('export:pickPath', async (_e, { defaultName, format }) => {
     const f = FORMATS[format] || FORMATS.mp4;
     const r = await dialog.showSaveDialog(win, { title: 'Export video', defaultPath: `${defaultName}.${f.ext}`, filters: [{ name: f.label, extensions: [f.ext] }] });
