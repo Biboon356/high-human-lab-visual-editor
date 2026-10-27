@@ -231,3 +231,15 @@ export async function makePeaks(file, perSec = 50) {
   }
   return { peaks: out, perSec };
 }
+
+/** Decodes [start, start+duration) of a media file's audio to 16 kHz mono signed-16 PCM (what Whisper expects). */
+export async function extractPcm16k(file, start = 0, duration = 0) {
+  const args = ['-hide_banner', '-loglevel', 'error'];
+  if (start > 0) args.push('-ss', String(start));
+  if (duration > 0) args.push('-t', String(duration));
+  args.push('-i', file, '-vn', '-sn', '-ac', '1', '-ar', '16000', '-f', 's16le', 'pipe:1');
+  const { stdout } = await run(FFMPEG, args);
+  if (stdout.length < 3200) throw new Error('This clip has no audio to transcribe.');
+  const ab = stdout.buffer.slice(stdout.byteOffset, stdout.byteOffset + stdout.byteLength - (stdout.byteLength % 2));
+  return new Int16Array(ab);
+}

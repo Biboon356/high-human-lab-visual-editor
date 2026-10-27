@@ -4,8 +4,10 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { Readable } from 'node:stream';
-import { probeMedia, makeProxy, decodePcm, ExportSession, ClipDecoder, makeThumbs, makePeaks, FFMPEG } from './ffmpeg.js';
+import { probeMedia, makeProxy, decodePcm, ExportSession, ClipDecoder, makeThumbs, makePeaks, extractPcm16k, FFMPEG } from './ffmpeg.js';
 import { validateProject } from '../shared/project.js';
+import { MODELS, DEFAULT_MODEL, modelStatus, ensureModel, transcribePcm, releaseEngine } from './asr.js';
+import { rmsEnvelope } from '../shared/audio-analysis.js';
 import { buildAnalysisArgs, buildExportArgs, validateExportSettings, FORMATS } from '../shared/export-plan.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -194,6 +196,58 @@ function registerIpc() {
     return { filePath: file };
   });
 
+  // ---- Speech recognition (Whisper, fully local) -------------------------------------------------------------
+  const modelsDir = () => path.join(app.getPath('userData'), 'models');
+  const pcmCache = new Map(); // token -> Int16Array of the audio just extracted, so transcribing needs no second decode
+  let asrJob = null;
+  const sendAsr = (payload) => win?.webContents.send('asr:progress', payload);
+  ipcMain.handle('asr:status', () => ({ dir: modelsDir(), defaultModel: DEFAULT_MODEL, models: modelStatus(modelsDir()) }));
+  ipcMain.handle('asr:download', async (_e, id) => {
+    if (asrJob) throw new Error('Another speech task is already running.');
+    asrJob = { aborted: false };
+    let last = 0;
+    try {
+      await ensureModel(modelsDir(), id, { signal: asrJob, onProgress: (p) => { const now = Date.now(); if (now - last > 200 || p.received === p.total) { last = now; sendAsr({ phase: 'download', id, received: p.received, total: p.total }); } } });
+      return modelStatus(modelsDir())[id];
+    } finally { asrJob = null; }
+  });
+  ipcMain.handle('asr:remove', (_e, id) => {
+    const m = MODELS[id]; if (!m) return false;
+    for (const f of [m.file, `${m.file}.part`]) fs.rmSync(path.join(modelsDir(), f), { force: true });
+    return true;
+  });
+  ipcMain.handle('asr:cancel', async () => { if (asrJob) { asrJob.aborted = true; try { await asrJob.stop?.(); } catch { /* finished already */ } } return true; });
+  ipcMain.handle('asr:extract', async (_e, { path: file, start = 0, duration = 0 }) => {
+    if (!allowedMedia.has(path.resolve(file))) throw new Error('Not an imported media file');
+    const pcm = await extractPcm16k(file, start, duration);
+    const token = crypto.randomUUID();
+    pcmCache.set(token, pcm);
+    for (const k of [...pcmCache.keys()].slice(0, -2)) pcmCache.delete(k); // keep the two latest
+    const env = rmsEnvelope(pcm, 16000, 100);
+    return { token, seconds: pcm.length / 16000, env: { rate: env.rate, rms: env.rms.buffer.slice(0) } };
+  });
+  ipcMain.handle('asr:transcribe', async (_e, { token, model = DEFAULT_MODEL, language = 'th', prompt }) => {
+    const pcm = pcmCache.get(token);
+    if (!pcm) throw new Error('The audio is no longer available — run the edit again.');
+    const m = MODELS[model];
+    if (!m) throw new Error(`Unknown speech model "${model}".`);
+    if (asrJob) throw new Error('Another speech task is already running.');
+    asrJob = { aborted: false };
+    try {
+      return await transcribePcm({ pcm, modelPath: path.join(modelsDir(), m.file), language, prompt, signal: asrJob, onProgress: (pct) => sendAsr({ phase: 'transcribe', pct }) });
+    } finally { asrJob = null; }
+  });
+  ipcMain.handle('subs:open', async () => {
+    const r = await dialog.showOpenDialog(win, { title: 'Import subtitles', properties: ['openFile'], filters: [{ name: 'Subtitles', extensions: ['srt', 'vtt'] }] });
+    return r.canceled ? null : { name: path.basename(r.filePaths[0]), text: fs.readFileSync(r.filePaths[0], 'utf8') };
+  });
+  ipcMain.handle('subs:save', async (_e, { text, name }) => {
+    const r = await dialog.showSaveDialog(win, { title: 'Export captions', defaultPath: `${name}.srt`, filters: [{ name: 'SubRip', extensions: ['srt'] }] });
+    if (r.canceled) return null;
+    const file = r.filePath.endsWith('.srt') ? r.filePath : `${r.filePath}.srt`;
+    fs.writeFileSync(file, text); return file;
+  });
+
   // Crash recovery: the renderer pushes the project here while it has unsaved changes.
   const autosavePath = () => path.join(app.getPath('userData'), 'autosave.hhlab');
   ipcMain.handle('autosave:write', (_e, json) => {
@@ -310,6 +364,7 @@ app.whenReady().then(() => {
 // Never leave encoder/decoder processes running if the app quits (or the window is closed) mid-export.
 function killChildren() {
   closeDecoders();
+  releaseEngine().catch(() => {});
   if (session) { session.proc.kill('SIGKILL'); session = null; }
 }
 app.on('before-quit', killChildren);

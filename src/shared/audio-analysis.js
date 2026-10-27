@@ -132,3 +132,20 @@ export function sampleFeatures(a, t) {
   const lerp = (arr) => arr[i] + (arr[j] - arr[i]) * u;
   return { rms: lerp(a.rms), bass: lerp(a.bass), mid: lerp(a.mid), high: lerp(a.high), beat: a.beat[i] };
 }
+
+/**
+ * Plain RMS level per frame (0..1 of full scale) for voice work: cheap, no normalisation, so thresholds are meaningful
+ * across clips. @param {Int16Array|Float32Array} samples @param {number} sampleRate @param {number} rate frames per second
+ */
+export function rmsEnvelope(samples, sampleRate, rate = 100) {
+  const hop = Math.max(1, Math.round(sampleRate / rate));
+  const n = Math.max(1, Math.floor(samples.length / hop));
+  const out = new Float32Array(n);
+  const scale = samples instanceof Int16Array ? 1 / 32768 : 1;
+  for (let f = 0; f < n; f++) {
+    let sum = 0;
+    for (let i = f * hop, e = Math.min(samples.length, i + hop); i < e; i++) { const v = samples[i] * scale; sum += v * v; }
+    out[f] = Math.sqrt(sum / hop);
+  }
+  return { rate: sampleRate / hop, rms: out };
+}

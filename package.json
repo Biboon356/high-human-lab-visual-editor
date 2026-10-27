@@ -1,6 +1,6 @@
 {
   "name": "high-human-lab-visual-editor",
-  "productName": "HIGH HUMAN LAB — VISUAL EDITOR",
+  "productName": "HIGH HUMAN LAB \u2014 VISUAL EDITOR",
   "version": "0.1.0",
   "description": "Experimental video editing workstation for musicians and visual artists.",
   "type": "module",
@@ -33,6 +33,7 @@
       "build/icon.png"
     ],
     "asarUnpack": [
+      "node_modules/@fugood/**",
       "node_modules/ffmpeg-static/**",
       "node_modules/ffprobe-static/**"
     ],
