@@ -6,6 +6,7 @@ import { evalTrack, setKey, removeKey } from '../src/shared/keyframes.js';
 import { resolveParam } from '../src/shared/params.js';
 import { analyze, sampleFeatures } from '../src/shared/audio-analysis.js';
 import { tempoChain, fadeFilters, buildExportArgs, buildAudioGraph, validateExportSettings, buildAnalysisArgs } from '../src/shared/export-plan.js';
+import { buildRoots } from '../src/shared/roots.js';
 import { planMontage } from '../src/shared/montage.js';
 import { createEffect, EFFECT_PRESETS, instantiatePreset, EFFECTS } from '../src/shared/effects-defs.js';
 import { createTextClip, TEXT_PRESETS } from '../src/shared/text-defs.js';
@@ -199,4 +200,17 @@ test('montage planner: contiguous, beat-aligned, within source bounds, determini
   assert.notDeepEqual(plan.map((s) => s.mediaId), planMontage({ beats, every: 2, total: 8.5, media, seed: 8 }).map((s) => s.mediaId));
   assert.deepEqual(new Set(plan.slice(0, 3).map((s) => s.mediaId)).size, 3, 'first three cuts use three different sources');
   assert.deepEqual(planMontage({ beats, every: 2, total: 8, media: [{ id: 'x', kind: 'audio', duration: 9 }] }), [], 'audio-only media is ignored');
+});
+
+test('roots: deterministic, bounded, tapered, births normalised, branching increases with density', () => {
+  const a = buildRoots({ seed: 5, density: 1, aspect: 16 / 9 }), b = buildRoots({ seed: 5, density: 1, aspect: 16 / 9 });
+  assert.deepEqual(Array.from(a.segs), Array.from(b.segs), 'same seed -> same roots');
+  assert.notDeepEqual(Array.from(a.segs.slice(0, 40)), Array.from(buildRoots({ seed: 6, density: 1 }).segs.slice(0, 40)));
+  assert.ok(a.count > 100 && a.count <= 7000, `segments ${a.count}`);
+  let maxBirth = 0, minBirth = 1, thinner = 0;
+  for (let i = 0; i < a.count; i++) { const o = i * 8; maxBirth = Math.max(maxBirth, a.segs[o + 6]); minBirth = Math.min(minBirth, a.segs[o + 6]); if (a.segs[o + 5] <= a.segs[o + 4] + 1e-9) thinner++; }
+  assert.ok(maxBirth <= 1 + 1e-6 && minBirth >= 0, 'births within 0..1'); assert.equal(thinner, a.count, 'every segment tapers (never widens)');
+  assert.ok(buildRoots({ seed: 5, density: 3 }).count > buildRoots({ seed: 5, density: 0.4 }).count, 'denser -> more segments');
+  for (const origin of [0, 1, 2, 3]) assert.ok(buildRoots({ origin }).count > 20, `origin ${origin}`);
+  const depths = new Set(); for (let i = 0; i < a.count; i++) depths.add(a.segs[i * 8 + 7]); assert.ok(depths.size >= 3, 'trunk + several branch orders');
 });

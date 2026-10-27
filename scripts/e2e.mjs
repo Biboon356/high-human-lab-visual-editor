@@ -556,6 +556,18 @@ await step('export dialog: platform preset sets 9:16 / fps / quality', async () 
   await ev(() => [...document.querySelectorAll('.modal button')].find((b) => b.textContent === 'Close').click());
 });
 
+await step('root system generator: branching roots grow over time in preview and in the exported file', async () => {
+  await resetProject();
+  await ev(async () => { const { store } = window.__app; const m = await import('/shared/organic-defs.js'); const { addClipRaw } = await import('/shared/timeline.js');
+    store.mutate((p) => { const c = m.createGeneratorClip(m.GEN_PRESETS.find((x) => x.name === 'Root System (rising, black)'), 0, 6); c.trackId = p.tracks.find((t) => t.name === 'V1').id; addClipRaw(p, c); }); });
+  const lit = async (t) => { await ev((t) => window.__app.store.setPlayhead(t), t); await settle(500); return ev(() => { const d = window.__grab(96, 54); let n = 0; for (let i = 0; i < d.length; i += 3) if (d[i] + d[i + 1] + d[i + 2] > 150) n++; return n / (d.length / 3); }); };
+  const a = await lit(0.8), b = await lit(2.5), c = await lit(5.5);
+  assert.ok(a < b && b < c, `coverage grows with time: ${a.toFixed(3)} < ${b.toFixed(3)} < ${c.toFixed(3)}`); assert.ok(c > 0.05, 'a full root system is on screen');
+  const out = path.join(dir, 'roots-out.mp4'); await ev((o) => window.__app.exportTo(o, { width: 320, height: 568, fps: 12 }), out);
+  const raw = path.join(dir, 'roots.raw'); sh(FFMPEG, ['-v', 'error', '-y', '-ss', '5', '-i', out, '-frames:v', '1', '-vf', 'scale=32:56,format=gray', '-f', 'rawvideo', raw]);
+  const d = fs.readFileSync(raw); let n = 0; for (const x of d) if (x > 120) n++; assert.ok(n / d.length > 0.04, `exported frame shows the roots (${(n / d.length).toFixed(3)})`);
+});
+
 await step('light theme + collapsible panels', async () => {
   await ev(() => { document.getElementById('toggle-theme').click(); document.getElementById('toggle-left').click(); });
   await settle(300); await shot('11-light-collapsed');
