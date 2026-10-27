@@ -64,3 +64,14 @@ test('SRT: parse (comma/dot, BOM, CRLF, numbering, tags, VTT) and serialize roun
   assert.deepEqual(parseSubtitles('garbage\n\nno times here'), []);
   assert.equal(formatTime(3723.004), '01:02:03,004'); assert.ok(Number.isNaN(parseTime('x')));
 });
+
+test('captions never straddle two ASR sentences, even when a jump cut made them adjacent in time', () => {
+  const a = words('สวัสดีครับวันนี้', 0, 0.1).map((w) => ({ ...w, phrase: 0 }));
+  const b = words('ตัดต่อง่ายมาก', 1.3, 0.1).map((w) => ({ ...w, phrase: 1 })); // 0.0s gap: the silence was cut
+  const cards = planCaptions([...a, ...b.map((w) => ({ ...w, start: w.start - 1.3 + a.at(-1).end, end: w.end - 1.3 + a.at(-1).end }))]);
+  assert.equal(cards.length, 2, cards.map((c) => c.text).join(' | '));
+  assert.ok(cards[0].text.startsWith('สวัสดี') && cards[1].text.startsWith('ตัดต่อ'));
+  // without phrase info the old behaviour (time based only) still works
+  const plain = planCaptions([...a, ...b.map((w) => ({ text: w.text, start: w.start - 1.3 + a.at(-1).end, end: w.end - 1.3 + a.at(-1).end }))]);
+  assert.ok(plain.length >= 1);
+});

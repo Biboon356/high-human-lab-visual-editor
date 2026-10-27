@@ -38,7 +38,8 @@ export function pickSourceClip(project, selectedId) {
 }
 
 function segmentsToWords(segments, env) {
-  return segments.flatMap((s) => wordsForPhrase(s.text, s.start, s.end, env));
+  // `phrase` marks which ASR segment a word came from, so captions never straddle two sentences (even after a jump cut)
+  return segments.flatMap((s, i) => wordsForPhrase(s.text, s.start, s.end, env).map((w) => ({ ...w, phrase: i })));
 }
 
 /**

@@ -61,7 +61,8 @@ export function planCaptions(words, { maxWidth = 14, maxLines = 2, maxDuration =
     const tooSlow = cur.length && w.end - cur[0].start > maxDuration;
     const pause = cur.length && gap > breakGap;
     const sentence = prev && HARD_END.test(prev.text);
-    if (cur.length && (tooLong || tooSlow || pause || sentence)) { groups.push(cur); cur = []; }
+    const newPhrase = prev && w.phrase !== undefined && prev.phrase !== undefined && w.phrase !== prev.phrase; // a new ASR sentence always starts a new card
+    if (cur.length && (tooLong || tooSlow || pause || sentence || newPhrase)) { groups.push(cur); cur = []; }
     cur.push(w);
   }
   if (cur.length) groups.push(cur);
@@ -69,7 +70,7 @@ export function planCaptions(words, { maxWidth = 14, maxLines = 2, maxDuration =
   // avoid orphan one-word cards by merging them into a neighbour when it fits
   for (let i = groups.length - 1; i > 0; i--) {
     const g = groups[i];
-    if (g.length === 1 && widthOf(groups[i - 1]) + widthOf(g) <= capacity && g[0].start - groups[i - 1].at(-1).end <= breakGap && groups[i - 1].at(-1).end - groups[i - 1][0].start + (g[0].end - g[0].start) <= maxDuration + 0.4 && !HARD_END.test(groups[i - 1].at(-1).text)) {
+    if (g.length === 1 && g[0].phrase === groups[i - 1].at(-1).phrase && widthOf(groups[i - 1]) + widthOf(g) <= capacity && g[0].start - groups[i - 1].at(-1).end <= breakGap && groups[i - 1].at(-1).end - groups[i - 1][0].start + (g[0].end - g[0].start) <= maxDuration + 0.4 && !HARD_END.test(groups[i - 1].at(-1).text)) {
       groups[i - 1].push(...g); groups.splice(i, 1);
     }
   }
