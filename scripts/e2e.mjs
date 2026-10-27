@@ -656,6 +656,50 @@ await step('save frame: full-resolution PNG of the current frame, effects includ
   assert.ok(lit / (d.length / 3) > 0.5, 'frame has picture content'); assert.ok(chroma / (d.length / 3) < 6, `the saturation-0 effect is baked in (mean chroma ${(chroma / (d.length / 3)).toFixed(1)})`);
 });
 
+await step('TikTok Auto-Edit on real (synthetic) Thai speech: cuts silences, Thai captions, 9:16, loudness — verified in the exported file', async () => {
+  const speech = path.join(root, 'test/fixtures/th-speech.ogg');
+  const src = path.join(dir, 'speech-landscape.mp4');
+  sh(FFMPEG, ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc2=size=1280x720:rate=30:duration=17', '-i', speech, '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-shortest', src]);
+  await resetProject(); await ev((p) => window.__app.importPaths([p]), src);
+  const SEGS = [{ text: 'สวัสดีครับ วันนี้เรามาทำคลิปติ๊กต็อกกันนะครับ', start: 0.0, end: 5.9 }, { text: 'ตัดต่อง่ายมากเลย แค่กดไม่กี่ปุ่ม', start: 7.2, end: 10.9 }, { text: 'ใครอยากรู้วิธีทำ ติดตามไว้เลยนะ', start: 12.4, end: 16.4 }];
+  const steps = [];
+  const res = await ev(async (segs) => { const a = window.__app; const r = await a.autoEdit.runAutoEdit({ opts: { look: 'clean' }, transcribe: async () => segs, onStep: () => {} });
+    const p = a.store.project; const media = p.media[0];
+    return { cuts: r.cuts, before: r.before, after: r.after, captions: r.captions, words: r.words, canvas: [p.settings.width, p.settings.height], normalize: p.audio?.normalize,
+      main: p.clips.filter((c) => c.type === 'media').map((c) => ({ s: +c.start.toFixed(2), d: +c.duration.toFixed(2), in: +c.in.toFixed(2), scale: +c.props.scale.toFixed(2) })),
+      caps: p.clips.filter((c) => c.type === 'text').map((c) => ({ s: +c.start.toFixed(2), e: +(c.start + c.duration).toFixed(2), text: c.text.content, karaoke: c.text.karaoke.words.length })), tracks: p.tracks.map((t) => t.name), mw: media.width }; }, SEGS);
+  assert.equal(res.cuts, 3, `three speech bursts kept: ${JSON.stringify(res.main)}`);
+  assert.ok(res.before > 16 && res.after < 15 && res.after > 11, `silences removed: ${res.before.toFixed(1)}s -> ${res.after.toFixed(1)}s`);
+  assert.deepEqual(res.canvas, [1080, 1920]); assert.equal(res.normalize, true);
+  assert.ok(res.main.every((c) => c.scale > 3), `16:9 fills a 9:16 canvas (scale ${res.main.map((c) => c.scale)})`);
+  assert.ok(res.main[1].scale > res.main[0].scale, 'alternate cuts punch in');
+  for (let i = 1; i < res.main.length; i++) assert.ok(Math.abs(res.main[i].s - (res.main[i - 1].s + res.main[i - 1].d)) < 1e-6, 'pieces are gapless after the ripple');
+  assert.ok(res.captions >= 3 && res.words >= 15, `Thai captions built: ${res.captions} cards, ${res.words} words`);
+  assert.ok(res.caps.every((c) => /[\u0E00-\u0E7F]/.test(c.text) && c.karaoke > 0 && c.e <= res.after + 0.5), 'captions are Thai, word-timed, inside the edit');
+  assert.ok(res.tracks.includes('CAP'));
+  await shot('14-autoedit');
+  // one Undo restores the original single clip and canvas
+  await ev(() => window.__app.store.undo());
+  const back = await ev(() => ({ clips: window.__app.store.project.clips.length, w: window.__app.store.project.settings.width, tracks: window.__app.store.project.tracks.length }));
+  assert.deepEqual(back, { clips: 1, w: 1280, tracks: 4 }, 'Undo is a single step');
+  await ev(async (segs) => { await window.__app.autoEdit.runAutoEdit({ opts: { look: 'clean' }, transcribe: async () => segs }); }, SEGS);
+  // export and measure the real file
+  const out = path.join(dir, 'tiktok.mp4'); await ev((o) => window.__app.exportTo(o, { width: 360, height: 640, fps: 15, quality: 'draft' }), out);
+  const info = probe(out); const v = info.streams.find((s) => s.codec_type === 'video');
+  assert.equal(v.width, 360); assert.equal(v.height, 640); assert.ok(Math.abs(Number(info.format.duration) - res.after) < 0.4, `duration ${info.format.duration} vs planned ${res.after}`);
+  const sd = spawnSync(FFMPEG, ['-v', 'info', '-i', out, '-vn', '-af', 'silencedetect=n=-38dB:d=0.5', '-f', 'null', '-'], { encoding: 'utf8' });
+  const longSilences = [...sd.stderr.matchAll(/silence_duration: ([\d.]+)/g)].map((m) => Number(m[1]));
+  console.log(`      exported ${Number(info.format.duration).toFixed(1)}s from a ${res.before.toFixed(1)}s source; silences >0.5s left: ${longSilences.length}`);
+  assert.equal(longSilences.length, 0, `no long silences left in the exported audio: ${longSilences}`);
+  const lufs = (f) => { const x = spawnSync(FFMPEG, ['-v', 'info', '-i', f, '-vn', '-af', 'ebur128=peak=true', '-f', 'null', '-'], { encoding: 'utf8' }); return Number(/I:\s+(-?[\d.]+) LUFS/.exec(x.stderr.split('Summary:').pop())?.[1]); };
+  const loud = lufs(out); console.log(`      integrated loudness ${loud} LUFS`);
+  assert.ok(loud > -17.5 && loud < -11, `loudness normalised near -14 LUFS (got ${loud})`);
+  // a caption is really burned into the frame: white pixels in the lower-middle area while someone speaks
+  const raw = path.join(dir, 'cap.raw'); sh(FFMPEG, ['-v', 'error', '-y', '-ss', '2.0', '-i', out, '-frames:v', '1', '-vf', 'crop=360:200:0:300,scale=72:40,format=gray', '-f', 'rawvideo', raw]);
+  const g = fs.readFileSync(raw); let white = 0; for (const b of g) if (b > 235) white++;
+  assert.ok(white > 20, `caption text pixels present in the exported frame (${white})`);
+});
+
 await step('light theme + collapsible panels', async () => {
   await ev(() => { document.getElementById('toggle-theme').click(); document.getElementById('toggle-left').click(); });
   await settle(300); await shot('11-light-collapsed');

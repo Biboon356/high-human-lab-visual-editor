@@ -19,6 +19,9 @@ export function audioSources(project) {
     .filter(({ media, track }) => media && media.hasAudio && track && !track.muted);
 }
 
+/** TikTok / Reels / Shorts all normalise to roughly -14 LUFS; matching it avoids the platform turning your video down. */
+export const LOUDNORM = 'loudnorm=I=-14:TP=-1.5:LRA=11';
+
 /** atempo only accepts 0.5..2 per instance, so chain them for larger/smaller factors. Pitch is preserved. */
 export function tempoChain(speed) {
   if (!speed || Math.abs(speed - 1) < 1e-6) return '';
@@ -58,7 +61,7 @@ export function buildAudioGraph(project, firstInput = 0, sampleRate = 48000) {
     labels.push(`[a${n}]`);
   });
   const total = Math.max(0.1, projectDuration(project));
-  parts.push(`${labels.join('')}amix=inputs=${labels.length}:normalize=0:duration=longest,apad=whole_dur=${total.toFixed(4)},atrim=end=${total.toFixed(4)}[aout]`);
+  parts.push(`${labels.join('')}amix=inputs=${labels.length}:normalize=0:duration=longest,apad=whole_dur=${total.toFixed(4)},atrim=end=${total.toFixed(4)}${project.audio?.normalize ? `,${LOUDNORM}` : ''}[aout]`);
   return { inputs: srcs.map((s) => s.media.path), filter: parts.join(';'), mapLabel: '[aout]' };
 }
 

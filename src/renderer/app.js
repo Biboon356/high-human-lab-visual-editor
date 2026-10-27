@@ -11,6 +11,7 @@ import { openExportDialog, isExporting } from './ui/export-dialog.js';
 import { renderProject } from './engine/exporter.js';
 import { renderStill } from './engine/still.js';
 import { startRoots } from './bg-roots.js';
+import * as autoEditEngine from './engine/autoedit.js';
 import { startAutosave, offerRecovery, writeNow } from './autosave.js';
 
 const $ = (id) => document.getElementById(id);
@@ -139,7 +140,7 @@ document.addEventListener('paste', (e) => { if (!inTextField() && store.clipboar
 
 // ---- automation hook (used by scripts/e2e.mjs; harmless in normal use)
 window.__app = {
-  store, preview, timeline, autosave: { writeNow, offerRecovery }, runAnalysis, cutOnBeats, autoMontage, importPaths: async (paths) => importResults(await hh.probePaths(paths)),
+  store, preview, timeline, autoEdit: autoEditEngine, autosave: { writeNow, offerRecovery }, runAnalysis, cutOnBeats, autoMontage, importPaths: async (paths) => importResults(await hh.probePaths(paths)),
   exportTo: async (outPath, overrides = {}) => {
     const s = store.project.settings;
     const settings = { width: s.width, height: s.height, fps: s.fps, quality: 'draft', format: outPath.endsWith('.webm') ? 'webm' : 'mp4', ...overrides, outPath };

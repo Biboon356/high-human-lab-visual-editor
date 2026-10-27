@@ -246,3 +246,11 @@ test('multi-select: group move is atomic and clamped; delete and ripple close ga
   const r = fixture(); const rx = addMediaClip(r, 'i', vTrack(r), 0), ry = addMediaClip(r, 'i', vTrack(r), 5);
   deleteClips(r, [rx.id]); assert.equal(ry.start, 5, 'plain delete leaves the gap');
 });
+
+test('loudness normalisation is opt-in per project and lands at the end of the audio graph', () => {
+  const p = fixture(); addMediaClip(p, 'v', vTrack(p), 0);
+  assert.ok(!buildAudioGraph(p).filter.includes('loudnorm'));
+  p.audio = { normalize: true };
+  const g = buildAudioGraph(p).filter;
+  assert.match(g, /atrim=end=[\d.]+,loudnorm=I=-14:TP=-1\.5:LRA=11\[aout\]/);
+});

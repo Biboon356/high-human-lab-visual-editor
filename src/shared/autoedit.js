@@ -117,3 +117,38 @@ export function loudWords(words, env, { fraction = 0.12, minChars = 2 } = {}) {
   const cutoff = percentile(peaks, 1 - fraction);
   return words.filter((w, i) => peaks[i] >= cutoff && peaks[i] > 0 && [...w.text].length >= minChars);
 }
+
+const overlap = (a0, a1, b0, b1) => Math.max(0, Math.min(a1, b1) - Math.max(a0, b0));
+
+/**
+ * Whisper invents text ("ขอบคุณที่รับชม", subtitles credits…) when it is fed silence or music.
+ * Drops segments that are mostly outside detected speech. If nothing at all was detected as speech, every segment goes.
+ */
+export function dropHallucinations(segments, speech, { minVoiced = 0.25 } = {}) {
+  if (!speech.length) return [];
+  return segments.filter((s) => {
+    const dur = s.end - s.start;
+    if (dur <= 0.05) return false;
+    const voiced = speech.reduce((a, r) => a + overlap(s.start, s.end, r.start, r.end), 0);
+    return voiced / dur >= minVoiced;
+  });
+}
+
+/**
+ * Which parts of the source to keep. Detected speech is the base; any word the ASR heard is kept even if the voice
+ * detector missed it (quiet speech); filler words are cut out; ranges closer than `minSilence` are merged back together.
+ * @returns {Array<{start:number,end:number}>} sorted, non-overlapping, in source seconds
+ */
+export function buildKeepRanges({ speech, words, total, cutSilence = true, removeFillers = true, minSilence = 0.35, minLen = 0.15, isFiller = () => false }) {
+  let keep = cutSilence ? speech.map((r) => ({ ...r })) : [{ start: 0, end: total }];
+  if (cutSilence) for (const w of words) keep.push({ start: Math.max(0, w.start - 0.03), end: Math.min(total, w.end + 0.05) });
+  keep = keep.sort((a, b) => a.start - b.start);
+  const merged = [];
+  for (const r of keep) { const last = merged.at(-1); if (last && r.start - last.end < minSilence) last.end = Math.max(last.end, r.end); else merged.push({ ...r }); }
+  keep = merged;
+  if (removeFillers) {
+    const cuts = words.filter((w) => isFiller(w.text)).map((w) => ({ start: Math.max(0, w.start - 0.02), end: w.end + 0.04 }));
+    keep = subtractRanges(keep, cuts, minLen);
+  }
+  return keep.filter((r) => r.end - r.start >= minLen).map((r) => ({ start: Math.max(0, r.start), end: Math.min(total, r.end) }));
+}

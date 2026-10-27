@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { detectSpeech, subtractRanges, buildTimeMap, remapWords, planReframe, punchLevels, loudWords } from '../src/shared/autoedit.js';
+import { dropHallucinations, buildKeepRanges, detectSpeech, subtractRanges, buildTimeMap, remapWords, planReframe, punchLevels, loudWords } from '../src/shared/autoedit.js';
 
 // 100 frames/s envelope: speech 0.5-2.0, pause 2.0-3.2, speech 3.2-5.0, short pause 5.0-5.2, speech 5.2-6.0, breath blip at 7.0
 function envelope() {
@@ -57,4 +57,25 @@ test('punch levels alternate; loudWords picks the loudest words only', () => {
   const l = loudWords(words, env, { fraction: 0.3, minChars: 2 });
   assert.deepEqual(l.map((w) => w.start), [1.0], 'only the loud multi-character word');
   assert.deepEqual(loudWords(words, { rate: 100, rms: [] }), []);
+});
+
+test('hallucination guard: text over silence/music is dropped, real speech kept; no speech at all drops everything', () => {
+  const speech = [{ start: 1, end: 3 }, { start: 6, end: 8 }];
+  const segs = [{ text: 'จริง', start: 1.1, end: 2.9 }, { text: 'ขอบคุณที่รับชม', start: 3.5, end: 5.5 }, { text: 'จริงอีก', start: 5.8, end: 8.2 }, { text: 'เสี้ยว', start: 2.95, end: 3.4 }];
+  assert.deepEqual(dropHallucinations(segs, speech).map((s) => s.text), ['จริง', 'จริงอีก']);
+  assert.deepEqual(dropHallucinations(segs, []), []);
+});
+
+test('keep ranges: speech + ASR words, fillers removed, near ranges merged, silences gone', () => {
+  const speech = [{ start: 0.5, end: 2 }, { start: 3.2, end: 5 }];
+  const words = [{ text: 'ดี', start: 0.6, end: 0.9 }, { text: 'เอ่อ', start: 1.0, end: 1.4 }, { text: 'มาก', start: 1.5, end: 1.9 }, { text: 'เบา', start: 7.0, end: 7.4 }];
+  const isF = (w) => w === 'เอ่อ';
+  const keep = buildKeepRanges({ speech, words, total: 10, isFiller: isF });
+  // the whispered word at 7.0 is kept although the detector missed it; the 2-3.2s silence is cut; the filler is cut out
+  assert.ok(keep.some((r) => r.start <= 7.0 && r.end >= 7.4), JSON.stringify(keep));
+  assert.ok(!keep.some((r) => r.start < 2.5 && r.end > 2.5), 'silence 2.0-3.2 is not kept');
+  assert.ok(!keep.some((r) => r.start < 1.2 && r.end > 1.2), 'filler removed from the middle');
+  for (let i = 1; i < keep.length; i++) assert.ok(keep[i].start >= keep[i - 1].end);
+  const all = buildKeepRanges({ speech, words, total: 10, cutSilence: false, removeFillers: false });
+  assert.deepEqual(all, [{ start: 0, end: 10 }], 'cut silence off keeps everything');
 });
