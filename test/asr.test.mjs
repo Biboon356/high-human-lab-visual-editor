@@ -8,7 +8,7 @@ import { rmsEnvelope } from '../src/shared/audio-analysis.js';
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'hhlab-asr-'));
 const fakeLoader = (log = []) => async () => ({
-  initWhisper: async (o) => { log.push(['init', o.model]); return { release: async () => log.push(['release']), transcribeData: (buf, opts) => {
+  initWhisper: async (o) => { if (!o.filePath) throw new Error('Model path is required'); log.push(['init', o.filePath]); return { release: async () => log.push(['release']), transcribeData: (buf, opts) => {
     log.push(['transcribe', buf.byteLength, opts.language, opts.beamSize]); opts.onProgress?.(50); opts.onProgress?.(100);
     return { stop: async () => log.push(['stop']), promise: Promise.resolve({ language: 'th', isAborted: false, segments: [
       { text: ' สวัสดีครับ ', t0: 500, t1: 1800 }, { text: '[BLANK_AUDIO]', t0: 1800, t1: 2500 }, { text: '(music)', t0: 2500, t1: 3000 }, { text: '', t0: 3000, t1: 3100 }, { text: 'วันนี้ดีมาก', t0: 3200, t1: 5000 }] }) };
@@ -75,4 +75,14 @@ test('rmsEnvelope: levels follow loudness, frame rate is exact', () => {
   const e = rmsEnvelope(x, sr, 100);
   assert.equal(e.rate, 100); assert.equal(e.rms.length, 200);
   assert.ok(e.rms[50] < 0.001 && e.rms[150] > 0.3 && e.rms[150] < 0.4, `silence ${e.rms[50]}, tone ${e.rms[150]}`);
+});
+
+// Regression: the real binding takes the model as `filePath`; passing `model` fails with "Model path is required".
+// A garbage file must get past that check and be rejected by whisper.cpp itself.
+test('transcribePcm: real whisper binding receives the model path (garbage file is rejected by whisper, not by option validation)', async (t) => {
+  try { await import('@fugood/whisper.node'); } catch { t.skip('native whisper binding not available on this machine'); return; }
+  const model = path.join(tmp(), 'garbage.bin'); fs.writeFileSync(model, 'not a ggml model');
+  await releaseEngine();
+  await assert.rejects(transcribePcm({ pcm: new Int16Array(16000), modelPath: model }), (e) => /model could not be opened/.test(e.message) && !/Model path is required/.test(e.message));
+  await releaseEngine();
 });

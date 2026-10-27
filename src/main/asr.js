@@ -50,7 +50,7 @@ export async function transcribePcm({ pcm, modelPath, language = 'th', prompt, o
   const eng = await loadEngine(loader);
   if (!cache || cache.modelPath !== modelPath) {
     await releaseEngine();
-    try { cache = { modelPath, ctx: await eng.initWhisper({ model: modelPath, useGpu: true }) }; }
+    try { cache = { modelPath, ctx: await eng.initWhisper({ filePath: modelPath, useGpu: true }) }; }
     catch (e) { throw new Error(`The speech model could not be opened (${e.message}). Delete it in the Auto-Edit panel and download it again.`); }
   }
   const { stop, promise } = cache.ctx.transcribeData(pcm.buffer.slice(pcm.byteOffset, pcm.byteOffset + pcm.byteLength), {
