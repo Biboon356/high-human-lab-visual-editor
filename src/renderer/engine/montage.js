@@ -1,7 +1,7 @@
 // Smart montage, renderer side: gathers footage analysis (main process) + music structure, asks the pure planner for the cut list,
 // and writes it into the project as ONE undoable step on a new video track.
 import { store } from '../store.js';
-import { addTrack, addMediaClip } from '/shared/timeline.js';
+import { addTrack, addMediaClip, dissolveInto } from '/shared/timeline.js';
 import { musicStructure } from '/shared/music-structure.js';
 import { planSmartMontage, MONTAGE_STYLES, reframeFor } from '/shared/smart-montage.js';
 import { EFFECT_PRESETS, instantiatePreset } from '/shared/effects-defs.js';
@@ -36,7 +36,7 @@ export function applyPlan({ project, plan, opts, prep }) {
   const byId = new Map(prep.sources.map((s) => [s.id, s]));
   const canvas = { width: project.settings.width, height: project.settings.height };
   const preset = (name) => EFFECT_PRESETS.find((p) => p.name === name);
-  const made = [];
+  const made = [], dissolves = [];
   for (const seg of plan.segments) {
     const clip = addMediaClip(project, seg.mediaId, track.id, seg.start);
     if (!clip) continue;
@@ -53,10 +53,13 @@ export function applyPlan({ project, plan, opts, prep }) {
     if (seg.kenBurns) clip.keyframes.scale = [{ t: 0, v: scale }, { t: seg.duration, v: scale * seg.kenBurns }];
     const p = seg.look && preset(seg.look);
     if (p) clip.effects = instantiatePreset(p);
-    if (seg.transition && seg.transition !== 'none') clip.transition = { type: seg.transition, duration: seg.transition === 'glitch' ? 0.16 : 0.2 };
+    if (seg.transition && seg.transition !== 'none' && seg.transition !== 'dissolve') clip.transition = { type: seg.transition, duration: seg.transition === 'glitch' ? 0.16 : 0.2 };
     if (seg.role === 'hero') clip.name = `★ ${clip.name}`;
     made.push(clip);
+    if (seg.transition === 'dissolve') dissolves.push(clip.id);
   }
+  // dissolves last: they move the incoming clip onto its own track and overlap it with the one before
+  for (const id of dissolves) dissolveInto(project, id, 0.4);
   return { track, clips: made };
 }
 

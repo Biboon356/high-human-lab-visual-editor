@@ -3,7 +3,7 @@ import { createClip, defaultProps } from './project.js';
 import { createEffect } from './effects-defs.js';
 
 export const FONTS = [
-  'Helvetica Neue', 'Arial Black', 'Impact', 'Futura', 'Courier New', 'Menlo', 'Consolas',
+  'Pinyon Script', 'Instrument Serif', 'Inter Tight', 'DM Mono', 'Helvetica Neue', 'Arial Black', 'Impact', 'Futura', 'Courier New', 'Menlo', 'Consolas',
   'Georgia', 'Times New Roman', 'Didot', 'Bodoni 72', 'Baskerville', 'Playfair Display', 'Hiragino Sans', 'Yu Gothic', 'Noto Sans JP', 'sans-serif', 'serif', 'monospace',
 ];
 
@@ -51,6 +51,15 @@ export function defaultText() {
 const mk = (name, text, props, effects = []) => ({ name, text, props, effects });
 
 export const TEXT_PRESETS = [
+  // Formal script lockup: a small serif kicker over a hot-pink script title (the "Moore Next Door" look). Add both with "Title lockup".
+  mk('Script Title (rose)',
+    { content: 'Moore Next Door', font: 'Pinyon Script', weight: 400, size: 0.14, fit: 0.92, color: '#f2287d', strokeWidth: 0.03, strokeColor: '#7d0b44',
+      anim: { type: 'fade', duration: 0.6, speed: 1 }, fx: { shadow: 0.55, glow: 0.3, split: 0.08 } },
+    { y: 0.02 }),
+  mk('Script Kicker (small caps)',
+    { content: 'IN', font: 'Instrument Serif', weight: 400, size: 0.06, uppercase: true, color: '#ff3a6e',
+      anim: { type: 'fade', duration: 0.5, speed: 1 }, fx: { shadow: 0.4 } },
+    { x: 0.03, y: 0.15, tracking: 0.18 }),
   mk('Hollow Glitch Block',
     { content: 'ROCKY', font: 'Arial Black', weight: 900, size: 0.3, fit: 0.92, uppercase: true, color: '#ffffff', hollow: true, fillAlpha: 0.12, strokeWidth: 0.012, strokeColor: '#ffffff',
       anim: { type: 'stutter', duration: 0.6, speed: 1 }, fx: { split: 0.55 } },
@@ -125,4 +134,13 @@ export function createTextClip(preset, start, duration = 4) {
     props: { ...defaultProps(), ...(preset?.props || {}) },
     effects: (preset?.effects || []).map((e) => structuredClone(e)),
   });
+}
+
+/** The two-line title card from the editorial reference: kicker above, script title below. Returns [kicker, title] (not yet on a track). */
+export function createTitleLockup(start, duration = 4, { kicker = 'IN', title = 'Moore Next Door' } = {}) {
+  const find = (n) => TEXT_PRESETS.find((p) => p.name === n);
+  const k = createTextClip(find('Script Kicker (small caps)'), start, duration), t = createTextClip(find('Script Title (rose)'), start, duration);
+  k.text.content = kicker; k.name = `Kicker · ${kicker}`;
+  t.text.content = title; t.name = `Title · ${title}`;
+  return [k, t];
 }

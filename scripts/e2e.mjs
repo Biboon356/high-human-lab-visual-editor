@@ -606,6 +606,44 @@ await step('smart montage: analyses footage + music, cuts on beats, explains its
   assert.ok(lit > 15, `the white subject is inside the 9:16 frame (${lit} bright cells)`);
 });
 
+await step('cross-dissolve mixes the two pictures (and undoes in one step); the script title lockup draws in the bundled font', async () => {
+  const red = path.join(dir, 'red.mp4'), blue = path.join(dir, 'blue.mp4');
+  sh(FFMPEG, ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'color=c=0xff0000:s=320x180:r=30:d=6', '-pix_fmt', 'yuv420p', red]);
+  sh(FFMPEG, ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'color=c=0x0000ff:s=320x180:r=30:d=6', '-pix_fmt', 'yuv420p', blue]);
+  await resetProject(); await ev((p) => window.__app.importPaths(p), [red, blue]);
+  const ids = await ev(async () => { const { store } = window.__app; const { addMediaClip, trackEnd } = await import('/shared/timeline.js');
+    const v1 = store.project.tracks.find((t) => t.name === 'V1'); const m = store.project.media;
+    const a = store.project.clips[0]; a.duration = 4; a.in = 1;
+    const b = store.mutate((p) => { const c = addMediaClip(p, m[1].id, v1.id, 4); c.duration = 4; c.in = 2; return c; });
+    store.select(b.id); return { a: a.id, b: b.id }; });
+  await ev(() => { document.getElementById('tl-dissolve-d').value = '1'; });
+  const clipsBefore = await ev(() => window.__app.store.project.clips.length);
+  await page.click('#tl-dissolve');
+  const st = await ev((i) => { const { store } = window.__app; const b = store.project.clips.find((c) => c.id === i.b); const a = store.project.clips.find((c) => c.id === i.a);
+    const ti = (id) => store.project.tracks.findIndex((t) => t.id === id); return { bs: b.start, bd: b.duration, bin: b.in, fi: b.fadeIn, above: ti(b.trackId) < ti(a.trackId), ae: a.start + a.duration }; }, ids);
+  assert.deepEqual([st.bs, st.bd, st.bin, st.fi, st.above, st.ae], [3, 5, 1, 1, true, 4], JSON.stringify(st));
+  const mean = async (t) => { await ev((x) => window.__app.store.setPlayhead(x), t); await settle(1100); return ev(() => { const d = window.__grab(32, 18); let r = 0, b = 0; for (let i = 0; i < d.length; i += 3) { r += d[i]; b += d[i + 2]; } const n = d.length / 3; return { r: r / n, b: b / n }; }); };
+  const before = await mean(2.0), mid = await mean(3.5), after = await mean(5.0);
+  assert.ok(before.r > 200 && before.b < 30, `pure red before the dissolve ${JSON.stringify(before)}`);
+  assert.ok(mid.r > 70 && mid.b > 70 && mid.r < 200 && mid.b < 200, `both pictures visible mid-dissolve ${JSON.stringify(mid)}`);
+  assert.ok(after.b > 200 && after.r < 30, `pure blue after ${JSON.stringify(after)}`);
+  await shot('18-dissolve-mid');
+  await ev(() => window.__app.store.undo());
+  assert.equal(await ev(() => window.__app.store.project.clips.length), clipsBefore);
+  assert.equal(await ev((i) => window.__app.store.project.clips.find((c) => c.id === i).start, ids.b), 4, 'Undo puts the clip back');
+
+  // script lockup
+  await ev(() => window.__app.store.setPlayhead(5));
+  await ev(() => document.getElementById('add-lockup').click());
+  const lk = await ev(() => window.__app.store.project.clips.filter((c) => c.type === 'text').map((c) => ({ f: c.text.font, t: c.text.content, tr: c.trackId })));
+  assert.equal(lk.length, 2); assert.deepEqual(lk.map((c) => c.f).sort(), ['Instrument Serif', 'Pinyon Script']); assert.notEqual(lk[0].tr, lk[1].tr);
+  assert.equal(await ev(() => document.fonts.check('40px "Pinyon Script"')), true, 'the bundled script font is loaded');
+  await ev(() => window.__app.store.setPlayhead(6.5)); await settle(1300);
+  const pink = await ev(() => { const d = window.__grab(96, 54); let n = 0; for (let i = 0; i < d.length; i += 3) if (d[i] > 180 && d[i + 1] < 110 && d[i + 2] > 40 && d[i + 2] < 190) n++; return n; });
+  assert.ok(pink > 25, `the pink script title is in the picture (${pink} pink cells)`);
+  await shot('19-script-title');
+});
+
 await step('export dialog: platform preset sets 9:16 / fps / quality', async () => {
   await resetProject(); await ev((p) => window.__app.importPaths([p]), clip);
   await page.click('[data-act="export"]'); await page.waitForSelector('.modal');

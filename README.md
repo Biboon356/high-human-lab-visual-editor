@@ -105,6 +105,11 @@ None of this has been measured against real Thai recordings yet (see status belo
 
 **Honest limits:** this is classical signal analysis plus a scoring planner — not a generative or "understanding" AI. It does not recognise faces, people, objects, emotions or what is being said in the footage, so it cannot know which shot is the "story"; it chooses by image quality, motion and music fit. The scoring weights are hand-tuned (unit-tested on synthetic footage and checked end-to-end, not tuned on a large set of real edits). *Classic random montage…* in the dialog keeps the old behaviour.
 
+## Editorial title cards and cross-dissolves
+
+- **Title lockup** (Type tab): a small serif kicker over a hot-pink formal-script title, in the bundled *Pinyon Script* (OFL). Both are ordinary text clips: edit the words, colour, animation, or swap the font for any installed one.
+- **Dissolve** (timeline toolbar): select a clip that starts where another picture clip ends, press **Dissolve** with a length (0.25–1.5 s). The incoming clip moves onto its own track directly above the outgoing one and overlaps it, so the pictures really mix (and the sound crossfades); it uses the incoming clip's spare head footage so the dissolve finishes on the cut, or the outgoing clip's tail if there is none. One Undo reverts. The *Cinematic* montage style uses it on calm cuts.
+
 ## Visual identity
 
 The interface follows a written art direction — soot-black and bone with forest/moss greens, italic-serif headlines, a root-line motif,
@@ -162,7 +167,7 @@ Legend: ✅ works and is covered by the automated tests · 🧪 prototype (works
 
 ## Testing
 
-`npm test` runs 78 unit tests. `scripts/e2e.mjs` (47 checks) is a real end-to-end run of the Electron app (see table above): it
+`npm test` runs 82 unit tests. `scripts/e2e.mjs` (48 checks) is a real end-to-end run of the Electron app (see table above): it
 generates test media with ffmpeg, drives the app, reads pixels out of the compositor, and probes exported files.
 Native file dialogs are stubbed at the Electron main-process level; every other path is the production code.
 

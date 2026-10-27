@@ -35,6 +35,7 @@
       <symbol id="i-pb" viewBox="0 0 16 16"><path d="M1.5 2.5h13v11h-13zM1.5 9.5h13" stroke="currentColor" fill="none"/></symbol>
       <symbol id="i-pr" viewBox="0 0 16 16"><path d="M1.5 2.5h13v11h-13zM10 2.5v11" stroke="currentColor" fill="none"/></symbol>
       <symbol id="i-aster" viewBox="0 0 16 16"><path d="M8 1.5v13M2.4 4.7l11.2 6.6M13.6 4.7 2.4 11.3" stroke="currentColor" fill="none"/></symbol>
+      <symbol id="i-dissolve" viewBox="0 0 16 16"><path d="M1.5 4h8v8h-8z" stroke="currentColor" fill="none"/><path d="M6.5 4h8v8h-8z" stroke="currentColor" fill="none" stroke-dasharray="1.5 1.5"/></symbol>
       <symbol id="i-ripple" viewBox="0 0 16 16"><path d="M2.5 4h4v8h-4zM9.5 4h4v8h-4z" stroke="currentColor" fill="none"/><path d="M7.5 8h1" stroke="currentColor" fill="none"/></symbol>
       <symbol id="i-trash" viewBox="0 0 16 16"><path d="M2.5 4h11M6 4V2.5h4V4M4 4l.6 9.5h6.8L12 4" stroke="currentColor" fill="none"/></symbol>
     </defs>
@@ -81,7 +82,7 @@
       </section>
       <section data-pane="type" class="pane">
         <header class="pane-head"><h2>Typography</h2><span>Lettering as material</span></header>
-        <div class="pane-actions"><button id="add-text"><svg class="ic"><use href="#i-plus"/></svg>Text clip</button></div>
+        <div class="pane-actions"><button id="add-text"><svg class="ic"><use href="#i-plus"/></svg>Text clip</button><button id="add-lockup" title="Small serif kicker over a script title — the editorial title card"><svg class="ic"><use href="#i-plus"/></svg>Title lockup</button></div>
         <p class="hint pad">Presets add a text clip at the playhead.</p>
         <div id="text-presets" class="preset-list"></div>
       </section>
@@ -136,6 +137,8 @@
         <button id="tl-split" title="Split at playhead (S)"><svg class="ic"><use href="#i-split"/></svg>Split</button>
         <button id="tl-duplicate" title="Duplicate selected clip (Ctrl/Cmd+D)"><svg class="ic"><use href="#i-dup"/></svg>Duplicate</button>
         <button id="tl-delete" title="Delete selected clips (Delete)"><svg class="ic"><use href="#i-trash"/></svg>Delete</button>
+        <button id="tl-dissolve" title="Cross-dissolve into the selected clip from the clip before it"><svg class="ic"><use href="#i-dissolve"/></svg>Dissolve</button>
+        <select id="tl-dissolve-d" title="Dissolve length" aria-label="Dissolve length"><option value="0.25">0.25 s</option><option value="0.5" selected>0.5 s</option><option value="1">1 s</option><option value="1.5">1.5 s</option></select>
         <button id="tl-ripple" title="Delete and close the gap (Shift+Delete)"><svg class="ic"><use href="#i-ripple"/></svg>Ripple</button>
         <span class="sep"></span>
         <button id="tl-zoom-out" class="icon" title="Zoom out (−)" aria-label="Zoom out"><svg class="ic"><use href="#i-minus"/></svg></button>

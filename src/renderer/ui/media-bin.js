@@ -1,7 +1,7 @@
 import { el, toast, fmtTime } from './dom.js';
 import { store } from '../store.js';
-import { addMediaClip, trackEnd } from '/shared/timeline.js';
-import { createTextClip, TEXT_PRESETS } from '/shared/text-defs.js';
+import { addMediaClip, trackEnd, addTrack, overlaps } from '/shared/timeline.js';
+import { createTextClip, createTitleLockup, TEXT_PRESETS } from '/shared/text-defs.js';
 import { createGeneratorClip, GEN_PRESETS } from '/shared/organic-defs.js';
 import { addClipRaw, projectDuration } from '/shared/timeline.js';
 import { uid } from '/shared/project.js';
@@ -135,6 +135,18 @@ export function mountMediaBin({ onImport }) {
   const tp = document.getElementById('text-presets');
   for (const p of TEXT_PRESETS) tp.append(el('button', { onclick: () => addOverlayClip((s) => createTextClip(p, s, 4)) }, p.name, el('small', { text: `${p.text.font} · ${p.text.anim?.type || 'static'}` })));
   document.getElementById('add-text').onclick = () => addOverlayClip((s) => createTextClip(null, s, 4));
+  document.getElementById('add-lockup').onclick = () => {
+    const start = Math.max(0, store.playhead), len = 4;
+    const [kicker, title] = createTitleLockup(start, len);
+    const t = store.mutate((p) => {
+      // two clips that share the same time need two tracks: reuse free video tracks from the top, add one if needed
+      const free = (avoid) => p.tracks.filter((x) => x.kind === 'video').find((x) => x.id !== avoid && !overlaps(p, x.id, start, len)) || addTrack(p, 'video');
+      const tt = free(null); title.trackId = tt.id; addClipRaw(p, title);
+      const kt = free(tt.id); kicker.trackId = kt.id; addClipRaw(p, kicker);
+      return title;
+    });
+    store.select(t.id);
+  };
   const gp = document.getElementById('gen-presets');
   for (const p of GEN_PRESETS) gp.append(el('button', { onclick: () => addOverlayClip((s) => createGeneratorClip(p, s, 6)) }, p.name, el('small', { text: `style: ${p.style}` })));
 }

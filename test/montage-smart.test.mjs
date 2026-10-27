@@ -136,7 +136,8 @@ test('planSmartMontage: hero shot at the drop, explained; stills, short clips an
 test('styles: one coherent grade, accents only on energetic cuts, transitions follow energy', () => {
   const cin = run({ style: 'cinematic' }).segments;
   assert.ok(cin.every((s) => s.look === 'Halation 35mm'), 'cinematic keeps one grade');
-  assert.ok(cin.filter((s) => s.energy < 0.35).every((s) => s.transition === 'none'));
+  assert.ok(cin.filter((s) => s.energy < 0.35).every((s, i) => s.transition === 'dissolve' || i === 0 || s.transition === 'none'), 'calm cinematic cuts dissolve');
+  assert.ok(cin.some((s) => s.transition === 'dissolve'));
   const hype = run({ style: 'hype' }).segments;
   assert.ok(hype.filter((s) => s.look && s.role !== 'hero').every((s) => s.energy >= 0.65), 'accent looks only when the music is full');
   assert.ok(hype.filter((s) => s.energy < 0.35).every((s) => !s.look && s.transition === 'none'), 'calm parts stay clean');

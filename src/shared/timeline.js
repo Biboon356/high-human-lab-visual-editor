@@ -227,3 +227,62 @@ export function addTrack(project, kind) {
   else project.tracks.push(track);
   return track;
 }
+
+const shiftKeys = (kf, d) => { for (const k of Object.keys(kf || {})) kf[k] = kf[k].map((p) => ({ ...p, t: p.t + d })); };
+
+/**
+ * Cross-dissolve into clip `clipId` from the picture clip that ends where it starts (any video track).
+ * Editors' A/B-roll: the incoming clip moves onto its own track *directly above* the outgoing one and overlaps it by `seconds`;
+ * whichever clip is on top fades (in or out), so the two pictures mix — and the sound crossfades with them.
+ * The overlap comes from the incoming clip's head room if it has any (the dissolve then ends on the cut), otherwise from the
+ * outgoing clip's tail. Returns {incoming, outgoing, seconds, track} or null when there is nothing to dissolve.
+ */
+export function dissolveInto(project, clipId, seconds = 0.5) {
+  const B = project.clips.find((c) => c.id === clipId);
+  if (!B || B.type !== 'media' || clipKind(project, B) === 'audio') return null;
+  const vids = new Set(project.tracks.filter((t) => t.kind === 'video').map((t) => t.id));
+  const P = project.clips.filter((c) => c.id !== B.id && c.type === 'media' && vids.has(c.trackId) && clipKind(project, c) !== 'audio' && Math.abs(clipEnd(c) - B.start) < 0.05)
+    .sort((a, b) => clipEnd(b) - clipEnd(a))[0];
+  if (!P) return null;
+  const isImg = (c) => clipKind(project, c) === 'image';
+  const spB = B.speed || 1, spP = P.speed || 1;
+  const head = isImg(B) ? Infinity : B.in / spB;
+  const tail = isImg(P) ? Infinity : ((findMedia(project, P.mediaId)?.duration || 0) - (P.in + P.duration * spP)) / spP;
+  let d = Math.min(seconds, B.duration * 0.5, P.duration * 0.5);
+  let mode = head >= d - 1e-6 ? 'head' : tail >= d - 1e-6 ? 'tail' : head >= tail ? 'head' : 'tail';
+  d = Math.min(d, mode === 'head' ? head : tail);
+  if (!(d >= 0.1)) return null;
+
+  const newStart = mode === 'head' ? B.start - d : B.start, newEnd = clipEnd(B);
+  // which track does the incoming clip live on? Its own, if it is already off the outgoing clip's track and has room; else one directly above.
+  const free = (trackId, a, b) => !overlaps(project, trackId, a, b - a, B.id);
+  let trackId = B.trackId;
+  const pIdx = project.tracks.findIndex((t) => t.id === P.trackId);
+  const fits = trackId !== P.trackId && free(trackId, newStart, newEnd);
+  if (!fits) {
+    const above = project.tracks[pIdx - 1];
+    if (above && above.kind === 'video' && /\+$/.test(above.name) && free(above.id, newStart, newEnd)) trackId = above.id;
+    else {
+      const t = { id: `trk_${Math.random().toString(36).slice(2, 9)}`, name: `${project.tracks[pIdx].name.replace(/\+$/, '')}+`, kind: 'video', muted: false, hidden: false };
+      project.tracks.splice(pIdx, 0, t);
+      trackId = t.id;
+    }
+  }
+  // the outgoing clip must keep the room it needs on its own track (its extended tail may not run into a neighbour)
+  if (mode === 'tail' && overlaps(project, P.trackId, clipEnd(P), d, B.id)) return null;
+
+  if (mode === 'head') {
+    B.start = newStart; B.duration += d;
+    if (!isImg(B)) B.in -= d * spB;
+    shiftKeys(B.keyframes, d);
+    for (const fx of B.effects || []) shiftKeys(fx.keyframes, d);
+  } else {
+    P.duration += d;
+  }
+  B.trackId = trackId;
+  B.transition = { type: 'none', duration: 0.25 };
+  const bIdx = project.tracks.findIndex((t) => t.id === B.trackId);
+  if (bIdx < project.tracks.findIndex((t) => t.id === P.trackId)) B.fadeIn = Math.max(B.fadeIn || 0, d); // incoming is on top: it fades in
+  else P.fadeOut = Math.max(P.fadeOut || 0, d);                                                          // outgoing is on top: it fades out
+  return { incoming: B, outgoing: P, seconds: d, track: project.tracks[bIdx] };
+}

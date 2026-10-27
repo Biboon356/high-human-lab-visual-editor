@@ -15,7 +15,7 @@ export const MONTAGE_STYLES = {
   street: { label: 'Street · xerox / VHS', base: null, accents: ['Xerox Photocopy', 'Halftone Print (B&W)', 'Tour Tape (VHS)', 'Midnight Purple'], accentRate: 0.6, hero: 'Comic Flash (red/yellow)',
     transitions: { hi: ['glitch', 'whip', 'flash'], mid: ['flash', 'none'], lo: ['none'] }, punch: 1.06, density: 0.05 },
   cinematic: { label: 'Cinematic · slow burn', base: 'Halation 35mm', accents: [], accentRate: 0, hero: 'Halation 35mm',
-    transitions: { hi: ['punch'], mid: ['none'], lo: ['none'] }, punch: 1, density: -0.2 },
+    transitions: { hi: ['punch'], mid: ['dissolve', 'none'], lo: ['dissolve'] }, punch: 1, density: -0.2 },
   clean: { label: 'Clean · no filters', base: null, accents: [], accentRate: 0, hero: null,
     transitions: { hi: ['flash'], mid: ['none'], lo: ['none'] }, punch: 1, density: 0 },
 };

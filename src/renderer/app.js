@@ -101,6 +101,9 @@ function syncChrome() {
 }
 store.on('dirty', syncChrome); store.on('reset', syncChrome); store.on('project', syncChrome);
 mountTooltips();
+// bundled faces must be loaded before the canvas draws with them; redraw once they are ready
+Promise.all(['400 40px "Pinyon Script"', '400 40px "Instrument Serif"', 'italic 400 40px "Instrument Serif"', '500 40px "Inter Tight"', '400 40px "DM Mono"'].map((f) => document.fonts.load(f)))
+  .then(() => store.emit('render')).catch(() => {});
 $('tl-montage').onclick = openMontageDialog;
 
 // Slow parallax: the root background drifts a few pixels against the pointer (skipped for reduced-motion, cheap: one rAF-throttled style write).

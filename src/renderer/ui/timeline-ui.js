@@ -5,7 +5,7 @@ import { visualsFor, drawVisuals } from '../engine/media-cache.js';
 import { planMontage } from '/shared/montage.js';
 import { EFFECT_PRESETS, instantiatePreset } from '/shared/effects-defs.js';
 import { store } from '../store.js';
-import { moveClips, deleteClips, overlaps, trackEnd, canPlace, clipEnd, projectDuration, moveClip, trimStart, trimEnd, splitClip, deleteClip, addMediaClip, addTrack, clipKind } from '/shared/timeline.js';
+import { dissolveInto, moveClips, deleteClips, overlaps, trackEnd, canPlace, clipEnd, projectDuration, moveClip, trimStart, trimEnd, splitClip, deleteClip, addMediaClip, addTrack, clipKind } from '/shared/timeline.js';
 import { findMedia, findTrack, uid } from '/shared/project.js';
 
 const LABEL_W = 118;
@@ -189,6 +189,7 @@ export function mountTimeline() {
   document.getElementById('tl-add-v').onclick = () => store.mutate((p) => addTrack(p, 'video'));
   document.getElementById('tl-add-a').onclick = () => store.mutate((p) => addTrack(p, 'audio'));
   document.getElementById('tl-delete').onclick = () => deleteSelected();
+  document.getElementById('tl-dissolve').onclick = () => dissolveSelected(Number(document.getElementById('tl-dissolve-d').value));
   document.getElementById('tl-ripple').onclick = () => deleteSelected({ ripple: true });
   document.getElementById('tl-split').onclick = () => splitSelected();
   document.getElementById('tl-duplicate').onclick = () => duplicateSelected();
@@ -202,6 +203,20 @@ export function mountTimeline() {
   render();
   addEventListener('resize', render);
   return { render, setZoom };
+}
+
+/** Cross-dissolve into each selected clip from the picture clip before it. One undo step. */
+export function dissolveSelected(seconds = 0.5) {
+  const ids = store.multi.size ? [...store.multi] : store.selection ? [store.selection] : [];
+  if (!ids.length) { toast('Select the clip you want to dissolve into.', 'error'); return 0; }
+  const order = ids.map((id) => store.project.clips.find((c) => c.id === id)).filter(Boolean).sort((a, b) => a.start - b.start);
+  store.snapshot();
+  let n = 0;
+  for (const c of order) if (dissolveInto(store.project, c.id, seconds)) n++;
+  if (!n) { store.undoStack.pop(); toast('Nothing to dissolve: pick a picture clip that starts where another one ends (and has a little spare footage to overlap).', 'error'); return 0; }
+  store.touch('project');
+  toast(`Dissolved into ${n} clip${n === 1 ? '' : 's'} (${seconds} s). The incoming clip now sits on its own track above.`);
+  return n;
 }
 
 export function splitSelected() {
