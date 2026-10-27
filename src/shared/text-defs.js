@@ -22,6 +22,7 @@ export const TEXT_ANIMATIONS = {
   letters: 'Letters rise (stagger)',
   wave: 'Wave (per letter)',
   scramble: 'Decode / scramble',
+  karaoke: 'Karaoke (word highlight)',
 };
 
 export function defaultText() {

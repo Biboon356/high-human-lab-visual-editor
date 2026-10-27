@@ -4,8 +4,11 @@ const GENERIC = new Set(['sans-serif', 'serif', 'monospace', 'cursive', 'fantasy
 const hash = (n) => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
 const ease = (u) => 1 - Math.pow(1 - Math.min(1, Math.max(0, u)), 3);
 
+// Fallbacks that carry Thai glyphs on macOS, Windows and Linux, so Thai text never renders as tofu boxes.
+const THAI_FALLBACK = '"Sukhumvit Set", "Thonburi", "Leelawadee UI", "Tahoma", "Noto Sans Thai", "Loma", "Garuda"';
+
 export function fontString(text, px) {
-  const fam = GENERIC.has(text.font) ? text.font : `"${text.font}", sans-serif`;
+  const fam = GENERIC.has(text.font) ? `${text.font}` : `"${text.font}", ${THAI_FALLBACK}, sans-serif`;
   return `${text.italic ? 'italic ' : ''}${text.weight} ${px}px ${fam}`;
 }
 
@@ -50,6 +53,28 @@ export function drawTextClip(ctx, W, H, clip, t, p) {
     }
     case 'stutter': { // rapid on/off + position stutter, then holds
       if (t < dur) { const k = Math.floor(t * 24 * a.speed); alpha *= hash(k + 2) < 0.6 ? 1 : 0; dx = (hash(k) - 0.5) * 0.03 * W; }
+      break;
+    }
+    case 'karaoke': {
+      const K = T.karaoke;
+      if (K?.words?.length) {
+        const act = K.words.findIndex((w) => t >= w.start && t < w.end);
+        const lastDone = K.words.reduce((m, w, i) => (t >= w.end ? i : m), -1);
+        const active = act >= 0 ? act : -1;
+        // a short fade-in for the card, nothing else moves except the active word
+        alpha *= Math.min(1, t / Math.max(0.05, a.duration)) * Math.min(1, Math.max(0, (clip.duration - t) / 0.12));
+        perChar = (idx, abs) => {
+          const wi = K.words.findIndex((w) => abs >= w.from && abs < w.to);
+          if (wi < 0) return { dy: 0, alpha: 1, sc: 1 };
+          const w = K.words[wi];
+          if (wi === active) {
+            const e = ease((t - w.start) / 0.09);
+            return { dy: 0, alpha: 1, sc: 1 + ((K.pop || 1.12) - 1) * e, fill: K.hl, plate: K.mode === 'box' ? K.plate || '#1f7a46' : null, wordIdx: wi, fillActive: K.fillActive };
+          }
+          const spoken = wi <= lastDone;
+          return { dy: 0, alpha: spoken ? 1 : K.upcoming ?? 0.9, sc: 1, wordIdx: wi };
+        };
+      }
       break;
     }
     case 'letters': {
@@ -120,25 +145,49 @@ export function drawTextClip(ctx, W, H, clip, t, p) {
   const lineX = (i) => (T.align === 'left' ? -blockW / 2 : T.align === 'right' ? blockW / 2 - widths[i] : -widths[i] / 2);
   const lineY = (i) => (i - (lines.length - 1) / 2) * lh;
   const baseIndex = lines.map((_, i) => lines.slice(0, i).reduce((n, l) => n + [...l].length, 0));
+  const absStart = lines.map((_, i) => lines.slice(0, i).reduce((n, l) => n + l.length + 1, 0)); // offsets into the text incl. newlines
+  let fillOverride = null;
   const pass = (paint, ox = 0) => lines.forEach((l, i) => {
     if (!perChar) { paint(l, lineX(i) + ox, lineY(i)); return; }
     const chars = [...l];
+    let abs = absStart[i];
     chars.forEach((ch, k) => {
+      const here = abs; abs += ch.length;
       if (ch === ' ') return;
-      const c = perChar(baseIndex[i] + k);
+      const c = perChar(baseIndex[i] + k, here);
       if (c.alpha <= 0.002) return;
       const gx = lineX(i) + ox + ctx.measureText(chars.slice(0, k).join('')).width, half = ctx.measureText(ch).width / 2;
       ctx.save(); ctx.globalAlpha *= c.alpha; ctx.translate(gx + half, lineY(i) + c.dy); ctx.scale(c.sc, c.sc);
-      paint(ch, -half, 0);
+      fillOverride = c.fill || null;
+      paint(ch, -half, 0, c);
+      fillOverride = null;
       ctx.restore();
     });
   });
-
   let fill = T.color;
   if (FX.gradient) { // chrome-style vertical gradient with a bright band near the middle
     const g = ctx.createLinearGradient(0, -blockH / 2, 0, blockH / 2);
     g.addColorStop(0, FX.grad1); g.addColorStop(0.48, FX.grad2); g.addColorStop(0.52, FX.grad1); g.addColorStop(1, FX.grad2);
     fill = g;
+  }
+  // karaoke "box" mode: a rounded plate behind the word being spoken
+  if (perChar && T.karaoke?.mode === 'box' && a.type === 'karaoke') {
+    const K = T.karaoke, act = K.words.findIndex((w) => t >= w.start && t < w.end);
+    if (act >= 0) {
+      const w = K.words[act];
+      lines.forEach((l, i) => {
+        const lo = absStart[i], hi = lo + l.length;
+        const from = Math.max(w.from, lo), to = Math.min(w.to, hi);
+        if (to <= from) return;
+        const x0 = lineX(i) + ctx.measureText(l.slice(0, from - lo)).width, x1 = lineX(i) + ctx.measureText(l.slice(0, to - lo)).width;
+        // plate height comes from plain base consonants, so every word gets the same-height plate whatever tone marks it carries
+        const body = ctx.measureText('กอา');
+        const padX = px * 0.2, padY = px * 0.2, y = lineY(i);
+        const top = y - body.actualBoundingBoxAscent, bottom = y + body.actualBoundingBoxDescent;
+        ctx.save(); ctx.fillStyle = K.plate || '#1f7a46'; ctx.beginPath();
+        ctx.roundRect(x0 - padX, top - padY, x1 - x0 + padX * 2, bottom - top + padY * 2, px * 0.22); ctx.fill(); ctx.restore();
+      });
+    }
   }
   // glow (soft, coloured) underneath, then drop shadow for depth
   if (FX.glow > 0) {
@@ -155,15 +204,15 @@ export function drawTextClip(ctx, W, H, clip, t, p) {
   ctx.save();
   if (FX.shadow > 0) { ctx.shadowColor = `rgba(0,0,0,${0.55 + 0.4 * FX.shadow})`; ctx.shadowBlur = px * 0.14 * FX.shadow; ctx.shadowOffsetY = px * 0.05 * FX.shadow; ctx.shadowOffsetX = px * 0.02 * FX.shadow; }
   const sw = T.hollow ? Math.max(T.strokeWidth || 0, 0.03) : T.strokeWidth || 0;
-  pass((l, x, y) => {
+  pass((l, x, y, c) => {
     if (T.hollow) { // faint fill first, then a full-strength outline on top
-      const fa = T.fillAlpha ?? 0.15;
-      if (fa > 0) { ctx.save(); ctx.globalAlpha *= fa; ctx.fillStyle = fill; ctx.fillText(l, x, y); ctx.restore(); }
+      const fa = c?.fillActive && c.fill ? 1 : T.fillAlpha ?? 0.15;
+      if (fa > 0) { ctx.save(); ctx.globalAlpha *= fa; ctx.fillStyle = fillOverride || fill; ctx.fillText(l, x, y); ctx.restore(); }
       ctx.lineWidth = sw * px; ctx.strokeStyle = T.strokeColor || T.color; ctx.strokeText(l, x, y);
       return;
     }
     if (sw > 0) { ctx.lineWidth = sw * px; ctx.strokeStyle = T.strokeColor; ctx.strokeText(l, x, y); }
-    ctx.fillStyle = fill;
+    ctx.fillStyle = fillOverride || fill;
     ctx.fillText(l, x, y);
   });
   ctx.restore();
