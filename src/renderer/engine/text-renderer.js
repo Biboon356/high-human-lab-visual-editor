@@ -16,6 +16,7 @@ export function drawTextClip(ctx, W, H, clip, t, p) {
   const dur = Math.max(0.05, a.duration);
   const u = t / dur;
   let alpha = p.opacity, dx = 0, dy = 0, scale = p.scale;
+  let perChar = null; // (charIndex) -> {dy, alpha, sc} for animations that move letters individually
   let content = T.uppercase ? T.content.toUpperCase() : T.content;
 
   switch (a.type) {
@@ -49,6 +50,26 @@ export function drawTextClip(ctx, W, H, clip, t, p) {
     }
     case 'stutter': { // rapid on/off + position stutter, then holds
       if (t < dur) { const k = Math.floor(t * 24 * a.speed); alpha *= hash(k + 2) < 0.6 ? 1 : 0; dx = (hash(k) - 0.5) * 0.03 * W; }
+      break;
+    }
+    case 'letters': {
+      const spd = Math.max(0.1, a.speed);
+      perChar = (idx) => { const e = ease((t - (idx * 0.05) / spd) / Math.max(0.15, dur * 0.3)); return { dy: (1 - e) * 0.06 * H, alpha: e, sc: 1 + (1 - e) * 0.45 }; };
+      break;
+    }
+    case 'wave':
+      perChar = (idx) => ({ dy: Math.sin(t * 3 * a.speed + idx * 0.6) * 0.014 * H, alpha: 1, sc: 1 });
+      break;
+    case 'scramble': { // characters flicker through random glyphs until they lock into place left-to-right
+      const GLYPHS = '#@$%&*+=<>?/|0123456789ABCDEFXZ';
+      const total = Math.max(1, content.replace(/\n/g, '').length);
+      let idx = 0;
+      const lock = Math.min(1.15, u * 1.15);
+      content = [...content].map((ch) => {
+        if (ch === '\n' || ch === ' ') return ch;
+        const i = idx++;
+        return i / total < lock - hash(i * 5.3) * 0.12 ? ch : GLYPHS[Math.floor(hash(i * 13.1 + Math.floor(t * 24)) * GLYPHS.length)];
+      }).join('');
       break;
     }
     case 'strobe': alpha *= Math.floor(t * 12 * a.speed) % 2 === 0 ? 1 : 0.12; break;
@@ -98,7 +119,20 @@ export function drawTextClip(ctx, W, H, clip, t, p) {
   }
   const lineX = (i) => (T.align === 'left' ? -blockW / 2 : T.align === 'right' ? blockW / 2 - widths[i] : -widths[i] / 2);
   const lineY = (i) => (i - (lines.length - 1) / 2) * lh;
-  const pass = (paint, ox = 0) => lines.forEach((l, i) => paint(l, lineX(i) + ox, lineY(i)));
+  const baseIndex = lines.map((_, i) => lines.slice(0, i).reduce((n, l) => n + [...l].length, 0));
+  const pass = (paint, ox = 0) => lines.forEach((l, i) => {
+    if (!perChar) { paint(l, lineX(i) + ox, lineY(i)); return; }
+    const chars = [...l];
+    chars.forEach((ch, k) => {
+      if (ch === ' ') return;
+      const c = perChar(baseIndex[i] + k);
+      if (c.alpha <= 0.002) return;
+      const gx = lineX(i) + ox + ctx.measureText(chars.slice(0, k).join('')).width, half = ctx.measureText(ch).width / 2;
+      ctx.save(); ctx.globalAlpha *= c.alpha; ctx.translate(gx + half, lineY(i) + c.dy); ctx.scale(c.sc, c.sc);
+      paint(ch, -half, 0);
+      ctx.restore();
+    });
+  });
 
   let fill = T.color;
   if (FX.gradient) { // chrome-style vertical gradient with a bright band near the middle

@@ -630,6 +630,20 @@ await step('multi-select: shift-click, group drag, Delete, Undo, and Ripple dele
   assert.ok(Math.abs(r.B - (before.B - 2)) < 1e-6 && Math.abs(r.C - (before.C - 2)) < 1e-6, `later clips slid left by A's length (2s): ${JSON.stringify({ before, after: r })}`);
 });
 
+await step('kinetic type: letters rise one by one, wave moves, scramble decodes to the real text', async () => {
+  await resetProject();
+  const stat = async (anim, t) => ev(async ([anim, t]) => { const { store } = window.__app; const T = await import('/shared/text-defs.js'); const { addClipRaw } = await import('/shared/timeline.js');
+    store.mutate((p) => { p.clips.length = 0; const c = T.createTextClip(null, 0, 4); c.trackId = p.tracks.find((x) => x.name === 'V1').id; c.text.content = 'HELLO WORLD'; c.text.size = 0.2; c.text.anim = { type: anim, duration: 1.2, speed: 1 }; addClipRaw(p, c); });
+    store.setPlayhead(t); await new Promise((r) => setTimeout(r, 450)); const d = window.__grab(96, 54); let n = 0; for (let i = 0; i < d.length; i += 3) if (d[i] > 128) n++; return { n, sig: Array.from(d.slice(0, 5000)).join(',').length + d.reduce((a, b) => a + b, 0) }; }, [anim, t]);
+  const none = await stat('none', 3);
+  const l0 = await stat('letters', 0.12), l1 = await stat('letters', 0.5), l2 = await stat('letters', 3);
+  assert.ok(l0.n < l1.n && l1.n < l2.n, `letters appear progressively: ${l0.n} < ${l1.n} < ${l2.n}`);
+  assert.ok(Math.abs(l2.n - none.n) / none.n < 0.03, `finished letters match the plain text (${l2.n} vs ${none.n})`);
+  const w1 = await stat('wave', 0.3), w2 = await stat('wave', 0.9); assert.notEqual(w1.sig, w2.sig, 'wave changes over time');
+  const s0 = await stat('scramble', 0.15), s2 = await stat('scramble', 3);
+  assert.notEqual(s0.sig, none.sig, 'scrambled glyphs differ from the final text'); assert.equal(s2.sig, none.sig, 'once decoded the picture is identical to plain text');
+});
+
 await step('light theme + collapsible panels', async () => {
   await ev(() => { document.getElementById('toggle-theme').click(); document.getElementById('toggle-left').click(); });
   await settle(300); await shot('11-light-collapsed');
