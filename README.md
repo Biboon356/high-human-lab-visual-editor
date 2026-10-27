@@ -117,7 +117,7 @@ Legend: ✅ works and is covered by the automated tests · 🧪 prototype (works
 
 ## Testing
 
-`npm test` runs 12 unit tests. `scripts/e2e.mjs` (30 checks) is a real end-to-end run of the Electron app (see table above): it
+`npm test` runs 14 unit tests. `scripts/e2e.mjs` (34 checks) is a real end-to-end run of the Electron app (see table above): it
 generates test media with ffmpeg, drives the app, reads pixels out of the compositor, and probes exported files.
 Native file dialogs are stubbed at the Electron main-process level; every other path is the production code.
 

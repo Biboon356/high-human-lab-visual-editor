@@ -331,8 +331,8 @@ await step('Export dialog UI: choose file, render, progress, verified result box
   await resetProject(); await ev((p) => window.__app.importPaths([p]), clip);
   await stubDialog('showSaveDialog', { canceled: false, filePath: out });
   await page.click('[data-act="export"]'); await page.waitForSelector('.modal');
-  await page.selectOption('.modal select >> nth=0', { index: 0 });
-  await page.selectOption('.modal select >> nth=2', 'draft');
+  // address the selects by their row label, not position (the Preset select was added in front)
+  await page.selectOption('.modal .grid > select >> nth=3', 'draft'); // Preset, Resolution, Frame rate, Quality, Format
   await page.click('.modal button:has-text("Choose")'); await page.waitForFunction(() => document.querySelector('.modal input[readonly]').value);
   await page.click('.modal button:text-is("Render")');
   await page.waitForSelector('.modal .progress:not([hidden])');
