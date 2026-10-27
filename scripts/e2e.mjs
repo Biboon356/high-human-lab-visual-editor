@@ -175,7 +175,7 @@ await step('typography + organic generator clips render', async () => {
     const { createGeneratorClip, GEN_PRESETS } = await import('/shared/organic-defs.js'); const { addClipRaw } = await import('/shared/timeline.js');
     const p = store.project, top = p.tracks.find((t) => t.name === 'V2').id;
     const v1 = p.tracks.find((t) => t.name === 'V1').id;
-    const t = createTextClip(TEXT_PRESETS[2], 0.2, 2.5); t.trackId = top;
+    const t = createTextClip(TEXT_PRESETS.find((x) => x.name === 'Glitch Title'), 0.2, 2.5); t.trackId = top;
     t.keyframes.rotation = [{ t: 0, v: 0 }, { t: 2, v: 10 }];
     const g = createGeneratorClip(GEN_PRESETS[0], 6.2, 3); g.trackId = v1;
     store.mutate(() => { addClipRaw(p, t); addClipRaw(p, g); });
