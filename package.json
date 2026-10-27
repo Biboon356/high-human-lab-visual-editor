@@ -1,6 +1,6 @@
 {
   "name": "high-human-lab-visual-editor",
-  "productName": "HIGH HUMAN LAB — VISUAL EDITOR",
+  "productName": "HIGH HUMAN LAB \u2014 VISUAL EDITOR",
   "version": "0.1.0",
   "description": "Experimental video editing workstation for musicians and visual artists.",
   "type": "module",
@@ -28,7 +28,8 @@
     "productName": "HIGH HUMAN LAB - VISUAL EDITOR",
     "files": [
       "src/**/*",
-      "package.json"
+      "package.json",
+      "build/icon.png"
     ],
     "asarUnpack": [
       "node_modules/ffmpeg-static/**",
@@ -54,7 +55,8 @@
       ]
     },
     "directories": {
-      "output": "dist"
+      "output": "dist",
+      "buildResources": "build"
     },
     "artifactName": "HIGH-HUMAN-LAB-${version}-${os}-${arch}.${ext}"
   },

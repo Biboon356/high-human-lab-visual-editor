@@ -72,6 +72,7 @@ function createWindow() {
   win = new BrowserWindow({
     width: 1600, height: 960, minWidth: 1100, minHeight: 700,
     backgroundColor: '#0b0d0c',
+    ...(fs.existsSync(path.join(SRC, '..', 'build', 'icon.png')) ? { icon: path.join(SRC, '..', 'build', 'icon.png') } : {}),
     title: 'HIGH HUMAN LAB — VISUAL EDITOR',
     webPreferences: { preload: path.join(here, 'preload.cjs'), contextIsolation: true, sandbox: true, nodeIntegration: false },
   });
