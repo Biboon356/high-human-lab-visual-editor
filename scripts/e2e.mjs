@@ -12,8 +12,11 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const req = createRequire(import.meta.url);
 let pw;
-for (const base of [root + '/', '/opt/node-tools/']) { try { pw = createRequire(base).call ? createRequire(base)('playwright') : null; break; } catch { /* next */ } }
-if (!pw) throw new Error('Playwright is required for the e2e test: npm i -D playwright');
+for (const name of ['playwright-core', 'playwright']) {
+  for (const base of [root + '/', '/opt/node-tools/']) { try { pw = createRequire(base)(name); break; } catch { /* try next */ } }
+  if (pw) break;
+}
+if (!pw) throw new Error('Playwright is required for the e2e test: npm i -D playwright-core');
 const { _electron } = pw;
 const { FFMPEG, FFPROBE } = await import(path.join(root, 'src/main/ffmpeg.js'));
 

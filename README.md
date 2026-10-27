@@ -21,7 +21,7 @@ npm start          # launches the app
 |---|---|
 | `npm start` | Run the app in development |
 | `npm test` | Unit tests for the pure modules (timeline, keyframes, analysis, export planning, project validation) |
-| `npm run test:e2e` | Launches the **real Electron app**, imports real media, edits, saves/reopens, exports and checks the output with ffprobe. Needs Playwright (`npm i -D playwright`) and a display; on headless Linux: `xvfb-run -a npm run test:e2e` |
+| `npm run test:e2e` | Launches the **real Electron app**, imports real media, edits, saves/reopens, exports and checks the output with ffprobe. Needs a display (Playwright-core is a dev dependency); on headless Linux: `xvfb-run -a npm run test:e2e` |
 | `npm run dist:mac` / `npm run dist:win` | Package an installer with electron-builder (`dist/`). **Must be run on the target OS** (macOS builds need macOS). Not exercised in CI yet — see below |
 
 Environment overrides: `HHLAB_FFMPEG` / `HHLAB_FFPROBE` point at your own binaries (e.g. a build with extra codecs).
@@ -116,7 +116,7 @@ Legend: ✅ works and is covered by the automated tests · 🧪 prototype (works
 
 ## Testing
 
-`npm test` runs 11 unit tests. `scripts/e2e.mjs` (30 checks) is a real end-to-end run of the Electron app (see table above): it
+`npm test` runs 12 unit tests. `scripts/e2e.mjs` (30 checks) is a real end-to-end run of the Electron app (see table above): it
 generates test media with ffmpeg, drives the app, reads pixels out of the compositor, and probes exported files.
 Native file dialogs are stubbed at the Electron main-process level; every other path is the production code.
 
