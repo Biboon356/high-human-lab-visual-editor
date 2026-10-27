@@ -196,7 +196,6 @@ export function mountTimeline() {
   store.on('project', render);
   store.on('analysis', render);
   store.on('mediavis', render);
-  document.getElementById('tl-montage').onclick = () => autoMontage({ every: Number(document.getElementById('tl-beat-n').value), looks: document.getElementById('tl-montage-looks').checked });
   document.getElementById('tl-cut-beats').onclick = () => cutOnBeats(Number(document.getElementById('tl-beat-n').value));
   store.on('selection', () => { for (const n of content.querySelectorAll('.clip')) n.classList.toggle('sel', store.multi.has(n.dataset.clip)); });
   store.on('playhead', () => { placePlayhead(); followPlayhead(); });

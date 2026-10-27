@@ -4,12 +4,14 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { downloadFile } from './model-download.js';
+import { composePrompt } from '../shared/asr-plan.js';
 
 /** ggml models published at huggingface.co/ggerganov/whisper.cpp. Quantised builds keep downloads small. */
 export const MODELS = {
   fast: { file: 'ggml-small-q5_1.bin', label: 'Fast (Whisper small)', approxMB: 190, minBytes: 150e6, note: 'Quickest; fine for clear speech' },
   balanced: { file: 'ggml-medium-q5_0.bin', label: 'Balanced (Whisper medium)', approxMB: 540, minBytes: 450e6, note: 'Noticeably better Thai' },
-  best: { file: 'ggml-large-v3-turbo-q5_0.bin', label: 'Best (Whisper large-v3-turbo)', approxMB: 574, minBytes: 480e6, note: 'Highest accuracy; needs a recent computer' },
+  best: { file: 'ggml-large-v3-turbo-q5_0.bin', label: 'Best (Whisper large-v3-turbo)', approxMB: 574, minBytes: 480e6, note: 'Highest speed/accuracy trade-off; needs a recent computer' },
+  max: { file: 'ggml-large-v3-q5_0.bin', label: 'Maximum (Whisper large-v3)', approxMB: 1080, minBytes: 900e6, note: 'Most accurate Thai; slow, ~1 GB, needs a recent computer' },
 };
 export const DEFAULT_MODEL = 'balanced';
 
@@ -66,4 +68,39 @@ export async function transcribePcm({ pcm, modelPath, language = 'th', prompt, o
     .map((s) => ({ text: String(s.text || '').trim(), start: s.t0 / 1000, end: s.t1 / 1000 })) // binding reports milliseconds
     .filter((s) => s.text && !BLANK.test(s.text) && s.end > s.start);
   return { segments, language: res.language || language };
+}
+
+const SAMPLE_RATE = 16000;
+const MIN_CHUNK = 1.2; // whisper.cpp wants >= 1 s of input; shorter chunks are padded with silence
+
+/**
+ * Transcribes each region on its own and stitches the results back onto the clip's timeline.
+ * @param {{pcm:Int16Array, chunks:Array<{start:number,end:number}>, modelPath:string, language?:string, terms?:string[], onProgress?:(pct:number)=>void, signal?:object, loader?:Function, threads?:number}} o
+ */
+export async function transcribeChunks({ pcm, chunks, modelPath, language = 'th', terms = [], onProgress, signal, loader, threads }) {
+  const total = chunks.reduce((s, c) => s + (c.end - c.start), 0) || 1;
+  let done = 0, prev = '';
+  const segments = [];
+  for (const c of chunks) {
+    if (signal?.aborted) throw new Error('Transcription cancelled.');
+    const a = Math.max(0, Math.floor(c.start * SAMPLE_RATE)), b = Math.min(pcm.length, Math.ceil(c.end * SAMPLE_RATE));
+    if (b <= a) continue;
+    const slice = new Int16Array(Math.max(b - a, Math.ceil(MIN_CHUNK * SAMPLE_RATE)));
+    slice.set(pcm.subarray(a, b));
+    const prompt = composePrompt({ terms, prev });
+    const base = done / total, span = (c.end - c.start) / total;
+    const r = await transcribePcm({ pcm: slice, modelPath, language, prompt: prompt || undefined, signal, loader, threads, onProgress: (p) => onProgress?.(Math.min(99, Math.round((base + span * (p / 100)) * 100))) });
+    const here = [];
+    for (const s of r.segments) {
+      const text = s.text.trim();
+      // a prompt echoed back as the whole segment is a known failure mode; it is never speech
+      if (!text || (prompt && text === prompt.trim())) continue;
+      here.push({ text, start: c.start + s.start, end: Math.min(c.end, c.start + s.end) });
+    }
+    segments.push(...here);
+    if (here.length) prev = here.map((s) => s.text).join(' ');
+    done += c.end - c.start;
+    onProgress?.(Math.round((done / total) * 100));
+  }
+  return { segments: segments.filter((s) => s.end > s.start), language };
 }

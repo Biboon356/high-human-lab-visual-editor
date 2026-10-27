@@ -62,6 +62,7 @@
         <button id="toggle-right" class="icon" title="Toggle right panel" aria-label="Toggle right panel"><svg class="ic"><use href="#i-pr"/></svg></button>
         <button id="toggle-theme" title="Light / dark theme">Theme</button>
         <span class="sep"></span>
+        <button data-act="captions" id="btn-captions" title="Fix caption words and manage your vocabulary">Captions</button>
         <button data-act="autoedit" id="btn-autoedit" class="accent" title="Transcribe Thai speech, cut silences, add captions, frame for 9:16 — in one go (Ctrl/Cmd+Shift+A)"><svg class="ic"><use href="#i-aster"/></svg>TikTok Auto-Edit</button>
         <button data-act="export" class="primary" title="Export video (Ctrl/Cmd+E)">Export <svg class="ic"><use href="#i-next"/></svg></button>
       </div>
@@ -149,8 +150,8 @@
         <span class="sep"></span>
         <button id="tl-cut-beats" title="Split the selected clip on detected beats"><svg class="ic"><use href="#i-beat"/></svg>Cut on beats</button>
         <select id="tl-beat-n" title="Cut every N-th beat"><option value="1">every beat</option><option value="2">every 2</option><option value="4" selected>every 4 (bar)</option><option value="8">every 8</option></select>
-        <button id="tl-montage" title="Fill a new video track with your imported clips/images, cut on the beat grid"><svg class="ic"><use href="#i-film"/></svg>Auto-montage</button>
-        <label class="chk" title="Give each cut a random look (xerox, comic, purple, solarize, VHS…)"><input type="checkbox" id="tl-montage-looks" checked /> random looks</label>
+        <button id="tl-montage" title="Analyse your footage and music, then cut a montage: slow where the song is calm, hard on the drops, best moments only"><svg class="ic"><use href="#i-film"/></svg>Auto-montage</button>
+        <label class="chk" hidden title="Classic montage: give each cut a random look"><input type="checkbox" id="tl-montage-looks" checked /> random looks</label>
         <span class="grow"></span>
         <span class="hint" id="tl-hint">Space play · S split · Del delete · Shift-click multi-select · drag edges to trim</span>
       </div>

@@ -81,9 +81,29 @@ Select a clip with someone speaking, press **✨ TikTok Auto-Edit** (or `Ctrl/Cm
 5. reframes **16:9 → 9:16** (fill or blurred-background), applies a light look, and normalises loudness to −14 LUFS,
 6. leaves everything editable on the timeline; **Export for TikTok…** is one click away, and captions can be saved as `.srt`.
 
-*Speech models* (Whisper small / medium / large-v3-turbo, 190–575 MB) are downloaded on first use into the app-data folder from Hugging Face; Balanced (medium) is the default.
+**Getting the words right.** Whisper is the weak link for Thai, so the app works around it instead of trusting it blindly:
+- each voiced region is transcribed on its own (less drift, fewer invented words in pauses), with the end of the previous sentence as context;
+- the recogniser hears a denoised, level-steadied copy of the audio (your cuts and export still use the original);
+- a **vocabulary** of corrections ("what it wrote → what it should write") is applied to every transcript and sent to Whisper as a spelling hint;
+- **Captions…** (top bar, or *Edit captions…* after a run) lists every caption: fix any word, the karaoke timing of the other words is kept, one Undo reverts, and your fix is remembered for next time;
+- an extra **Maximum (Whisper large-v3, ~1 GB)** model for the most accurate Thai.
+None of this has been measured against real Thai recordings yet (see status below); the editor and vocabulary are what make a wrong word a ten-second fix instead of a re-edit.
+
+*Speech models* (Whisper small / medium / large-v3-turbo / large-v3, 190 MB–1 GB) are downloaded on first use into the app-data folder from Hugging Face; Balanced (medium) is the default.
 
 **Honest status:** the silence cutting, Thai word segmentation, captions, reframing, loudness and export are tested end-to-end (including on real synthetic Thai speech, measured from the exported file). The **Whisper transcription itself has not been run against a real model in the development sandbox** (the model host is blocked there): the native binding loads and its error handling is tested, but Thai *accuracy* on real recordings is unverified — try *Balanced* or *Best* for noisy or fast speech, and use the `.srt` import as a fallback.
+
+## Smart auto-montage (footage- and music-aware)
+
+**Auto-montage** in the timeline toolbar analyses your clips and your music on your computer, then cuts a montage:
+
+- **The music decides where to cut:** bars are classed calm / medium / full from the audio (bass, level, highs); calm parts get long shots, full bars cut every beat or two, a detected drop gets a boundary exactly on it and a *hero shot*. Every cut is on a detected beat.
+- **The footage decides what to show:** each clip is scanned (4 samples/s) for sharpness, exposure, contrast, colour, hand shake, motion and scene changes; the planner picks the best window that has **no scene cut inside**, motion that fits the music's energy, no footage reused, no back-to-back repeats, and a colour flow between shots.
+- **A style decides how it looks** (Hype / Street / Cinematic / Clean): one coherent grade, accent looks and glitch/flash/punch transitions only on the energetic cuts, alternating punch-in, slow push-ins on stills.
+- **Wide footage on a tall canvas** is cropped to follow the action, not the centre.
+- The dialog shows what it decided and why (sections, drops, hero shot, unused clips) with an energy/cut strip; **Re-roll** gives different choices from the same analysis, **Undo** removes it in one step. Footage analysis is cached per file, so re-rolls are instant.
+
+**Honest limits:** this is classical signal analysis plus a scoring planner — not a generative or "understanding" AI. It does not recognise faces, people, objects, emotions or what is being said in the footage, so it cannot know which shot is the "story"; it chooses by image quality, motion and music fit. The scoring weights are hand-tuned (unit-tested on synthetic footage and checked end-to-end, not tuned on a large set of real edits). *Classic random montage…* in the dialog keeps the old behaviour.
 
 ## Visual identity
 
@@ -121,7 +141,9 @@ Legend: ✅ works and is covered by the automated tests · 🧪 prototype (works
 | Keyframes | 🧪 | per-parameter keys with smooth interpolation, shown on timeline clips; no curve editor, no per-key easing choice, no dragging keys on the timeline |
 | Organic engine | 🧪 | **drawn root systems** (branching, tapering, growing from top/bottom/left/centre) plus contour, topographic-fluid, cell-membrane and dust generators; keyframable *Growth*, hand-drawn boil, overlay blend; look is still being tuned |
 | Audio-reactive | ✅ / 🧪 | amplitude, 3 bands, beat detection and tempo estimate ✅; analysis is whole-mix only (no per-clip source choice), fixed 60 Hz, beats are simple spectral flux 🧪 |
-| Clip speed, fades, cut-in transitions (flash/punch/glitch/whip), auto-montage on beats | ✅ | constant speed with pitch kept; picture + sound fades; seeded beat-synced montage with random looks |
+| Clip speed, fades, cut-in transitions (flash/punch/glitch/whip) | ✅ | constant speed with pitch kept; picture + sound fades |
+| Smart auto-montage (footage analysis + music structure + styles) | ✅ | see *Smart auto-montage*; heuristic, not generative AI; classic random montage still available |
+| Caption editor + vocabulary, chunked/cleaned Whisper input | ✅ (accuracy gain unmeasured) | editor, learning and chunking are tested; the Whisper accuracy improvement itself is unverified on real recordings |
 | TikTok Auto-Edit (Thai captions, jump cuts, 9:16, loudness) | ✅ / 🧪 | everything except live Whisper transcription is tested end-to-end; transcription accuracy on real Thai speech needs your feedback 🧪 |
 | Export | ✅ | H.264/AAC and VP9/Opus, 6 resolutions (+project), 24–60 fps, 3 quality levels, progress/ETA, cancel, errors surfaced, output re-probed before "success" |
 | Preview audio | 🧪 | each clip plays through its own media element; no master mixer, meters or waveforms |
@@ -140,7 +162,7 @@ Legend: ✅ works and is covered by the automated tests · 🧪 prototype (works
 
 ## Testing
 
-`npm test` runs 56 unit tests. `scripts/e2e.mjs` (45 checks) is a real end-to-end run of the Electron app (see table above): it
+`npm test` runs 78 unit tests. `scripts/e2e.mjs` (47 checks) is a real end-to-end run of the Electron app (see table above): it
 generates test media with ffmpeg, drives the app, reads pixels out of the compositor, and probes exported files.
 Native file dialogs are stubbed at the Electron main-process level; every other path is the production code.
 

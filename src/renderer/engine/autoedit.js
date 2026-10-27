@@ -11,6 +11,9 @@ import { planCaptions } from '/shared/captions.js';
 import { createCaptionClip } from '/shared/caption-styles.js';
 import { parseSubtitles } from '/shared/srt.js';
 import { EFFECT_PRESETS, instantiatePreset, createEffect } from '/shared/effects-defs.js';
+import { planAsrChunks } from '/shared/asr-plan.js';
+import { applyGlossary, promptTerms } from '/shared/glossary.js';
+import { loadGlossary } from '../glossary-store.js';
 
 export const LOOKS = {
   none: { label: 'None' },
@@ -24,6 +27,8 @@ export const LOOKS = {
 export const DEFAULTS = {
   language: 'th', model: 'balanced', captionStyle: 'pop', cutSilence: true, sensitivity: 0.5, minSilence: 0.35, removeFillers: true,
   punch: true, reframe: 'fill', setCanvas: true, look: 'clean', normalize: true, captions: true,
+  cleanAudio: true, // recogniser hears a denoised, level-steadied copy; cuts still use the original audio
+  chunked: true,    // transcribe each voiced region separately (less drift and fewer hallucinations in pauses)
 };
 
 const NO_SPEECH = 'No speech was found in this clip (or it is too quiet). Try a clip with a clearer voice, or raise the silence sensitivity.';
@@ -50,7 +55,7 @@ export async function analyze({ project, clip, opts, transcribe, subtitles, onSt
   const media = findMedia(project, clip.mediaId);
   const speed = clip.speed || 1;
   onStep('audio', 'Reading the audio…');
-  const ex = await window.hh.asrExtract({ path: media.path, start: clip.in, duration: clip.duration * speed });
+  const ex = await window.hh.asrExtract({ path: media.path, start: clip.in, duration: clip.duration * speed, clean: !!opts.cleanAudio });
   const env = { rate: ex.env.rate, rms: new Float32Array(ex.env.rms) };
   const total = ex.seconds;
   const speech = detectSpeech(env, { minSilence: opts.minSilence, sensitivity: opts.sensitivity });
@@ -68,8 +73,13 @@ export async function analyze({ project, clip, opts, transcribe, subtitles, onSt
     onStep('transcribe', 'Transcribing Thai speech…');
     const st = await window.hh.asrStatus();
     if (!st.models[opts.model]?.installed) { const e = new Error(`The "${st.models[opts.model]?.label || opts.model}" speech model is not downloaded yet.`); e.code = 'NO_MODEL'; throw e; }
-    segments = (await window.hh.asrTranscribe({ token: ex.token, model: opts.model, language: opts.language })).segments;
+    const glossary = loadGlossary();
+    const chunks = opts.chunked ? planAsrChunks(env, total) : undefined;
+    segments = (await window.hh.asrTranscribe({ token: ex.token, model: opts.model, language: opts.language, chunks, terms: promptTerms(glossary) })).segments;
   }
+  // the user's corrections ("what it keeps mishearing -> what it should be") apply to every transcript, whatever produced it
+  const glossary = loadGlossary();
+  if (glossary.length) segments = segments.map((s) => ({ ...s, text: applyGlossary(s.text, glossary) }));
   if (signal?.aborted) throw new Error('Cancelled.');
   segments = dropHallucinations(segments, speech);
   const words = segmentsToWords(segments, env);

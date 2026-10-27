@@ -555,6 +555,57 @@ await step('auto-montage: fills a new track on the beat grid from imported media
   const v = probe(out); assert.ok(Math.abs(Number(v.format.duration) - r.dur) < 0.3 && v.streams.some((s) => s.codec_type === 'audio'), 'rendered montage has the music and its length');
 });
 
+await step('smart montage: analyses footage + music, cuts on beats, explains itself, re-rolls, undoes, exports; action stays in frame when a wide clip fills a tall canvas', async () => {
+  const calm = path.join(dir, 'calm.mp4'), blob = path.join(dir, 'blob.mp4');
+  sh(FFMPEG, ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'smptebars=size=640x360:rate=30:duration=8', '-pix_fmt', 'yuv420p', calm]);
+  sh(FFMPEG, ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'color=black:s=640x360:r=30:d=8', '-f', 'lavfi', '-i', 'color=white:s=90x90:r=30:d=8', '-filter_complex', "[0][1]overlay=x='30+45*sin(2*PI*t*2)':y=135", '-pix_fmt', 'yuv420p', blob]);
+  await resetProject();
+  await ev(async ([a, b, c, d]) => { await window.__app.importPaths([a, b, c, d]); const { store } = window.__app; const { addMediaClip } = await import('/shared/timeline.js');
+    store.mutate((p) => addMediaClip(p, p.media.find((m) => m.kind === 'audio').id, p.tracks.find((t) => t.kind === 'audio').id, 0)); }, [clip, calm, pic, kick]);
+  await ev(() => window.__app.runAnalysis({ quiet: true }));
+  const before = await ev(() => window.__app.store.project.clips.length);
+  await page.click('#tl-montage'); await page.waitForSelector('#montage-modal');
+  await page.click('#montage-modal [data-style="street"]');
+  await page.click('#mt-run'); await page.waitForSelector('#montage-modal .mt-result', { timeout: 90000 });
+  const text = await ev(() => document.querySelector('#montage-modal .mt-result').textContent);
+  assert.match(text, /Music:/); assert.match(text, /\d+ cuts/); assert.match(text, /every cut on a beat/); assert.match(text, /Used \d of 3 clips/);
+  const ink = await ev(() => { const c = document.querySelector('.mt-strip'); const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i] > 0) n++; return n; });
+  assert.ok(ink > 500, `the energy/cut strip is drawn (${ink} px)`);
+  await shot('17-montage-dialog');
+  const grab = () => ev(() => { const { store } = window.__app; const track = store.project.tracks.filter((t) => t.kind === 'video').find((t) => store.project.clips.filter((c) => c.trackId === t.id).length >= 6);
+    const cs = store.project.clips.filter((c) => c.trackId === track.id).sort((a, b) => a.start - b.start); return { cs: cs.map((c) => ({ s: c.start, d: c.duration, m: c.mediaId, i: c.in, fx: c.effects.length, tr: c.transition?.type || 'none' })), beats: store.analysis.beats, dur: store.analysis.duration, total: store.project.clips.length }; });
+  const r = await grab();
+  assert.ok(r.cs.length >= 6, `cuts: ${r.cs.length}`);
+  for (let i = 1; i < r.cs.length; i++) { assert.ok(Math.abs(r.cs[i].s - (r.cs[i - 1].s + r.cs[i - 1].d)) < 1e-6, 'gapless'); assert.ok(r.beats.some((b) => Math.abs(b - r.cs[i].s) < 0.01), `cut at ${r.cs[i].s.toFixed(2)} is on a beat`); }
+  assert.ok(Math.abs(r.cs.at(-1).s + r.cs.at(-1).d - r.dur) < 0.05, 'runs to the end of the music');
+  assert.ok(new Set(r.cs.map((c) => c.m)).size >= 2, 'uses more than one source');
+  for (const m of new Set(r.cs.map((c) => c.m))) { const rs = r.cs.filter((c) => c.m === m && c.i >= 0).map((c) => [c.i, c.i + c.d]).sort((a, b) => a[0] - b[0]); }
+  // re-roll: same count of tracks, different choices, still valid
+  const seq = (x) => x.cs.map((c) => `${c.m}@${c.i}`).join();
+  await page.click('#mt-reroll'); await page.waitForTimeout(400);
+  const r2 = await grab(); assert.ok(seq(r2) !== seq(r), 're-roll picks different shots'); assert.equal(r2.total - before, r2.cs.length, 're-roll replaced the first result, not added to it');
+  // undo restores everything in one step
+  await page.click('#mt-undo'); await page.waitForTimeout(200);
+  assert.equal(await ev(() => window.__app.store.project.clips.length), before, 'one Undo removes the montage');
+  await page.click('#mt-run'); await page.waitForSelector('#montage-modal .mt-result .mt-lines');
+  const out = path.join(dir, 'smart-montage.mp4'); await ev((o) => window.__app.exportTo(o, { width: 192, height: 108, fps: 10 }), out);
+  const v = probe(out); assert.ok(Math.abs(Number(v.format.duration) - r.dur) < 0.3 && v.streams.some((s) => s.codec_type === 'audio'), 'the montage exports with the music');
+  await ev(() => [...document.querySelectorAll('.modal button')].find((b) => b.textContent === 'Close').click());
+
+  // action stays in frame: a wide clip whose action is on the LEFT fills a 9:16 canvas
+  await resetProject();
+  await ev(async ([a, k]) => { await window.__app.importPaths([a, k]); const { store } = window.__app; const { addMediaClip } = await import('/shared/timeline.js');
+    store.mutate((p) => { p.settings.width = 360; p.settings.height = 640; addMediaClip(p, p.media.find((m) => m.kind === 'audio').id, p.tracks.find((t) => t.kind === 'audio').id, 0); }); }, [blob, kick]);
+  await ev(() => window.__app.runAnalysis({ quiet: true }));
+  const res = await ev(async () => { const x = await window.__app.smartMontage.runSmartMontage({ opts: { style: 'clean', reframe: true, seed: 5 } }); const cs = x.clips.map((c) => ({ s: c.start, d: c.duration, sc: c.props.scale, x: c.props.x })); return { cs, focus: x.plan.segments.map((g) => g.focus) }; });
+  assert.ok(res.cs.every((c) => c.sc > 2), `wide clip fills the tall canvas (scale ${res.cs[0].sc})`);
+  assert.ok(res.cs.every((c) => c.x > 0), `the crop is shifted toward the action on the left (x ${res.cs.map((c) => c.x.toFixed(2))})`);
+  const mid = res.cs.find((c) => c.d > 0.8) || res.cs[0];
+  await ev((t) => window.__app.store.setPlayhead(t), mid.s + mid.d / 2); await settle(900);
+  const lit = await ev(() => { const d = window.__grab(36, 64); let n = 0; for (let i = 0; i < d.length; i += 3) if (d[i] > 200) n++; return n; });
+  assert.ok(lit > 15, `the white subject is inside the 9:16 frame (${lit} bright cells)`);
+});
+
 await step('export dialog: platform preset sets 9:16 / fps / quality', async () => {
   await resetProject(); await ev((p) => window.__app.importPaths([p]), clip);
   await page.click('[data-act="export"]'); await page.waitForSelector('.modal');
@@ -731,6 +782,42 @@ await step('Auto-Edit dialog: friendly no-model message, subtitle-file path, res
   await page.click('.ae-modal button:has-text("Export for TikTok")'); await page.waitForSelector('.modal select');
   const v = await ev(() => [...document.querySelectorAll('.modal select')].map((s) => s.value)); assert.deepEqual(v.slice(0, 4), ['tiktok', 'vertical-1080', '30', 'high']);
   await ev(() => [...document.querySelectorAll('.modal button')].find((b) => b.textContent === 'Close').click());
+});
+
+await step('Caption editor: fix a word in the dialog, timing and karaoke ranges stay valid, one Undo, the correction is remembered and applied next time', async () => {
+  const SEGS2 = [{ text: 'ทำคลิปติ๊กต๊อกกันนะครับ', start: 0.2, end: 5.8 }, { text: 'ตัดต่อง่ายมาก', start: 7.3, end: 10.8 }];
+  const capsOf = () => ev(() => window.__app.store.project.clips.filter((c) => c.type === 'text').sort((a, b) => a.start - b.start).map((c) => ({ id: c.id, s: c.start, d: c.duration, t: c.text.content.replace(/\n/g, ''), k: c.text.karaoke?.words || [], raw: c.text.content })));
+  await ev(() => localStorage.removeItem('hhlab.glossary'));
+  const speechSrc = path.join(dir, 'speech-ui.mp4');
+  if (!fs.existsSync(speechSrc)) sh(FFMPEG, ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc2=size=1280x720:rate=30:duration=17', '-i', path.join(root, 'test/fixtures/th-speech.ogg'), '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-shortest', speechSrc]);
+  await resetProject(); await ev((p) => window.__app.importPaths([p]), speechSrc);
+  await ev(async (s) => { await window.__app.autoEdit.runAutoEdit({ opts: { look: 'clean' }, transcribe: async () => s }); }, SEGS2);
+  const before = await capsOf();
+  const target = before.find((c) => c.t.includes('ติ๊กต๊อก')); assert.ok(target, `a caption contains the misheard word: ${JSON.stringify(before.map((c) => c.t))}`);
+  await page.click('#btn-captions'); await page.waitForSelector('.cap-modal .cap-row');
+  const idx = before.indexOf(target);
+  const input = page.locator('.cap-modal .cap-row input').nth(idx);
+  assert.equal(await input.inputValue(), target.t);
+  await input.fill(target.t.replace('ติ๊กต๊อก', 'TikTok'));
+  await shot('16-caption-editor');
+  await page.click('#cap-save'); await page.waitForFunction(() => !document.querySelector('.cap-modal'));
+  const after = await capsOf();
+  const edited = after.find((c) => c.id === target.id); assert.ok(edited && edited.t.includes('TikTok') && !edited.t.includes('ติ๊กต๊อก'), edited?.t);
+  assert.ok(Math.abs(edited.s - target.s) < 1e-6 && Math.abs(edited.d - target.d) < 1e-6, 'the caption keeps its place on the timeline');
+  assert.equal(edited.k.map((w) => edited.raw.slice(w.from, w.to)).join(''), edited.t, 'karaoke ranges cover the new text exactly');
+  assert.ok(edited.k.every((w, i) => w.end >= w.start && w.start >= -1e-6 && (i === 0 || w.start >= edited.k[i - 1].end - 1e-6)), 'word times stay ordered');
+  assert.equal(after.filter((c) => c.id !== target.id).map((c) => c.t).join('|'), before.filter((c) => c.id !== target.id).map((c) => c.t).join('|'), 'other captions untouched');
+  // single undo step
+  await ev(() => window.__app.store.undo());
+  assert.equal((await capsOf()).find((c) => c.id === target.id).t, target.t, 'Undo restores the original wording');
+  // the correction was remembered...
+  const g = await ev(() => JSON.parse(localStorage.getItem('hhlab.glossary') || '[]'));
+  assert.ok(g.some((e) => e.to.includes('TikTok') || e.to.includes('Tik')), `glossary learned something: ${JSON.stringify(g)}`);
+  // ...and the next transcript comes out corrected without touching the captions again
+  await resetProject(); await ev((p) => window.__app.importPaths([p]), path.join(dir, 'speech-ui.mp4'));
+  await ev(async (s) => { await window.__app.autoEdit.runAutoEdit({ opts: { look: 'clean' }, transcribe: async () => s }); }, SEGS2);
+  const again = await capsOf(); assert.ok(again.some((c) => c.t.includes('TikTok')) && !again.some((c) => c.t.includes('ติ๊กต๊อก')), JSON.stringify(again.map((c) => c.t)));
+  await ev(() => localStorage.removeItem('hhlab.glossary'));
 });
 
 await step('Auto-Edit model download: progress, ready state, a bad model file is reported clearly, removal', async () => {

@@ -9,6 +9,9 @@ import { mountReactive, runAnalysis } from './ui/reactive-ui.js';
 import { mountProjectSettings } from './ui/project-settings.js';
 import { openExportDialog, isExporting } from './ui/export-dialog.js';
 import { openAutoEdit } from './ui/autoedit-panel.js';
+import { openCaptionEditor, applyCaptionEdits } from './ui/caption-editor.js';
+import { openMontageDialog } from './ui/montage-panel.js';
+import * as smartMontage from './engine/montage.js';
 import { renderProject } from './engine/exporter.js';
 import { renderStill } from './engine/still.js';
 import { startRoots } from './bg-roots.js';
@@ -77,7 +80,7 @@ async function openProject() {
 
 const actions = {
   new: newProject, open: openProject, save: () => save(false), saveAs: () => save(true),
-  import: importMedia, export: openExportDialog, autoedit: openAutoEdit,
+  import: importMedia, export: openExportDialog, autoedit: openAutoEdit, captions: openCaptionEditor,
   undo: () => store.undo(), redo: () => store.redo(), duplicate: duplicateSelected,
 };
 document.querySelectorAll('[data-act]').forEach((b) => b.addEventListener('click', () => actions[b.dataset.act]()));
@@ -98,6 +101,7 @@ function syncChrome() {
 }
 store.on('dirty', syncChrome); store.on('reset', syncChrome); store.on('project', syncChrome);
 mountTooltips();
+$('tl-montage').onclick = openMontageDialog;
 
 // Slow parallax: the root background drifts a few pixels against the pointer (skipped for reduced-motion, cheap: one rAF-throttled style write).
 if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
@@ -157,7 +161,7 @@ document.addEventListener('paste', (e) => { if (!inTextField() && store.clipboar
 
 // ---- automation hook (used by scripts/e2e.mjs; harmless in normal use)
 window.__app = {
-  store, preview, timeline, autoEdit: autoEditEngine, autosave: { writeNow, offerRecovery }, runAnalysis, cutOnBeats, autoMontage, importPaths: async (paths) => importResults(await hh.probePaths(paths)),
+  store, preview, timeline, autoEdit: autoEditEngine, captionEdit: { applyCaptionEdits }, smartMontage, autosave: { writeNow, offerRecovery }, runAnalysis, cutOnBeats, autoMontage, importPaths: async (paths) => importResults(await hh.probePaths(paths)),
   exportTo: async (outPath, overrides = {}) => {
     const s = store.project.settings;
     const settings = { width: s.width, height: s.height, fps: s.fps, quality: 'draft', format: outPath.endsWith('.webm') ? 'webm' : 'mp4', ...overrides, outPath };

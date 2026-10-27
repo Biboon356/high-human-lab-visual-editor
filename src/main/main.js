@@ -6,8 +6,9 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { Readable } from 'node:stream';
 import { probeMedia, makeProxy, decodePcm, ExportSession, ClipDecoder, makeThumbs, makePeaks, extractPcm16k, FFMPEG } from './ffmpeg.js';
 import { validateProject } from '../shared/project.js';
-import { MODELS, DEFAULT_MODEL, modelStatus, ensureModel, transcribePcm, releaseEngine } from './asr.js';
+import { MODELS, DEFAULT_MODEL, modelStatus, ensureModel, transcribePcm, transcribeChunks, releaseEngine } from './asr.js';
 import { rmsEnvelope } from '../shared/audio-analysis.js';
+import { analyzeFile, killFootage } from './footage.js';
 import { buildAnalysisArgs, buildExportArgs, validateExportSettings, FORMATS } from '../shared/export-plan.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -218,26 +219,53 @@ function registerIpc() {
     return true;
   });
   ipcMain.handle('asr:cancel', async () => { if (asrJob) { asrJob.aborted = true; try { await asrJob.stop?.(); } catch { /* finished already */ } } return true; });
-  ipcMain.handle('asr:extract', async (_e, { path: file, start = 0, duration = 0 }) => {
+  ipcMain.handle('asr:extract', async (_e, { path: file, start = 0, duration = 0, clean = false }) => {
     if (!allowedMedia.has(path.resolve(file))) throw new Error('Not an imported media file');
     const pcm = await extractPcm16k(file, start, duration);
+    // the cut decisions keep using the untouched audio; only the recogniser hears the cleaned-up copy
+    let asr = pcm;
+    if (clean) { try { asr = await extractPcm16k(file, start, duration, { clean: true }); } catch { asr = pcm; } }
     const token = crypto.randomUUID();
-    pcmCache.set(token, pcm);
+    pcmCache.set(token, { pcm, asr });
     for (const k of [...pcmCache.keys()].slice(0, -2)) pcmCache.delete(k); // keep the two latest
     const env = rmsEnvelope(pcm, 16000, 100);
     return { token, seconds: pcm.length / 16000, env: { rate: env.rate, rms: env.rms.buffer.slice(0) } };
   });
-  ipcMain.handle('asr:transcribe', async (_e, { token, model = DEFAULT_MODEL, language = 'th', prompt }) => {
-    const pcm = pcmCache.get(token);
-    if (!pcm) throw new Error('The audio is no longer available — run the edit again.');
+  ipcMain.handle('asr:transcribe', async (_e, { token, model = DEFAULT_MODEL, language = 'th', prompt, chunks, terms }) => {
+    const cached = pcmCache.get(token);
+    if (!cached) throw new Error('The audio is no longer available — run the edit again.');
+    const pcm = cached.asr;
     const m = MODELS[model];
     if (!m) throw new Error(`Unknown speech model "${model}".`);
     if (asrJob) throw new Error('Another speech task is already running.');
     asrJob = { aborted: false };
     try {
-      return await transcribePcm({ pcm, modelPath: path.join(modelsDir(), m.file), language, prompt, signal: asrJob, onProgress: (pct) => sendAsr({ phase: 'transcribe', pct }) });
+      const modelPath = path.join(modelsDir(), m.file), onProgress = (pct) => sendAsr({ phase: 'transcribe', pct });
+      if (Array.isArray(chunks) && chunks.length) return await transcribeChunks({ pcm, chunks, modelPath, language, terms, signal: asrJob, onProgress });
+      return await transcribePcm({ pcm, modelPath, language, prompt, signal: asrJob, onProgress });
     } finally { asrJob = null; }
   });
+  // ---- Footage analysis for the smart montage ---------------------------------------------------------------
+  let montageJob = null;
+  ipcMain.handle('montage:analyze', async (_e, items) => {
+    if (montageJob) throw new Error('Another analysis is already running.');
+    montageJob = { aborted: false };
+    const out = {};
+    try {
+      let done = 0;
+      for (const it of items) {
+        if (!allowedMedia.has(path.resolve(it.path))) { out[it.id] = { error: 'Not an imported media file' }; continue; }
+        if (montageJob.aborted) throw new Error('Analysis cancelled.');
+        win?.webContents.send('montage:progress', { done, total: items.length, name: path.basename(it.path) });
+        try { out[it.id] = await analyzeFile({ file: it.path, kind: it.kind, cacheDir: path.join(app.getPath('userData'), 'analysis-cache'), signal: montageJob }); }
+        catch (e) { if (montageJob.aborted) throw e; out[it.id] = { error: e.message }; }
+        done++;
+      }
+      win?.webContents.send('montage:progress', { done: items.length, total: items.length, name: '' });
+      return out;
+    } finally { montageJob = null; }
+  });
+  ipcMain.handle('montage:cancel', () => { if (montageJob) montageJob.aborted = true; killFootage(); return true; });
   ipcMain.handle('subs:open', async () => {
     const r = await dialog.showOpenDialog(win, { title: 'Import subtitles', properties: ['openFile'], filters: [{ name: 'Subtitles', extensions: ['srt', 'vtt'] }] });
     return r.canceled ? null : { name: path.basename(r.filePaths[0]), text: fs.readFileSync(r.filePaths[0], 'utf8') };
@@ -365,6 +393,7 @@ app.whenReady().then(() => {
 // Never leave encoder/decoder processes running if the app quits (or the window is closed) mid-export.
 function killChildren() {
   closeDecoders();
+  killFootage();
   releaseEngine().catch(() => {});
   if (session) { session.proc.kill('SIGKILL'); session = null; }
 }

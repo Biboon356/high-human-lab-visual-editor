@@ -6,6 +6,7 @@ import { CAPTION_STYLES } from '/shared/caption-styles.js';
 import { serializeSrt } from '/shared/srt.js';
 import { findMedia } from '/shared/project.js';
 import { openExportDialog } from './export-dialog.js';
+import { openCaptionEditor, captionCards } from './caption-editor.js';
 
 const KEY = 'hhlab.autoedit.opts';
 const loadOpts = () => { try { return { ...DEFAULTS, ...JSON.parse(localStorage.getItem(KEY) || '{}') }; } catch { return { ...DEFAULTS }; } };
@@ -106,10 +107,11 @@ export async function openAutoEdit() {
         el('div', { class: 'ae-actions' },
           el('button', { class: 'primary', text: 'Export for TikTok…', onclick: () => { open = false; root.replaceChildren(); openExportDialog({ preset: 'tiktok' }); } }),
           el('button', { text: 'Export captions (.srt)', onclick: async () => {
-            const cards = store.transcript?.cards || [];
+            const cards = captionCards(store.project);
             const f = await window.hh.saveSubtitles(serializeSrt(cards.map((c) => ({ start: c.start, end: c.end, text: c.text.replace(/\n/g, ' ') }))), store.project.name || 'captions');
             if (f) toast(`Saved ${f}`);
           } }),
+          el('button', { id: 'ae-edit-captions', text: 'Edit captions…', title: 'Fix any word; keeps the karaoke timing and remembers your corrections', onclick: () => { open = false; root.replaceChildren(); openCaptionEditor(); } }),
           el('button', { text: 'Undo everything', onclick: () => { store.undo(); result.replaceChildren(el('div', { class: 'hint', text: 'Undone — the project is back to how it was.' })); } })));
     } catch (e) {
       steps.querySelectorAll('.ae-step:not(.done)').forEach((x) => { x.textContent = `✖ ${STEP_LABELS[x.dataset.k] || x.dataset.k}`; });
@@ -127,7 +129,9 @@ export async function openAutoEdit() {
     el('div', { class: 'hint' }, clip ? `Editing: ${clip.name || media?.name} · ${fmtTime(clip.duration)}` : el('span', { class: 'warn', text: 'No clip with audio found — import a video with speech and select it on the timeline.' })),
     el('section', { class: 'ae-sec' }, el('h4', { text: 'Speech · เสียงพูด' }),
       row('Language', select('language', { th: 'ไทย (Thai)', en: 'English', auto: 'Auto-detect' })),
-      row('Model', modelSel), modelBox, dlBar, subBtn),
+      row('Model', modelSel), modelBox, dlBar,
+      check('cleanAudio', 'Clean the audio before transcribing · ลดเสียงรบกวน', 'The recogniser hears a denoised, level-steadied copy; your cuts and export use the original audio'),
+      check('chunked', 'Transcribe speech region by region · แยกทีละช่วงพูด', 'Fewer made-up words in pauses and less drift on long clips'), subBtn),
     el('section', { class: 'ae-sec' }, el('h4', { text: 'Edit · การตัดต่อ' }),
       check('cutSilence', 'Cut silences · ตัดช่วงเงียบ', 'Jump-cut every pause longer than ~0.35 s'),
       row('Sensitivity', sens),
