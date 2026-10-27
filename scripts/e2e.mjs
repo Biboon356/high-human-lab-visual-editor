@@ -502,6 +502,35 @@ await step('typography: installed system fonts are listed in the font picker', a
   assert.ok(r.options >= r.n, 'datalist populated with the system fonts');
 });
 
+await step('speed 2x + fades: export is 3s long, frame-accurate vs ffmpeg retime, picture and audio really fade', async () => {
+  await resetProject(); await ev((p) => window.__app.importPaths([p]), clip);
+  await ev(async () => { const { store } = window.__app; const { setSpeed } = await import('/shared/timeline.js'); const c = store.project.clips[0];
+    store.mutate((p) => { setSpeed(p, c.id, 2); c.fadeIn = 1; c.fadeOut = 1; }); });
+  assert.equal(await ev(() => window.__app.store.project.clips[0].duration), 3);
+  const out = path.join(dir, 'speed-out.mp4'); await ev((o) => window.__app.exportTo(o, { width: 640, height: 360, fps: 30 }), out);
+  const info = probe(out); assert.ok(Math.abs(Number(info.format.duration) - 3) < 0.15, `duration ${info.format.duration}`);
+  const aud = info.streams.find((s) => s.codec_type === 'audio'); assert.ok(aud && Math.abs(Number(aud.duration) - 3) < 0.2, 'audio retimed to the same length');
+  const ref = path.join(dir, 'speed-ref.mp4'); sh(FFMPEG, ['-v', 'error', '-y', '-i', clip, '-vf', 'setpts=PTS/2,fps=30,scale=640:360', '-t', '3', '-c:v', 'libx264', '-crf', '12', '-pix_fmt', 'yuv420p', '-an', ref]);
+  const mid = (f) => { const o = f + '.mid.mp4'; sh(FFMPEG, ['-v', 'error', '-y', '-ss', '1.1', '-t', '0.8', '-i', f, '-c:v', 'libx264', '-crf', '10', '-an', o]); return o; };
+  const r = spawnSync(FFMPEG, ['-v', 'info', '-i', mid(out), '-i', mid(ref), '-lavfi', 'psnr', '-f', 'null', '-'], { encoding: 'utf8' });
+  const m = /average:([\d.]+|inf)/.exec(r.stderr); const psnr = m ? (m[1] === 'inf' ? 99 : Number(m[1])) : 0;
+  console.log(`      2x speed, un-faded middle section PSNR vs ffmpeg retime: ${psnr.toFixed(1)} dB`);
+  assert.ok(psnr > 30, `retimed frames line up with ground truth (PSNR ${psnr})`);
+  const gray = (t) => { const o = path.join(dir, `g${t}.raw`); sh(FFMPEG, ['-v', 'error', '-y', '-ss', String(t), '-i', out, '-frames:v', '1', '-vf', 'scale=16:9,format=gray', '-f', 'rawvideo', o]); const d = fs.readFileSync(o); return d.reduce((a, b) => a + b, 0) / d.length; };
+  const g0 = gray(0.03), g1 = gray(1.5); assert.ok(g0 < g1 * 0.25, `fade-in darkens the first frames (${g0.toFixed(1)} vs ${g1.toFixed(1)})`);
+  const vol = (ss) => { const x = spawnSync(FFMPEG, ['-v', 'info', '-ss', String(ss), '-t', '0.2', '-i', out, '-vn', '-af', 'volumedetect', '-f', 'null', '-'], { encoding: 'utf8' }); return Number(/mean_volume: (-?[\d.]+)/.exec(x.stderr)?.[1] ?? 0); };
+  const v0 = vol(0), v1 = vol(1.2); assert.ok(v0 < v1 - 6, `audio fades in (${v0} dB vs ${v1} dB)`);
+});
+
+await step('preview honours speed: while playing, the video element runs at 2x timeline speed', async () => {
+  await resetProject(); await ev((p) => window.__app.importPaths([p]), clip);
+  await ev(async () => { const { store } = window.__app; const { setSpeed } = await import('/shared/timeline.js'); store.mutate((p) => setSpeed(p, p.clips[0].id, 2)); store.setPlayhead(0); });
+  await page.click('#t-play'); await page.waitForTimeout(1300);
+  const r = await ev(() => { const { store, preview } = window.__app; const v = [...preview.sources.videos.values()][0]; return { t: store.playhead, vt: v.currentTime, rate: v.playbackRate }; });
+  await page.click('#t-play');
+  assert.equal(r.rate, 2); assert.ok(Math.abs(r.vt - 2 * r.t) < 0.5, `video time ${r.vt} ≈ 2 × timeline ${r.t}`);
+});
+
 await step('light theme + collapsible panels', async () => {
   await ev(() => { document.getElementById('toggle-theme').click(); document.getElementById('toggle-left').click(); });
   await settle(300); await shot('11-light-collapsed');

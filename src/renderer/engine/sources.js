@@ -2,6 +2,7 @@
 // one <img> per image media, one <audio> per audio clip (preview only).
 import { clipEnd } from '/shared/timeline.js';
 import { findMedia } from '/shared/project.js';
+import { fadeFactor } from '/shared/params.js';
 
 const SEEK_TIMEOUT_MS = 15000;
 
@@ -89,8 +90,10 @@ export class Sources {
         el = this.audios.get(clip.id);
         if (!el) { el = new Audio(); el.preload = 'auto'; el.src = this.urlFor(media); this.audios.set(clip.id, el); }
       }
-      const want = clip.in + (t - clip.start);
-      el.volume = trackMuted.get(clip.trackId) || !this.audible ? 0 : Math.min(1, Math.max(0, clip.volume ?? 1));
+      const speed = clip.speed || 1;
+      const want = clip.in + (t - clip.start) * speed;
+      if (el.playbackRate !== speed) el.playbackRate = speed;
+      el.volume = trackMuted.get(clip.trackId) || !this.audible ? 0 : Math.min(1, Math.max(0, (clip.volume ?? 1) * fadeFactor(clip, t - clip.start)));
       if (active) {
         if (Math.abs(el.currentTime - want) > (playing ? 0.3 : 0.001) && el.readyState > 0) el.currentTime = want;
         if (playing && el.paused) el.play().catch(() => {});
@@ -129,7 +132,7 @@ export class Sources {
         continue;
       }
       const v = this._video(clip, media);
-      const target = Math.min(Math.max(0, clip.in + (t - clip.start)), Math.max(0, media.duration - 0.001));
+      const target = Math.min(Math.max(0, clip.in + (t - clip.start) * (clip.speed || 1)), Math.max(0, media.duration - 0.001));
       jobs.push(this._seek(v, target, media.name));
     }
     await Promise.all(jobs);
@@ -155,7 +158,7 @@ export class Sources {
     if (!st) {
       const k = Math.min(1, this.maxDim / Math.max(media.width, media.height));
       const w = Math.max(2, Math.round(media.width * k)), h = Math.max(2, Math.round(media.height * k));
-      await window.hh.exportOpenDecoder({ id: clip.id, path: media.path, start: clip.in, duration: clip.duration + 0.5, fps, width: w, height: h });
+      await window.hh.exportOpenDecoder({ id: clip.id, path: media.path, start: clip.in, duration: clip.duration * (clip.speed || 1) + 0.5, speed: clip.speed || 1, fps, width: w, height: h });
       st = { next: 0, frame: null, pending: null, w, h };
       this.dec.set(clip.id, st);
     }

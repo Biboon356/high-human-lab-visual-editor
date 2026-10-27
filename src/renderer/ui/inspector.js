@@ -2,6 +2,8 @@ import { el, fmtTime } from './dom.js';
 import { store } from '../store.js';
 import { paramRow, flatRow, rowUpdaters } from './param-row.js';
 import { findMedia } from '/shared/project.js';
+import { setSpeed, MIN_SPEED, MAX_SPEED } from '/shared/timeline.js';
+import { toast } from './dom.js';
 import { EFFECTS, EFFECT_PRESETS, createEffect, instantiatePreset } from '/shared/effects-defs.js';
 import { CLIP_PROPS, TEXT_PROPS, BLEND_MODES } from '/shared/params.js';
 import { TEXT_ANIMATIONS } from '/shared/text-defs.js';
@@ -46,6 +48,21 @@ export function mountInspector(root) {
     const nameIn = field(el('input', { type: 'text', value: clip.name }), 'input', (i) => { clip.name = i.value; }, { structural: true });
     const body = [flatRow('Name', nameIn)];
     body.push(el('div', { class: 'stat' }, `start `, el('b', { text: fmtTime(clip.start) }), `  dur `, el('b', { text: fmtTime(clip.duration) }), media ? `  in ` : '', media ? el('b', { text: fmtTime(clip.in) }) : ''));
+    if (clip.type === 'media' && media?.kind !== 'image') {
+      const sp = el('input', { type: 'number', min: MIN_SPEED, max: MAX_SPEED, step: 0.05, value: (clip.speed || 1).toFixed(2), style: 'width:70px' });
+      sp.addEventListener('change', () => {
+        const v = Number(sp.value);
+        store.snapshot();
+        if (setSpeed(store.project, clip.id, v)) { store.touch('project'); store.emit('keyframes'); }
+        else { store.undoStack.pop(); sp.value = (clip.speed || 1).toFixed(2); toast(`Can't set ${v}×: out of range (${MIN_SPEED}–${MAX_SPEED}) or it would overlap the next clip.`, 'error'); }
+      });
+      body.push(flatRow('Speed', sp, el('span', { class: 'hint', text: '× (pitch kept)' })));
+    }
+    const fadeRow = (label, key) => {
+      const i = el('input', { type: 'range', min: 0, max: Math.max(0.1, +(clip.duration / 2).toFixed(2)), step: 0.05, value: clip[key] || 0 });
+      return flatRow(label, field(i, 'input', (n) => { clip[key] = Number(n.value); }));
+    };
+    body.push(fadeRow('Fade in (s)', 'fadeIn'), fadeRow('Fade out (s)', 'fadeOut'));
     if (media?.hasAudio) {
       const vol = el('input', { type: 'range', min: 0, max: 1.5, step: 0.01, value: clip.volume ?? 1 });
       body.push(flatRow('Volume', field(vol, 'input', (i) => { clip.volume = Number(i.value); }, { structural: true })));

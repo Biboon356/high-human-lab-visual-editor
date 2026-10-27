@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createProject, uid, validateProject, createClip } from '../src/shared/project.js';
-import { addMediaClip, moveClip, trimStart, trimEnd, splitClip, deleteClip, activeVisualClips, projectDuration, addClipRaw, overlaps } from '../src/shared/timeline.js';
+import { setSpeed, addMediaClip, moveClip, trimStart, trimEnd, splitClip, deleteClip, activeVisualClips, projectDuration, addClipRaw, overlaps } from '../src/shared/timeline.js';
 import { evalTrack, setKey, removeKey } from '../src/shared/keyframes.js';
 import { resolveParam } from '../src/shared/params.js';
 import { analyze, sampleFeatures } from '../src/shared/audio-analysis.js';
-import { buildExportArgs, buildAudioGraph, validateExportSettings, buildAnalysisArgs } from '../src/shared/export-plan.js';
+import { tempoChain, fadeFilters, buildExportArgs, buildAudioGraph, validateExportSettings, buildAnalysisArgs } from '../src/shared/export-plan.js';
 import { createEffect, EFFECT_PRESETS, instantiatePreset, EFFECTS } from '../src/shared/effects-defs.js';
 import { createTextClip, TEXT_PRESETS } from '../src/shared/text-defs.js';
 import { createGeneratorClip, GEN_PRESETS } from '../src/shared/organic-defs.js';
@@ -164,4 +164,23 @@ test('premium presets: audio-bound presets carry bindings; text fx and generator
   assert.deepEqual(g.gen.keyframes.growth.map((k) => k.v), [0, 1]);
   assert.equal(g.props.blend, 'screen');
   assert.equal(Object.keys(EFFECTS).length, 23);
+});
+
+test('speed: duration follows source span, trims/splits respect it, tempo chains stay in atempo range', () => {
+  const p = fixture();
+  const c = addMediaClip(p, 'v', vTrack(p), 0); // 10s source
+  c.keyframes.opacity = [{ t: 0, v: 0 }, { t: 10, v: 1 }];
+  assert.ok(setSpeed(p, c.id, 2)); assert.equal(c.duration, 5); assert.equal(c.keyframes.opacity[1].t, 5, 'keys stretch with the clip');
+  const r = splitClip(p, c.id, 2); assert.equal(r.in, 4, 'split advances the source by local*speed');
+  trimEnd(p, r.id, 100); assert.ok(r.in + r.duration * 2 <= 10 + 1e-9, 'cannot play past the end of the source');
+  trimStart(p, r.id, r.start + 1); assert.equal(r.in, 6);
+  const blocker = addMediaClip(p, 'i', vTrack(p), c.start + c.duration);
+  assert.equal(setSpeed(p, c.id, 0.5), false, 'slowing down would run into the next clip');
+  assert.equal(setSpeed(p, c.id, 9), false); assert.equal(setSpeed(p, c.id, 0), false);
+  assert.equal(tempoChain(1), ''); assert.equal(tempoChain(2), 'atempo=2.00000,');
+  assert.equal(tempoChain(4), 'atempo=2,atempo=2.00000,'); assert.equal(tempoChain(0.25), 'atempo=0.5,atempo=0.50000,');
+  const q = fixture(); const a = addMediaClip(q, 'a', aTrack(q), 0); a.speed = 2; a.duration = 4; a.fadeIn = 0.5; a.fadeOut = 1;
+  const g = buildAudioGraph(q).filter;
+  assert.ok(g.includes('atrim=start=0.0000:end=8.0000') && g.includes('atempo=2.00000') && g.includes('afade=t=in:st=0:d=0.500') && g.includes('afade=t=out:st=3.000:d=1.000'), g);
+  assert.equal(fadeFilters({ duration: 2, fadeIn: 0, fadeOut: 0 }), '');
 });

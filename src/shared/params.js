@@ -44,3 +44,11 @@ export function resolveClipProps(clip, t, feats) {
   out.blend = clip.props.blend || 'normal';
   return out;
 }
+
+/** 0..1 multiplier from a clip's fade-in / fade-out at clip-relative time t. */
+export function fadeFactor(clip, t) {
+  let f = 1;
+  if (clip.fadeIn > 0) f = Math.min(f, Math.max(0, t / clip.fadeIn));
+  if (clip.fadeOut > 0) f = Math.min(f, Math.max(0, (clip.duration - t) / clip.fadeOut));
+  return Math.min(1, f);
+}

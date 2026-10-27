@@ -6,7 +6,7 @@ import { activeVisualClips } from '/shared/timeline.js';
 import { findMedia } from '/shared/project.js';
 import { EFFECTS } from '/shared/effects-defs.js';
 import { GEN_PARAMS } from '/shared/organic-defs.js';
-import { resolveParam, resolveClipProps } from '/shared/params.js';
+import { resolveParam, resolveClipProps, fadeFactor } from '/shared/params.js';
 import { drawTextClip } from './text-renderer.js';
 
 const STYLE_INDEX = { roots: 0, fluid: 1, cells: 2, dust: 3 };
@@ -210,6 +210,7 @@ export class Compositor {
     for (const clip of activeVisualClips(project, t)) {
       const tl = t - clip.start;
       const props = resolveClipProps(clip, tl, features);
+      props.opacity *= fadeFactor(clip, tl);
       let ready = false;
 
       if (clip.type === 'media') {

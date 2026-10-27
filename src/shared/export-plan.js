@@ -19,6 +19,25 @@ export function audioSources(project) {
     .filter(({ media, track }) => media && media.hasAudio && track && !track.muted);
 }
 
+/** atempo only accepts 0.5..2 per instance, so chain them for larger/smaller factors. Pitch is preserved. */
+export function tempoChain(speed) {
+  if (!speed || Math.abs(speed - 1) < 1e-6) return '';
+  const parts = [];
+  let s = speed;
+  while (s > 2) { parts.push('atempo=2'); s /= 2; }
+  while (s < 0.5) { parts.push('atempo=0.5'); s *= 2; }
+  parts.push(`atempo=${s.toFixed(5)}`);
+  return `${parts.join(',')},`;
+}
+
+/** afade filters (timeline-time seconds, applied after retiming) for a clip's fade in/out. */
+export function fadeFilters(clip) {
+  const out = [];
+  if (clip.fadeIn > 0) out.push(`afade=t=in:st=0:d=${clip.fadeIn.toFixed(3)}`);
+  if (clip.fadeOut > 0) out.push(`afade=t=out:st=${Math.max(0, clip.duration - clip.fadeOut).toFixed(3)}:d=${clip.fadeOut.toFixed(3)}`);
+  return out.length ? `${out.join(',')},` : '';
+}
+
 /**
  * Returns {inputs:[path...], filter:string|null, mapLabel:string|null} for the audio mix of the project.
  * Input indexes start at `firstInput` so callers can prepend the raw video input.
@@ -31,9 +50,10 @@ export function buildAudioGraph(project, firstInput = 0, sampleRate = 48000) {
   srcs.forEach(({ clip, media }, n) => {
     const idx = firstInput + n;
     const ms = Math.round(clip.start * 1000);
+    const speed = clip.speed || 1;
     parts.push(
-      `[${idx}:a]atrim=start=${clip.in.toFixed(4)}:end=${(clip.in + clip.duration).toFixed(4)},asetpts=PTS-STARTPTS,` +
-        `aresample=${sampleRate},aformat=channel_layouts=stereo,volume=${(clip.volume ?? 1).toFixed(3)},adelay=${ms}|${ms}[a${n}]`,
+      `[${idx}:a]atrim=start=${clip.in.toFixed(4)}:end=${(clip.in + clip.duration * speed).toFixed(4)},asetpts=PTS-STARTPTS,${tempoChain(speed)}` +
+        `aresample=${sampleRate},aformat=channel_layouts=stereo,volume=${(clip.volume ?? 1).toFixed(3)},${fadeFilters(clip)}adelay=${ms}|${ms}[a${n}]`,
     );
     labels.push(`[a${n}]`);
   });

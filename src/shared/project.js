@@ -47,6 +47,9 @@ export function createClip(fields) {
     duration: 5,
     in: 0,
     volume: 1,
+    speed: 1, // playback rate of the source (media clips); duration is timeline time, so source span = duration * speed
+    fadeIn: 0, // seconds (visual opacity + audio volume ramp)
+    fadeOut: 0,
     props: defaultProps(),
     keyframes: {}, // propKey -> [{t, v}]  (t is clip-relative seconds)
     bindings: {}, // propKey -> {source, amount}
@@ -80,6 +83,9 @@ export function validateProject(p) {
   for (const c of p.clips) {
     if (!trackIds.has(c.trackId)) throw new Error(`Clip "${c.name || c.id}" references a missing track.`);
     c.props = { ...defaultProps(), ...(c.props || {}) };
+    c.speed = c.speed > 0 ? c.speed : 1;
+    c.fadeIn ||= 0;
+    c.fadeOut ||= 0;
     c.keyframes ||= {};
     c.bindings ||= {};
     c.effects ||= [];

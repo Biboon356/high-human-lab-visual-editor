@@ -82,13 +82,14 @@ export function trimStart(project, clipId, newStart) {
   let s = Math.min(newStart, end - MIN_CLIP);
   s = Math.max(s, 0);
   let delta = s - clip.start;
+  const sp = clip.type === 'media' ? clip.speed || 1 : 1;
   if (clip.type === 'media') {
-    if (clip.in + delta < 0) { delta = -clip.in; s = clip.start + delta; }
-    clip.in += delta;
+    if (clip.in + delta * sp < 0) { delta = -clip.in / sp; s = clip.start + delta; }
+    clip.in += delta * sp;
   }
   const prev = project.clips.filter((c) => c.trackId === clip.trackId && c.id !== clip.id && clipEnd(c) <= clip.start + 1e-6);
   const floor = prev.reduce((m, c) => Math.max(m, clipEnd(c)), 0);
-  if (s < floor) { clip.in += clip.type === 'media' ? floor - s : 0; s = floor; }
+  if (s < floor) { clip.in += clip.type === 'media' ? (floor - s) * sp : 0; s = floor; }
   clip.start = s;
   clip.duration = end - s;
   return true;
@@ -98,7 +99,7 @@ export function trimEnd(project, clipId, newEnd) {
   const clip = findClip(project, clipId);
   if (!clip) return false;
   let e = Math.max(newEnd, clip.start + MIN_CLIP);
-  const maxDur = sourceLimit(project, clip) - (clip.type === 'media' ? clip.in : 0);
+  const maxDur = (sourceLimit(project, clip) - (clip.type === 'media' ? clip.in : 0)) / (clip.type === 'media' ? clip.speed || 1 : 1);
   e = Math.min(e, clip.start + maxDur);
   const next = project.clips.filter((c) => c.trackId === clip.trackId && c.id !== clip.id && c.start >= clipEnd(clip) - 1e-6);
   const ceil = next.reduce((m, c) => Math.min(m, c.start), Infinity);
@@ -118,7 +119,7 @@ export function splitClip(project, clipId, t) {
   right.id = createClip({}).id;
   right.start = t;
   right.duration = clip.duration - local;
-  if (clip.type === 'media') right.in = clip.in + local;
+  if (clip.type === 'media') right.in = clip.in + local * (clip.speed || 1);
   clip.duration = local;
   // keyframes are clip-relative: partition them at the cut
   const cut = (owner, ownerRight) => {
@@ -134,6 +135,29 @@ export function splitClip(project, clipId, t) {
   if (clip.gen) cut(clip.gen, right.gen);
   project.clips.push(right);
   return right;
+}
+
+export const MIN_SPEED = 0.1;
+export const MAX_SPEED = 4;
+
+/** Changes playback speed keeping the same source span, so the clip gets shorter/longer on the timeline.
+ *  Returns false (and changes nothing) if the new length would overlap a neighbour or exceed the source. */
+export function setSpeed(project, clipId, speed) {
+  const clip = findClip(project, clipId);
+  if (!clip || clip.type !== 'media' || !(speed >= MIN_SPEED && speed <= MAX_SPEED)) return false;
+  const span = clip.duration * (clip.speed || 1);
+  const duration = span / speed;
+  if (duration < MIN_CLIP || overlaps(project, clip.trackId, clip.start, duration, clip.id)) return false;
+  const ratio = duration / clip.duration;
+  clip.speed = speed;
+  clip.duration = duration;
+  // keyframes live in clip-relative time: stretch them with the clip so the animation keeps its shape
+  for (const owner of [clip, clip.gen, ...(clip.effects || [])]) {
+    for (const keys of Object.values(owner?.keyframes || {})) for (const k of keys) k.t *= ratio;
+  }
+  clip.fadeIn = Math.min(clip.fadeIn || 0, duration / 2);
+  clip.fadeOut = Math.min(clip.fadeOut || 0, duration / 2);
+  return true;
 }
 
 export function deleteClip(project, clipId) {

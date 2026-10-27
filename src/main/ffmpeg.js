@@ -154,7 +154,7 @@ export class ExportSession {
  * Replaces per-frame <video> seeking during export (faster, VFR-safe, always reads the original file, never a proxy).
  */
 export class ClipDecoder {
-  constructor({ path: file, start, duration, fps, width, height }) {
+  constructor({ path: file, start, duration, fps, width, height, speed = 1 }) {
     this.frameBytes = width * height * 4;
     this.queue = [];
     this.waiters = [];
@@ -165,7 +165,7 @@ export class ClipDecoder {
     this.err = [];
     this.error = null;
     const args = ['-hide_banner', '-loglevel', 'error', '-ss', String(start), '-t', String(duration), '-i', file, '-an', '-sn',
-      '-vf', `fps=${fps},scale=${width}:${height}:flags=bicubic,format=rgba`, '-f', 'rawvideo', '-pix_fmt', 'rgba', 'pipe:1'];
+      '-vf', `${speed !== 1 ? `setpts=PTS/${speed},` : ''}fps=${fps},scale=${width}:${height}:flags=bicubic,format=rgba`, '-f', 'rawvideo', '-pix_fmt', 'rgba', 'pipe:1'];
     this.proc = spawn(FFMPEG, args, { stdio: ['ignore', 'pipe', 'pipe'] });
     this.proc.on('error', (e) => { this.error = new Error(e.code === 'ENOENT' ? `ffmpeg not found ("${FFMPEG}")` : e.message); this._finish(); });
     this.proc.stderr.on('data', (d) => this.err.push(d));
