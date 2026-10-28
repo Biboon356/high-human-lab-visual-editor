@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { Readable } from 'node:stream';
-import { probeMedia, makeProxy, decodePcm, ExportSession, ClipDecoder, makeThumbs, makePeaks, extractPcm16k, FFMPEG } from './ffmpeg.js';
+import { probeMedia, makeProxy, decodePcm, ExportSession, ClipDecoder, makeThumbs, makePeaks, extractPcm16k, reverseRange, extractFrame, FFMPEG } from './ffmpeg.js';
 import { validateProject } from '../shared/project.js';
 import { MODELS, DEFAULT_MODEL, modelStatus, ensureModel, transcribePcm, transcribeChunks, releaseEngine } from './asr.js';
 import { rmsEnvelope } from '../shared/audio-analysis.js';
@@ -167,6 +167,27 @@ function registerIpc() {
     const key = crypto.createHash('sha1').update(src + fs.statSync(src).mtimeMs).digest('hex').slice(0, 16);
     const dest = path.join(proxyDir(), `${key}.mp4`);
     if (!fs.existsSync(dest)) await makeProxy(src, dest);
+    allow(dest);
+    return dest;
+  });
+
+  // Reverse / freeze: derived media made from a clip's source file, cached by file + range, imported like any other media.
+  const derivedDir = (name) => path.join(app.getPath('userData'), name);
+  const derivedKey = (...a) => crypto.createHash('sha1').update(a.join('|')).digest('hex').slice(0, 16);
+  ipcMain.handle('media:reverse', async (_e, o) => {
+    if (!allowedMedia.has(path.resolve(o.path))) throw new Error('Not an imported media file');
+    fs.mkdirSync(derivedDir('reversed'), { recursive: true });
+    const key = derivedKey(o.path, fs.statSync(o.path).mtimeMs, o.start, o.duration);
+    const dest = path.join(derivedDir('reversed'), `${key}.mp4`);
+    if (!fs.existsSync(dest)) await reverseRange(o.path, dest, o, path.join(derivedDir('reversed'), `tmp-${key}`));
+    allow(dest);
+    return dest;
+  });
+  ipcMain.handle('media:frame', async (_e, o) => {
+    if (!allowedMedia.has(path.resolve(o.path))) throw new Error('Not an imported media file');
+    fs.mkdirSync(derivedDir('frames'), { recursive: true });
+    const dest = path.join(derivedDir('frames'), `${derivedKey(o.path, fs.statSync(o.path).mtimeMs, o.time.toFixed(3))}.png`);
+    if (!fs.existsSync(dest)) await extractFrame(o.path, dest, o.time);
     allow(dest);
     return dest;
   });

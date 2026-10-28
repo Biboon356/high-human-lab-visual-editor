@@ -8,11 +8,19 @@ void main(){ v_uv = a_pos*0.5+0.5; gl_Position = vec4(a_pos,0.,1.); }`;
 // Placed layer: a quad of half-size u_half (px) rotated/offset in pixel space.
 export const VERT_LAYER = `#version 300 es
 in vec2 a_pos; out vec2 v_uv;
-uniform vec2 u_res, u_half, u_offset; uniform float u_rot;
+uniform vec2 u_res, u_half, u_offset, u_flip; uniform float u_rot, u_rx, u_ry, u_persp;
 void main(){
   v_uv = a_pos*0.5+0.5;
+  vec2 p = a_pos*u_half*u_flip;                       // flip mirrors the picture about its own centre
+  if(u_rx != 0. || u_ry != 0.){                       // 3D: turn the plane about Y then tilt about X, then look at it through a camera
+    vec3 q = vec3(p, 0.);
+    float cy = cos(u_ry), sy = sin(u_ry), cx = cos(u_rx), sx = sin(u_rx);
+    q = vec3(cy*q.x + sy*q.z, q.y, -sy*q.x + cy*q.z);
+    q = vec3(q.x, cx*q.y - sx*q.z, sx*q.y + cx*q.z);
+    p = q.xy * (u_persp / max(u_persp - q.z, u_persp*0.08));
+  }
   float c=cos(u_rot), s=sin(u_rot);
-  vec2 p = a_pos*u_half; p = vec2(c*p.x - s*p.y, s*p.x + c*p.y) + u_offset;
+  p = vec2(c*p.x - s*p.y, s*p.x + c*p.y) + u_offset;
   gl_Position = vec4(p/(u_res*0.5), 0., 1.);
 }`;
 
@@ -485,6 +493,143 @@ vec4 effect(vec2 uv){
     }
   }
   return emit(outc, c.a);
+}`),
+  crop: wrap(`
+uniform float u_left, u_right, u_top, u_bottom, u_round, u_feather;
+vec4 effect(vec2 uv){
+  vec4 c = src(uv);
+  vec2 lo = vec2(u_left, u_bottom), hi = vec2(1.-u_right, 1.-u_top);   // uv.y = 0 is the bottom edge
+  float asp = u_res.x/u_res.y;
+  vec2 ctr = (lo+hi)*.5*vec2(asp,1.), half_ = (hi-lo)*.5*vec2(asp,1.);
+  float r = min(u_round*min(half_.x, half_.y)*2., min(half_.x, half_.y));
+  vec2 d = abs(uv*vec2(asp,1.) - ctr) - half_ + r;
+  float sd = length(max(d, 0.)) + min(max(d.x, d.y), 0.) - r;       // signed distance to the rounded rectangle
+  float f = max(u_feather, 1.5/u_res.y);                            // at least a 1.5 px soft edge so it never aliases
+  float a = 1. - smoothstep(-f, 0., sd);
+  return emit(c.rgb, c.a*clamp(a,0.,1.));
+}`),
+  object3d: wrap(`
+uniform float u_shape, u_material, u_background, u_size, u_x, u_y, u_rx, u_ry, u_rz, u_sx, u_sy, u_sz, u_shine;
+uniform vec3 u_tint;
+mat3 rotm(vec3 a){
+  float cx=cos(a.x), sx=sin(a.x), cy=cos(a.y), sy=sin(a.y), cz=cos(a.z), sz=sin(a.z);
+  mat3 mx = mat3(1.,0.,0., 0.,cx,sx, 0.,-sx,cx);
+  mat3 my = mat3(cy,0.,-sy, 0.,1.,0., sy,0.,cy);
+  mat3 mz = mat3(cz,sz,0., -sz,cz,0., 0.,0.,1.);
+  return mx*my*mz;
+}
+float sdBox(vec3 p, vec3 b, float r){ vec3 q = abs(p)-b+r; return length(max(q,0.)) + min(max(q.x,max(q.y,q.z)),0.) - r; }
+float sdf(vec3 p){
+  float s = u_size;
+  if(u_shape < .5)  return sdBox(p, vec3(s*.5), s*.03);                       // cube
+  if(u_shape < 1.5) return length(p) - s*.62;                                   // sphere
+  if(u_shape < 2.5){ vec2 q = vec2(length(p.xz) - s*.5, p.y); return length(q) - s*.2; }   // torus
+  if(u_shape < 3.5) return sdBox(p, vec3(s*.5), s*.22);                         // rounded cube
+  if(u_shape < 4.5){ p.y -= clamp(p.y, -s*.32, s*.32); return length(p) - s*.3; }          // capsule
+  vec3 a = abs(p); return (a.x + a.y + a.z - s*.8)*.57735027;                   // octahedron
+}
+vec3 env(vec3 r){                                                               // a small studio: gradient sky, two softboxes, a hot spot
+  float h = r.y*.5 + .5;
+  vec3 c = mix(vec3(.04,.05,.10), vec3(.78,.88,1.), smoothstep(.05,1.,h));
+  c += vec3(1.)*smoothstep(.6,.92,abs(sin(r.x*2.6 + r.z*1.7)))*smoothstep(.3,.8,h)*.85;
+  c += vec3(1.,.95,.9)*smoothstep(.93,.995,dot(r, normalize(vec3(.4,.8,.5))))*1.5;
+  c *= .85 + .3*smoothstep(-.2,.1,r.y);
+  return c;
+}
+vec2 surfUV(vec3 p, vec3 n, float asp){
+  if(u_shape > .5 && u_shape < 1.5){ return vec2(atan(p.x,p.z)/6.28318 + .5, asin(clamp(p.y/(u_size*.62),-1.,1.))/3.14159 + .5); }
+  if(u_shape > 1.5 && u_shape < 2.5){ float u = atan(p.z,p.x)/6.28318 + .5; float v = atan(p.y, length(p.xz) - u_size*.5)/6.28318 + .5; return vec2(abs(fract(u*2.)*2.-1.), v); }
+  vec3 a = abs(n); vec2 f;
+  if(a.x > a.y && a.x > a.z) f = vec2(p.z*sign(n.x), p.y); else if(a.y > a.z) f = vec2(p.x, p.z*sign(n.y)); else f = vec2(p.x*-sign(n.z), p.y);
+  f = f/(u_size*.9) + .5;
+  return vec2(.5 + (f.x-.5)/asp*1., f.y);                                       // keep the picture's proportions on each face (centre square)
+}
+vec4 effect(vec2 uv){
+  vec4 bg = src(uv);
+  float asp = u_res.x/u_res.y;
+  vec2 q = (uv - .5)*vec2(asp,1.)*2.;                                           // y in -1..1: one world unit = half the screen height
+  vec3 ro = vec3(0., 0., 4.), rd = normalize(vec3(q, -4.)), off = vec3(u_x, u_y, 0.);
+  mat3 R = rotm(radians(vec3(u_rx + u_sx*u_time, u_ry + u_sy*u_time, u_rz + u_sz*u_time)));
+  vec3 o = (ro - off)*R, d = rd*R;                                              // into object space (R is orthonormal, v*R = Rᵀ v)
+  float t = 2.2, dmin = 9.; bool hit = false;
+  for(int i=0;i<64;i++){
+    vec3 p = o + d*t;
+    float h = sdf(p);
+    dmin = min(dmin, h/max(t,1.));
+    if(h < .0015){ hit = true; break; }
+    t += h*.9;
+    if(t > 7.) break;
+  }
+  float px = 2./u_res.y;
+  float cover = hit ? 1. : 1. - smoothstep(0., px*1.5, dmin);
+  vec3 base = bg.rgb;
+  if(u_background > 1.5) base = vec3(0.); else if(u_background > .5) base = bg.rgb*.3;
+  float outA = u_background > 2.5 ? cover : max(bg.a, cover);
+  if(cover <= 0.001) return u_background > 2.5 ? vec4(0.) : emit(base, bg.a);
+  vec3 p = o + d*t;
+  vec2 e = vec2(.002, 0.);
+  vec3 n = normalize(vec3(sdf(p+e.xyy)-sdf(p-e.xyy), sdf(p+e.yxy)-sdf(p-e.yxy), sdf(p+e.yyx)-sdf(p-e.yyx)));
+  vec3 nw = R*n, rw = reflect(rd, nw);                                          // world-space normal / reflection
+  vec3 L = normalize(vec3(.5,.8,.6));
+  float diff = clamp(dot(nw, L), 0., 1.), fres = pow(1. - clamp(dot(-rd, nw), 0., 1.), 3.);
+  vec2 suv = surfUV(p, n, asp);
+  vec3 col;
+  if(u_material < .5){                                                          // the picture itself, lit like a printed surface
+    vec3 tex = src(clamp(suv, .001, .999)).rgb;
+    col = tex*(.5 + .6*diff) + env(rw)*u_shine*.25*fres + vec3(1.)*pow(clamp(dot(rw, L),0.,1.), 40.)*u_shine*.6;
+  } else if(u_material < 1.5){                                                  // chrome
+    col = env(rw)*u_tint*1.05 + fres*.25*u_shine;
+  } else if(u_material < 2.5){                                                  // glass: the picture bends through, chromatic at the rim
+    vec2 k = nw.xy*.14*(.4 + fres);
+    vec3 refr = vec3(src(uv + k*1.0).r, src(uv + k*1.12).g, src(uv + k*1.25).b);
+    col = mix(refr*.9 + u_tint*.06, env(rw), clamp(fres*1.4 + .08, 0., 1.)*u_shine);
+  } else if(u_material < 3.5){                                                  // wireframe: neon lines on a dark body, a trace of the picture inside
+    vec2 g = suv*vec2(10., 10.); vec2 w = abs(fract(g) - .5);
+    float ln = max(smoothstep(.43,.5,w.x), smoothstep(.43,.5,w.y));
+    col = src(clamp(suv,.001,.999)).rgb*.18 + u_tint*ln*(1.2 + u_shine) + u_tint*fres*.5;
+  } else {                                                                      // holo foil
+    float h = dot(rw, vec3(.3,.5,.2))*1.6 + diff*.4 + u_time*.1;
+    vec3 foil = .5 + .5*cos(6.28318*(h + vec3(0.,.33,.67)));
+    col = mix(env(rw)*.6, foil, .65)*(.6 + .5*diff) + fres*.3;
+  }
+  vec3 outc = mix(base, col, cover);
+  return u_background > 2.5 ? vec4(clamp(col,0.,1.)*cover, cover) : emit(outc, outA);
+}`),
+  grid3d: wrap(`
+uniform float u_horizon, u_scale, u_speed, u_line, u_glow, u_sky, u_floor;
+uniform vec3 u_color, u_color2;
+vec4 effect(vec2 uv){
+  vec4 c = src(uv);
+  float asp = u_res.x/u_res.y;
+  vec3 col = c.rgb;
+  float hz = u_horizon;
+  if(uv.y > hz){
+    if(u_sky > .5){                                                             // sunset gradient with a banded sun
+      float h = (uv.y - hz)/(1. - hz);
+      vec3 sky = mix(u_color2*.9, vec3(.10,.02,.28), smoothstep(0., .7, h));
+      sky = mix(sky, vec3(.02,.0,.08), smoothstep(.4, 1., h));
+      vec2 sp = (uv - vec2(.5, hz + .22))*vec2(asp, 1.);
+      float sun = 1. - smoothstep(.17, .175, length(sp));
+      float bands = step(.0, sin((sp.y)*70. + 6.)) + step(sp.y, .02);
+      sky += mix(vec3(1.,.8,.2), u_color, smoothstep(-.17,.17,sp.y))*sun*clamp(bands, 0., 1.);
+      sky += u_color2*.35*exp(-h*14.);
+      col = sky;
+    }
+  } else {
+    float depth = (hz - uv.y);                                                  // 0 at the horizon, growing toward the viewer
+    float z = .35/max(depth, .002);
+    float x = (uv.x - .5)*asp*z*2.;
+    vec2 g = vec2(x, z + u_time*u_speed*2.) / (40./u_scale);
+    vec2 fw = fwidth(g)*u_line*1.2;
+    vec2 gl = abs(fract(g - .5) - .5)/max(fw, vec2(1e-4));
+    float line = 1. - min(min(gl.x, gl.y), 1.);
+    float fade = smoothstep(.0, .12, depth);                                    // lines dissolve into the horizon haze
+    vec3 floorc = mix(vec3(.02,0.,.08), u_color2*.2, exp(-depth*7.));
+    col = mix(col, floorc, u_floor*fade);
+    col += u_color*line*fade*(1. + u_glow*.8) + u_color*line*u_glow*.4*exp(-depth*9.);
+  }
+  col += u_color2*u_glow*.55*exp(-abs(uv.y - hz)*55.);                          // glow along the horizon
+  return emit(col, c.a);
 }`),
   film: wrap(`
 uniform float u_grain, u_halation, u_contrast, u_lift, u_vignette, u_weave;

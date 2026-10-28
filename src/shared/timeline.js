@@ -1,6 +1,6 @@
 // Pure timeline operations. All functions mutate the project in place and return
 // a boolean/ref describing the result; callers snapshot for undo before calling.
-import { createClip, findClip, findMedia, findTrack } from './project.js';
+import { createClip, findClip, findMedia, findTrack, uid } from './project.js';
 
 export const MIN_CLIP = 0.1;
 export const clipEnd = (c) => c.start + c.duration;
@@ -241,6 +241,34 @@ export function removeEmptyTrack(project, trackId) {
   if (project.tracks.filter((x) => x.kind === t.kind).length <= 1) return false;
   project.tracks = project.tracks.filter((x) => x.id !== trackId);
   return true;
+}
+
+/** Source-file window a clip plays: [in, in + duration × speed). */
+export function sourceSpan(clip) {
+  return { start: clip.in || 0, duration: clip.duration * (clip.speed || 1) };
+}
+
+/** Source time (seconds into the media file) shown by `clip` at timeline time t. */
+export function sourceTimeAt(clip, t) {
+  return (clip.in || 0) + (t - clip.start) * (clip.speed || 1);
+}
+
+/**
+ * Freeze frame: cuts the clip at `t`, slides everything after the cut on that track later by `seconds`, and puts a still
+ * (an image media item holding that exact frame) into the gap. Returns {freeze, right} or null if t is not inside the clip.
+ */
+export function freezeFrameAt(project, clipId, t, seconds, stillMediaId) {
+  const clip = findClip(project, clipId);
+  const still = findMedia(project, stillMediaId);
+  if (!clip || !still || !(seconds > 0) || !(t > clip.start + 1e-6 && t < clipEnd(clip) - 1e-6)) return null;
+  const right = splitClip(project, clipId, t);
+  if (!right) return null;
+  for (const c of project.clips) if (c.trackId === clip.trackId && c.start >= t - 1e-6) c.start += seconds;
+  const freeze = createClip({ trackId: clip.trackId, type: 'media', mediaId: stillMediaId, name: `Freeze · ${clip.name || ''}`.trim(), start: t, duration: seconds });
+  freeze.props = { ...freeze.props, ...structuredClone(clip.props) };
+  freeze.effects = structuredClone(clip.effects || []).map((e) => ({ ...e, id: uid('fx') }));
+  project.clips.push(freeze);
+  return { freeze, right };
 }
 
 export function addTrack(project, kind) {

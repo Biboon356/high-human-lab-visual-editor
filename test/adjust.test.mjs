@@ -7,7 +7,7 @@ import { activeVisualClips, clipKind } from '../src/shared/timeline.js';
 import { createProject } from '../src/shared/project.js';
 
 test('every Y2K look builds a chain of known effects with shaders', () => {
-  assert.ok(ADJUST_LOOKS.length >= 12);
+  assert.ok(ADJUST_LOOKS.length >= 19);
   for (const l of ADJUST_LOOKS) {
     const c = createAdjustClip(l, 2, 5);
     assert.equal(c.type, 'adjust');
@@ -59,7 +59,7 @@ test('organic looks grow in over time and use the veins effect', async () => {
 });
 
 test('new niche effects: every declared param is read by its shader, option counts match', () => {
-  for (const k of ['dither', 'holo', 'kaleido', 'spores', 'cells', 'hud']) {
+  for (const k of ['dither', 'holo', 'kaleido', 'spores', 'cells', 'hud', 'crop', 'object3d', 'grid3d']) {
     assert.ok(EFFECT_FRAG[k], `${k} has a shader`);
     for (const d of EFFECTS[k].params) assert.match(EFFECT_FRAG[k], new RegExp(`u_${d.key}\\b`), `${k}.${d.key}`);
   }
@@ -67,4 +67,12 @@ test('new niche effects: every declared param is read by its shader, option coun
   assert.equal(EFFECTS.hud.params.find((d) => d.key === 'style').options.length, 3);
   assert.ok(EFFECTS.veins.params.some((d) => d.key === 'cling'));
   assert.match(EFFECT_FRAG.veins, /u_cling/);
+});
+
+test('3D object effect: option lists match the shader branches', () => {
+  const p = (k) => EFFECTS.object3d.params.find((d) => d.key === k);
+  assert.equal(p('shape').options.length, 6);
+  assert.equal(p('material').options.length, 5);
+  assert.equal(p('background').options.length, 4);
+  assert.equal(EFFECTS.grid3d.params.find((d) => d.key === 'sky').options.length, 2);
 });

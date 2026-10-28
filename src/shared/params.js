@@ -29,6 +29,9 @@ export const CLIP_PROPS = [
   { key: 'y', label: 'Position Y', min: -1, max: 1, step: 0.005, def: 0 },
   { key: 'scale', label: 'Scale', min: 0.05, max: 5, step: 0.01, def: 1 },
   { key: 'rotation', label: 'Rotation', min: -360, max: 360, step: 0.5, def: 0 },
+  { key: 'rotX', label: '3D tilt (X)', min: -180, max: 180, step: 0.5, def: 0 },
+  { key: 'rotY', label: '3D turn (Y)', min: -180, max: 180, step: 0.5, def: 0 },
+  { key: 'depth', label: '3D perspective', min: 0, max: 1, step: 0.01, def: 0.5 },
 ];
 export const TEXT_PROPS = [
   { key: 'tracking', label: 'Letter spacing (em)', min: -0.2, max: 1.5, step: 0.005, def: 0 },

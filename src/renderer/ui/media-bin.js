@@ -92,7 +92,7 @@ export function appendToTimeline(mediaId) {
 }
 
 // an adjustment layer needs a track to itself above the footage it grades, so it never shares a lane with another clip
-function addAdjustLayer(look) {
+export function addAdjustLayer(look) {
   const start = Math.max(0, store.playhead);
   const rest = projectDuration(store.project) - start;
   const len = rest >= 1 ? rest : 8; // cover what is left of the cut; an empty timeline gets a default length

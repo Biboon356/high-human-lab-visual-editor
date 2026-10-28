@@ -736,6 +736,93 @@ await step('looks: an adjustment layer grades everything under it; glints sparkl
   await shot('22-organic-veins');
 });
 
+await step('basic edits: reverse plays backwards (picture + sound) and undoes, freeze frame holds a frame, flip mirrors, 3D tilt narrows the picture, crop cuts it', async () => {
+  const ramp = path.join(dir, 'ramp.mp4'), half = path.join(dir, 'half.png'), white = path.join(dir, 'white.png');
+  sh(FFMPEG, ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'color=c=white:s=160x90:d=4:r=15,fade=t=in:st=0:d=4', '-f', 'lavfi', '-i', 'sine=frequency=440:d=4', '-shortest', '-pix_fmt', 'yuv420p', '-c:a', 'aac', ramp]);
+  sh(FFMPEG, ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'color=black:s=160x90,drawbox=x=0:y=0:w=80:h=90:c=white:t=fill', '-frames:v', '1', half]);
+  sh(FFMPEG, ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'color=white:s=160x90', '-frames:v', '1', white]);
+  const bright = () => ev(() => { const d = window.__grab(32, 18); let s = 0; for (let i = 0; i < d.length; i++) s += d[i]; return s / d.length; });
+  const at = async (t) => { await ev((t) => window.__app.store.setPlayhead(t), t); await settle(600); return bright(); };
+  await resetProject();
+  await ev(async (c) => { await window.__app.importPaths([c]); const { store } = window.__app; store.mutate((p) => { p.settings.width = 320; p.settings.height = 180; }); }, ramp);
+  const first = await at(0.3), last = await at(3.6);
+  assert.ok(last > first + 80, `the ramp brightens over time (${first.toFixed(0)} → ${last.toFixed(0)})`);
+  const mediaBefore = await ev(() => window.__app.store.project.media.length);
+  await ev(() => { const { store } = window.__app; store.select(store.project.clips.find((c) => c.type === 'media').id); });
+  assert.equal(await ev(() => window.__app.reverseSelected()), true, 'reverse succeeds');
+  assert.equal(await ev(() => window.__app.store.project.media.length), mediaBefore + 1, 'a reversed media item was added');
+  const info = await ev(() => { const { store } = window.__app; const c = store.project.clips.find((x) => x.type === 'media'); const m = store.project.media.find((x) => x.id === c.mediaId); return { name: m.name, dur: m.duration, audio: m.hasAudio, inT: c.in, d: c.duration }; });
+  assert.match(info.name, /reversed/); assert.ok(Math.abs(info.dur - 4) < 0.4, `reversed length ${info.dur}`); assert.equal(info.audio, true, 'the sound came along'); assert.equal(info.inT, 0);
+  await settle(800);
+  const rfirst = await at(0.3), rlast = await at(3.6);
+  assert.ok(rfirst > rlast + 80, `reversed: bright at the start, dark at the end (${rfirst.toFixed(0)} → ${rlast.toFixed(0)})`);
+  await ev(() => window.__app.store.undo());
+  assert.ok((await at(3.6)) > (await at(0.3)) + 80, 'undo restores the forward clip');
+  // freeze frame at 1.0 s for 2 s
+  await ev(() => { const { store } = window.__app; store.select(store.project.clips.find((c) => c.type === 'media').id); store.setPlayhead(1); });
+  const totalBefore = await ev(async () => (await import('/shared/timeline.js')).projectDuration(window.__app.store.project));
+  assert.equal(await ev(() => window.__app.freezeAtPlayhead(2)), true, 'freeze succeeds');
+  const totalAfter = await ev(async () => (await import('/shared/timeline.js')).projectDuration(window.__app.store.project));
+  assert.ok(Math.abs(totalAfter - totalBefore - 2) < 0.01, `the cut grew by the freeze length (${totalBefore} → ${totalAfter})`);
+  await settle(800);
+  const f1 = await at(1.3), f2 = await at(2.7), after = await at(3.8);
+  assert.ok(Math.abs(f1 - f2) < 4, `held frame does not change (${f1.toFixed(1)} vs ${f2.toFixed(1)})`);
+  assert.ok(after > f2 + 15, 'playback resumes after the hold');
+  // flip / 3D / crop on still images
+  const lit = () => ev(() => { const W = 64, H = 36, d = window.__grab(W, H); let n = 0, left = 0, right = 0; for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const v = d[(y * W + x) * 3]; if (v > 128) { n++; if (x < W / 2) left++; else right++; } } return { n: n / (W * H), left: left / (W * H / 2), right: right / (W * H / 2) }; });
+  await resetProject();
+  await ev(async ([h]) => { await window.__app.importPaths([h]); const { store } = window.__app; const { addMediaClip } = await import('/shared/timeline.js'); store.mutate((p) => { p.settings.width = 320; p.settings.height = 180; addMediaClip(p, p.media[0].id, p.tracks.find((t) => t.kind === 'video').id, 0).duration = 4; }); store.select(store.project.clips[0].id); store.setPlayhead(0.5); }, [half]);
+  await settle(800);
+  const a = await lit(); assert.ok(a.left > 0.5 && a.right < 0.05, `half image: white on the left (${JSON.stringify(a)})`);
+  await ev(() => { const { store } = window.__app; store.project.clips[0].props.flipX = 1; store.touch('project'); }); await settle(600);
+  const b = await lit(); assert.ok(b.right > 0.5 && b.left < 0.05, `flipX mirrors it (${JSON.stringify(b)})`);
+  await resetProject();
+  await ev(async ([w]) => { await window.__app.importPaths([w]); const { store } = window.__app; const { addMediaClip } = await import('/shared/timeline.js'); store.mutate((p) => { p.settings.width = 320; p.settings.height = 180; const c = addMediaClip(p, p.media[0].id, p.tracks.find((t) => t.kind === 'video').id, 0); c.duration = 4; c.props.scale = 1.4; }); store.setPlayhead(0.5); }, [white]);
+  await settle(800);
+  const flat = await lit(); assert.ok(flat.n > 0.95, `a white card fills the frame (${flat.n})`);
+  await ev(() => { const { store } = window.__app; store.project.clips[0].props.rotY = 70; store.touch('project'); }); await settle(600);
+  const turned = await lit(); assert.ok(turned.n < 0.8 && turned.n > 0.2, `turned 70° it narrows (${flat.n.toFixed(2)} → ${turned.n.toFixed(2)})`);
+  await ev(async () => { const { store } = window.__app; const { createEffect } = await import('/shared/effects-defs.js'); const c = store.project.clips[0]; c.props.rotY = 0; c.effects = [createEffect('crop', { left: 0.5 })]; store.touch('project'); }); await settle(600);
+  const cropped = await lit(); assert.ok(cropped.n > 0.4 && cropped.n < 0.6, `crop left 50% leaves half (${cropped.n.toFixed(2)})`);
+  await shot('27-basic-edits');
+});
+
+await step('presets: a large searchable library; click adds a multi-effect chain to the selected clip, Layer adds an adjustment layer, every preset renders without shader errors', async () => {
+  await resetProject();
+  await ev(async (c) => { await window.__app.importPaths([c]); const { store } = window.__app; store.mutate((p) => { p.settings.width = 320; p.settings.height = 180; }); store.select(store.project.clips[0].id); store.setPlayhead(1.5); }, clip);
+  await page.click('#panel-left [data-tab="presets"]');
+  const total = await ev(() => document.querySelectorAll('#preset-list .preset-row').length);
+  assert.ok(total >= 120, `the list shows the whole library (${total})`);
+  await page.fill('#preset-search', 'vhs'); const vhs = await ev(() => document.querySelectorAll('#preset-list .preset-row').length);
+  assert.ok(vhs >= 5 && vhs < total, `search narrows the list (${vhs})`);
+  await page.fill('#preset-search', ''); await page.click('#preset-cats [data-cat="Glitch"]');
+  assert.ok((await ev(() => [...document.querySelectorAll('#preset-list .preset-row')].length)) >= 10, 'a category filters');
+  await page.click('#preset-cats [data-cat="All"]');
+  await page.fill('#preset-search', 'datamosh');
+  const before = await ev(() => window.__app.store.selectedClip.effects.length);
+  await page.click('#preset-list [data-preset="glitch/datamosh-smear"]');
+  const after = await ev(() => window.__app.store.selectedClip.effects.map((e) => e.type));
+  assert.equal(after.length - before, 3, `a three-effect chain was added (${after})`); assert.ok(after.includes('mosh'));
+  await ev(() => window.__app.store.undo());
+  assert.equal(await ev(() => window.__app.store.selectedClip.effects.length), before, 'one Undo removes the whole chain');
+  await page.fill('#preset-search', 'chrome hour'); await page.click('#preset-list [data-layer="y2k/chrome-hour"]');
+  assert.equal(await ev(() => window.__app.store.project.clips.filter((c) => c.type === 'adjust').length), 1, 'Layer adds an adjustment layer');
+  // every preset renders: apply each as a layer, grab a frame, no GL/shader errors logged
+  const errs = logs.length;
+  const ids = await ev(async () => (await import('/shared/preset-library.js')).PRESET_LIBRARY.map((p) => p.id));
+  let changed = 0;
+  const base = await ev(() => { window.__app.store.project.clips = window.__app.store.project.clips.filter((c) => c.type !== 'adjust'); window.__app.store.touch('project'); return window.__grab(32, 18); });
+  for (const id of ids) {
+    await ev(async (id) => { const { store } = window.__app; const L = await import('/shared/preset-library.js'); const A = await import('/shared/adjust-defs.js'); const T = await import('/shared/timeline.js');
+      store.mutate((p) => { p.clips = p.clips.filter((c) => c.type !== 'adjust'); const c = A.createAdjustClip(L.PRESET_LIBRARY.find((x) => x.id === id), 0, 6); c.trackId = T.addTrack(p, 'video').id; T.addClipRaw(p, c); }); store.setPlayhead(4.5); }, id);
+    await settle(180);
+    const d = await ev(() => window.__grab(32, 18)); let s = 0; for (let i = 0; i < d.length; i++) s += Math.abs(d[i] - base[i]); if (s / d.length > 0.5) changed++;
+  }
+  assert.ok(changed >= ids.length * 0.9, `${changed} of ${ids.length} presets visibly change the picture`);
+  assert.equal(logs.slice(errs).filter((l) => /shader|compile|GLSL|WebGL|error/i.test(l)).length, 0, 'no shader or GL errors in the console');
+  await page.fill('#preset-search', ''); await shot('28-presets');
+});
+
 await step('timeline tracks reorder: drag the grip or use the arrows, audio can sit above video, rename, remove an empty row, video order changes what draws on top', async () => {
   await resetProject();
   await ev(async (c) => { await window.__app.importPaths([c]); const { store } = window.__app; const { addMediaClip } = await import('/shared/timeline.js');
@@ -782,7 +869,7 @@ await step('niche looks render: dither, holo, kaleidoscope, spores, cells, HUD, 
   const grab = () => ev(() => window.__grab(96, 54));
   const diff = (a, b) => { let s = 0; for (let i = 0; i < a.length; i++) s += Math.abs(a[i] - b[i]); return s / a.length; };
   const base = await grab();
-  const names = ['Anamorphic Night', 'Holo Foil', 'Handheld 1-bit', 'Amber Terminal', 'Camcorder', 'Thermal Lock', 'Kaleido Trip', 'Veins · Follow Edges', 'Spores · Bioluminescent', 'Cells · Glass', 'Lichen Bloom'];
+  const names = ['Anamorphic Night', 'Holo Foil', 'Handheld 1-bit', 'Amber Terminal', 'Camcorder', 'Thermal Lock', 'Kaleido Trip', 'Veins · Follow Edges', 'Spores · Bioluminescent', 'Cells · Glass', 'Lichen Bloom', '3D · Footage Cube', '3D · Chrome Sphere', '3D · Glass Torus', '3D · Wire Cube', '3D · Holo Pill', 'Synthwave Grid', 'Grid Floor (over footage)'];
   const errorsBefore = logs.length;
   for (const n of names) {
     await ev(async (n) => { const { store } = window.__app; const A = await import('/shared/adjust-defs.js'); const T = await import('/shared/timeline.js');

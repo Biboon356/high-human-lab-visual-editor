@@ -25,11 +25,13 @@ export class Sources {
 
   _video(clip, media) {
     let v = this.videos.get(clip.id);
+    if (v && v.dataset.mid !== media.id) { v.pause(); v.removeAttribute('src'); v.load(); this.videos.delete(clip.id); v = null; } // the clip now plays a different file (reversed, relinked…)
     if (!v) {
       v = document.createElement('video');
       v.preload = 'auto';
       v.playsInline = true;
       v.muted = !this.audible;
+      v.dataset.mid = media.id;
       v.src = this.urlFor(media);
       // A new element can't be seeked until metadata arrives, so redraw (and re-sync) at each load stage.
       for (const ev of ['seeked', 'loadedmetadata', 'loadeddata']) v.addEventListener(ev, () => this.onFrameReady());
@@ -88,7 +90,8 @@ export class Sources {
       else {
         if (!near && !this.audios.has(clip.id)) continue;
         el = this.audios.get(clip.id);
-        if (!el) { el = new Audio(); el.preload = 'auto'; el.src = this.urlFor(media); this.audios.set(clip.id, el); }
+        if (el && el.dataset.mid !== media.id) { el.pause(); el.removeAttribute('src'); el.load(); this.audios.delete(clip.id); el = null; }
+        if (!el) { el = new Audio(); el.preload = 'auto'; el.dataset.mid = media.id; el.src = this.urlFor(media); this.audios.set(clip.id, el); }
       }
       const speed = clip.speed || 1;
       const want = clip.in + (t - clip.start) * speed;

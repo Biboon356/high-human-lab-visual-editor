@@ -78,6 +78,11 @@ export function mountInspector(root) {
         if ((clip.type === 'generator' || clip.type === 'adjust') && d.key !== 'opacity') continue;
         body.push(paramRow({ owner: clip, def: d, getBase: () => clip.props[d.key], setBase: (v) => { clip.props[d.key] = v; }, localTime: lt }));
       }
+      if (clip.type === 'media' || clip.type === 'text') {
+        const fh = field(el('input', { type: 'checkbox', checked: !!clip.props.flipX }), 'change', (i) => { clip.props.flipX = i.checked ? 1 : 0; });
+        const fv = field(el('input', { type: 'checkbox', checked: !!clip.props.flipY }), 'change', (i) => { clip.props.flipY = i.checked ? 1 : 0; });
+        body.push(flatRow('Flip', el('label', { class: 'chk', title: 'Mirror left ↔ right' }, fh, 'horizontal'), el('label', { class: 'chk', title: 'Mirror top ↔ bottom' }, fv, 'vertical')));
+      }
       if (clip.type === 'text') for (const d of TEXT_PROPS) body.push(paramRow({ owner: clip, def: d, getBase: () => clip.props[d.key], setBase: (v) => { clip.props[d.key] = v; }, localTime: lt }));
       if (clip.type !== 'adjust') {
       const blend = el('select', {}, BLEND_MODES.map((m) => el('option', { value: m, text: m, ...(m === clip.props.blend ? { selected: true } : {}) })));

@@ -7,6 +7,7 @@ import { EFFECT_PRESETS, instantiatePreset } from '/shared/effects-defs.js';
 import { store } from '../store.js';
 import { dissolveInto, moveClips, deleteClips, overlaps, trackEnd, canPlace, clipEnd, projectDuration, moveClip, trimStart, trimEnd, splitClip, deleteClip, addMediaClip, addTrack, clipKind, moveTrack, removeEmptyTrack } from '/shared/timeline.js';
 import { findMedia, findTrack, uid } from '/shared/project.js';
+import { reverseSelected, freezeAtPlayhead } from '../engine/edit-tools.js';
 
 const LABEL_W = 118;
 const SNAP_PX = 8;
@@ -236,6 +237,8 @@ export function mountTimeline() {
   document.getElementById('tl-delete').onclick = () => deleteSelected();
   document.getElementById('tl-dissolve').onclick = () => dissolveSelected(Number(document.getElementById('tl-dissolve-d').value));
   document.getElementById('tl-ripple').onclick = () => deleteSelected({ ripple: true });
+  document.getElementById('tl-reverse').onclick = () => reverseSelected();
+  document.getElementById('tl-freeze').onclick = () => freezeAtPlayhead(Number(document.getElementById('tl-freeze-d').value));
   document.getElementById('tl-split').onclick = () => splitSelected();
   document.getElementById('tl-duplicate').onclick = () => duplicateSelected();
 

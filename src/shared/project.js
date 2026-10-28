@@ -33,7 +33,7 @@ export function createProject(name = 'Untitled Lab') {
 }
 
 export function defaultProps() {
-  return { opacity: 1, x: 0, y: 0, scale: 1, rotation: 0, blend: 'normal', tracking: 0 };
+  return { opacity: 1, x: 0, y: 0, scale: 1, rotation: 0, rotX: 0, rotY: 0, depth: 0.5, flipX: 0, flipY: 0, blend: 'normal', tracking: 0 };
 }
 
 export function createClip(fields) {

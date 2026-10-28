@@ -83,6 +83,53 @@ export async function makeProxy(src, dest) {
   return dest;
 }
 
+/**
+ * Reverses [start, start+duration) of a clip into a new playable file. ffmpeg's `reverse` filter holds every frame it is
+ * given in memory, so the picture is reversed in short chunks (stitched back in reverse order) and the sound, which is
+ * small, in one piece. Memory stays bounded however long the clip is.
+ */
+export async function reverseRange(src, dest, { start = 0, duration, hasAudio = true, hasVideo = true, fps = 30, width = 1920, height = 1080 }, tmpDir) {
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+  fs.mkdirSync(tmpDir, { recursive: true });
+  const base = ['-hide_banner', '-loglevel', 'error', '-y'];
+  const parts = [];
+  try {
+    let videoFile = null;
+    if (hasVideo) {
+      const chunk = width * height > 2200000 ? 1 : 2; // 4K gets 1 s chunks
+      const n = Math.max(1, Math.ceil(duration / chunk));
+      for (let i = n - 1; i >= 0; i--) {
+        const s0 = start + i * chunk, len = Math.min(chunk, duration - i * chunk);
+        const f = path.join(tmpDir, `c${n - 1 - i}.mp4`);
+        await run(FFMPEG, [...base, '-ss', String(s0), '-t', String(len), '-i', src, '-an', '-vf', `fps=${fps},reverse`,
+          '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '16', '-pix_fmt', 'yuv420p', f]);
+        parts.push(f);
+      }
+      videoFile = path.join(tmpDir, 'video.mp4');
+      const list = path.join(tmpDir, 'list.txt');
+      fs.writeFileSync(list, parts.map((f) => `file '${f.replace(/'/g, "'\\''")}'`).join('\n'));
+      await run(FFMPEG, [...base, '-f', 'concat', '-safe', '0', '-i', list, '-c', 'copy', videoFile]);
+    }
+    let audioFile = null;
+    if (hasAudio) {
+      audioFile = path.join(tmpDir, 'audio.m4a');
+      await run(FFMPEG, [...base, '-ss', String(start), '-t', String(duration), '-i', src, '-vn', '-af', 'areverse', '-c:a', 'aac', '-b:a', '192k', audioFile]);
+    }
+    const inputs = [videoFile, audioFile].filter(Boolean).flatMap((f) => ['-i', f]);
+    await run(FFMPEG, [...base, ...inputs, '-c', 'copy', '-movflags', '+faststart', dest]);
+    return dest;
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+}
+
+/** One frame of a video at `time`, as a PNG at full source resolution. */
+export async function extractFrame(src, dest, time) {
+  await run(FFMPEG, ['-hide_banner', '-loglevel', 'error', '-y', '-ss', String(Math.max(0, time)), '-i', src, '-frames:v', '1', '-an', dest]);
+  return dest;
+}
+
 /** Decode an ffmpeg audio graph to f32le PCM, returned as a Float32Array. */
 export async function decodePcm(args) {
   const { stdout } = await run(FFMPEG, args);

@@ -135,9 +135,14 @@ export class Compositor {
     return this.srcTex;
   }
 
-  _drawLayer(tex, halfW, halfH, offX, offY, rot, opacity) {
+  /** t3: optional {flipX, flipY, rotX, rotY, depth} from the clip's props (degrees; depth 0..1 = how strong the perspective is). */
+  _drawLayer(tex, halfW, halfH, offX, offY, rot, opacity, t3 = null) {
     const p = this._program('layer', VERT_LAYER, FRAG_LAYER);
     this._use(p);
+    this._set2('u_flip', t3?.flipX ? -1 : 1, t3?.flipY ? -1 : 1);
+    this._set1('u_rx', t3 ? (t3.rotX * Math.PI) / 180 : 0);
+    this._set1('u_ry', t3 ? (t3.rotY * Math.PI) / 180 : 0);
+    this._set1('u_persp', this.h * (6 - 5.1 * (t3 ? Math.min(1, Math.max(0, t3.depth)) : 0.5)));
     this._bindTex(tex);
     this._set1i('u_tex', 0);
     this._set2('u_res', this.w, this.h);
@@ -216,6 +221,8 @@ export class Compositor {
       const trans = transitionAt(clip, tl);
       if (trans) props.scale *= trans.scaleMul;
       let ready = false;
+      const t3 = { flipX: clip.props.flipX, flipY: clip.props.flipY, rotX: props.rotX, rotY: props.rotY, depth: props.depth };
+      const flat = clip.type === 'media' || clip.type === 'adjust'; // pictures tilt about their own centre when drawn; the rest tilt as a full-frame card at the end
 
       if (clip.type === 'media') {
         const fr = sources.frameFor(project, clip);
@@ -223,7 +230,7 @@ export class Compositor {
         const tex = fr.data ? this._uploadRaw(fr.data, fr.w, fr.h) : this._upload(fr.el);
         this._clear(this.fbos.a, 0, 0, 0, 0);
         const fit = Math.min(this.w / fr.w, this.h / fr.h) * props.scale;
-        this._drawLayer(tex, (fr.w * fit) / 2, (fr.h * fit) / 2, props.x * this.w, props.y * this.h, (-props.rotation * Math.PI) / 180, 1);
+        this._drawLayer(tex, (fr.w * fit) / 2, (fr.h * fit) / 2, props.x * this.w, props.y * this.h, (-props.rotation * Math.PI) / 180, 1, t3);
         ready = true;
       } else if (clip.type === 'text') {
         drawTextClip(this.textCtx, this.w, this.h, clip, tl, props);
@@ -262,7 +269,7 @@ export class Compositor {
 
       this._target(this.fbos.acc);
       this._blend(props.blend);
-      this._drawLayer(cur.tex, this.w / 2, this.h / 2, 0, 0, 0, props.opacity);
+      this._drawLayer(cur.tex, this.w / 2, this.h / 2, 0, 0, 0, props.opacity, flat ? null : t3);
       gl.disable(gl.BLEND);
     }
 
@@ -276,6 +283,7 @@ export class Compositor {
     this._set2('u_half', this.w / 2, this.h / 2);
     this._set2('u_offset', 0, 0);
     this._set1('u_rot', 0);
+    this._set2('u_flip', 1, 1);
     this._set1('u_opacity', 1);
     this._draw();
     return { missing };

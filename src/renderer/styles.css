@@ -276,3 +276,19 @@ kbd { font: 500 9.5px var(--mono); letter-spacing: .04em; padding: 1px 6px; bord
 .tl-rename { width: 70px; height: 16px; font: 500 11px var(--mono); padding: 0 3px; }
 .tl-row.dragging { opacity: .45; }
 .tl-drop { position: absolute; left: 0; right: 0; height: 2px; background: var(--accent2, #7dffb0); box-shadow: 0 0 8px var(--accent2, #7dffb0); pointer-events: none; z-index: 20; }
+/* Presets tab */
+.chips { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 14px 8px; }
+.chip { font: 500 10px var(--mono); letter-spacing: .04em; padding: 3px 7px; height: auto; border: 1px solid var(--line2); background: transparent; color: var(--dim); }
+.chip.on, .chip:hover { color: var(--text); border-color: var(--text); }
+#preset-search { width: 100%; }
+.preset-list.presets { display: flex; flex-direction: column; }
+.preset-row { display: flex; align-items: stretch; }
+.preset-row .p-clip { flex: 1; min-width: 0; text-align: left; }
+.preset-row .p-clip .pn { display: block; }
+.preset-row .p-layer { flex: none; font: 500 9px var(--mono); letter-spacing: .06em; text-transform: uppercase; padding: 0 8px; }
+.preset-list.presets .preset-row .p-layer { flex-direction: row; align-items: center; justify-content: center; gap: 0; border-top: 1px solid var(--line); border-left: 1px solid var(--line); padding: 0 10px; color: var(--dim); }
+.preset-list.presets .preset-row .p-layer:hover:not(:disabled) { padding-left: 10px; color: var(--text); }
+/* five left-panel tabs: tighter, and never clipped */
+.tabs[data-tabs="left"] button { font-size: 8.5px; letter-spacing: .08em; gap: 3px; min-width: 0; padding: 0 2px; }
+.preset-list.presets .preset-row .p-clip small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.preset-list.presets .preset-row .p-layer { writing-mode: horizontal-tb; align-self: stretch; }

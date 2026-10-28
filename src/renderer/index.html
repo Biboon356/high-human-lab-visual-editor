@@ -35,6 +35,8 @@
       <symbol id="i-pb" viewBox="0 0 16 16"><path d="M1.5 2.5h13v11h-13zM1.5 9.5h13" stroke="currentColor" fill="none"/></symbol>
       <symbol id="i-pr" viewBox="0 0 16 16"><path d="M1.5 2.5h13v11h-13zM10 2.5v11" stroke="currentColor" fill="none"/></symbol>
       <symbol id="i-aster" viewBox="0 0 16 16"><path d="M8 1.5v13M2.4 4.7l11.2 6.6M13.6 4.7 2.4 11.3" stroke="currentColor" fill="none"/></symbol>
+      <symbol id="i-reverse" viewBox="0 0 16 16"><path d="M13 4L7 8l6 4z M7 4L1 8l6 4z" stroke="currentColor" fill="none"/></symbol>
+      <symbol id="i-freeze" viewBox="0 0 16 16"><path d="M8 1.5v13M2.2 4.7l11.6 6.6M2.2 11.3l11.6-6.6" stroke="currentColor" fill="none"/></symbol>
       <symbol id="i-dissolve" viewBox="0 0 16 16"><path d="M1.5 4h8v8h-8z" stroke="currentColor" fill="none"/><path d="M6.5 4h8v8h-8z" stroke="currentColor" fill="none" stroke-dasharray="1.5 1.5"/></symbol>
       <symbol id="i-ripple" viewBox="0 0 16 16"><path d="M2.5 4h4v8h-4zM9.5 4h4v8h-4z" stroke="currentColor" fill="none"/><path d="M7.5 8h1" stroke="currentColor" fill="none"/></symbol>
       <symbol id="i-trash" viewBox="0 0 16 16"><path d="M2.5 4h11M6 4V2.5h4V4M4 4l.6 9.5h6.8L12 4" stroke="currentColor" fill="none"/></symbol>
@@ -76,6 +78,7 @@
         <button data-tab="type"><i>02</i>Type</button>
         <button data-tab="organic"><i>03</i>Organic</button>
         <button data-tab="looks"><i>04</i>Looks</button>
+        <button data-tab="presets"><i>05</i>Presets</button>
       </nav>
       <section data-pane="media" class="pane on">
         <header class="pane-head"><h2>Library</h2><span>Footage, sound, stills</span></header>
@@ -95,6 +98,13 @@
         <div id="organic-looks" class="preset-list"></div>
         <p class="hint pad sub">Stand-alone generators — roots, mycelium and terrain drawn as their own layer.</p>
         <div id="gen-presets" class="preset-list"></div>
+      </section>
+      <section data-pane="presets" class="pane" id="pane-presets">
+        <header class="pane-head"><h2>Presets</h2><span id="preset-count">Chains of effects, ready to use</span></header>
+        <div class="pane-actions"><input id="preset-search" type="search" placeholder="Search — vhs, chrome, beat, 3d…" aria-label="Search presets" autocomplete="off" /></div>
+        <div id="preset-cats" class="chips" role="tablist" aria-label="Preset categories"></div>
+        <p class="hint pad" id="preset-hint">Click a preset to put it on the selected clip. <b>Layer</b> grades everything under it instead.</p>
+        <div id="preset-list" class="preset-list presets"></div>
       </section>
       <section data-pane="looks" class="pane">
         <header class="pane-head"><h2>Looks</h2><span>Y2K, grade the whole frame</span></header>
@@ -149,6 +159,9 @@
         <button id="tl-delete" title="Delete selected clips (Delete)"><svg class="ic"><use href="#i-trash"/></svg>Delete</button>
         <button id="tl-dissolve" title="Cross-dissolve into the selected clip from the clip before it"><svg class="ic"><use href="#i-dissolve"/></svg>Dissolve</button>
         <select id="tl-dissolve-d" title="Dissolve length" aria-label="Dissolve length"><option value="0.25">0.25 s</option><option value="0.5" selected>0.5 s</option><option value="1">1 s</option><option value="1.5">1.5 s</option></select>
+        <button id="tl-reverse" title="Play the selected clip backwards (picture and sound)"><svg class="ic"><use href="#i-reverse"/></svg>Reverse</button>
+        <button id="tl-freeze" title="Hold the frame under the playhead"><svg class="ic"><use href="#i-freeze"/></svg>Freeze</button>
+        <select id="tl-freeze-d" title="Freeze length" aria-label="Freeze length"><option value="1">1 s</option><option value="2" selected>2 s</option><option value="3">3 s</option><option value="5">5 s</option></select>
         <button id="tl-ripple" title="Delete and close the gap (Shift+Delete)"><svg class="ic"><use href="#i-ripple"/></svg>Ripple</button>
         <span class="sep"></span>
         <button id="tl-zoom-out" class="icon" title="Zoom out (−)" aria-label="Zoom out"><svg class="ic"><use href="#i-minus"/></svg></button>

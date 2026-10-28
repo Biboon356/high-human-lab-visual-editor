@@ -19,6 +19,13 @@ export const ADJUST_LOOKS = [
   { name: 'Camcorder', note: 'REC badge, timecode, focus frame, tape wobble', chain: [fx('vhs', { jitter: 0.18, bleed: 0.01, noise: 0.25, tracking: 0.15 }), fx('color', { saturation: 1.15, contrast: 1.08 }), fx('hud', { style: 0, grid: 0.12 })] },
   { name: 'Thermal Lock', note: 'heat-map colour with a rotating target lock', chain: [fx('gradmap', { shadow: '#10003a', mid: '#e0200a', high: '#fff27a', contrast: 1.5 }), fx('grain', { amount: 0.2 }), fx('hud', { style: 1, color: '#ffffff', grid: 0 })] },
   { name: 'Kaleido Trip', note: 'six-way mirror that slowly turns', chain: [fx('kaleido', { segments: 6, spin: 8, zoom: 1.1 }), fx('chroma', { amount: 0.008 }), fx('bloom', { threshold: 0.6, intensity: 0.5 })] },
+  { name: '3D · Footage Cube', note: 'your picture wrapped on a slowly turning cube', chain: [fx('object3d', { shape: 0, material: 0, background: 1, size: 1.1, ry: 30, sy: 30 })] },
+  { name: '3D · Chrome Sphere', note: 'liquid-metal ball floating over the picture', chain: [fx('object3d', { shape: 1, material: 1, background: 0, size: 1.2, sy: 20, shine: 1 }), fx('bloom', { threshold: 0.75, intensity: 0.4, radius: 40 })] },
+  { name: '3D · Glass Torus', note: 'a glass ring that bends the footage behind it', chain: [fx('object3d', { shape: 2, material: 2, background: 0, size: 1.4, rx: 55, sy: 25, sx: 12 }), fx('chroma', { amount: 0.004 })] },
+  { name: '3D · Wire Cube', note: 'neon wireframe cube, the picture ghosted inside', chain: [fx('object3d', { shape: 3, material: 3, background: 1, size: 1.2, tint: '#6dffd0', sy: 40 }), fx('bloom', { threshold: 0.6, intensity: 0.7, radius: 30 })] },
+  { name: '3D · Holo Pill', note: 'iridescent capsule drifting through the frame', chain: [fx('object3d', { shape: 4, material: 4, background: 0, size: 1.3, rz: 35, sy: 28, sx: 10 })] },
+  { name: 'Synthwave Grid', note: 'sunset sky and a neon floor rushing at you', chain: [fx('grid3d', { horizon: 0.42, sky: 1, speed: 0.6 }), fx('bloom', { threshold: 0.7, intensity: 0.5, radius: 40 }), fx('crt', { scan: 0.15, bleed: 0.006, curve: 0.05 })] },
+  { name: 'Grid Floor (over footage)', note: 'neon floor lines only, your picture stays as the sky', chain: [fx('grid3d', { horizon: 0.38, sky: 0, floor: 0.35, speed: 0.5, color: '#7dffb0', color2: '#38e1ff' }), fx('bloom', { threshold: 0.7, intensity: 0.45, radius: 36 })] },
   { name: 'Mall Tape', note: 'tired VHS, pink shadows', chain: [fx('vhs', { jitter: 0.25, bleed: 0.014, noise: 0.35, tracking: 0.3 }), fx('color', { saturation: 1.2, contrast: 1.1, hue: -12 }), fx('bloom', { threshold: 0.6, intensity: 0.5 })] },
 ];
 

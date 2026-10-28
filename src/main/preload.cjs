@@ -10,6 +10,8 @@ contextBridge.exposeInMainWorld('hh', {
   mediaThumbs: (o) => invoke('media:thumbs', o),
   mediaPeaks: (p) => invoke('media:peaks', p),
   makeProxy: (p) => invoke('media:proxy', p),
+  reverseRange: (o) => invoke('media:reverse', o),
+  extractFrame: (o) => invoke('media:frame', o),
   openProject: () => invoke('project:open'),
   saveProject: (project, filePath, saveAs) => invoke('project:save', { project, filePath, saveAs }),
   analyzeAudio: (project) => invoke('audio:analyze', project),
