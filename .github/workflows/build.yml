@@ -21,7 +21,9 @@ jobs:
       - run: npm test
 
   e2e:
-    # Drives the real Electron app under Xvfb (software GL). Non-blocking until it has proven stable on hosted runners.
+    # Drives the real Electron app under Xvfb (software GL) — a test harness only, nobody runs the app on Linux.
+    # Takes ~16 min, so it runs on demand (Actions > Build installers > Run workflow), not on every push or release.
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     continue-on-error: true
     timeout-minutes: 30
