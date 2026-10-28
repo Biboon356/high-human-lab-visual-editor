@@ -85,3 +85,9 @@ Preset: **Xerox Photocopy** (คอนทราสต์สูง + toner noise 
 2. **เกรดทั้งเฟรม**: แท็บ **Looks** → กดลุคเดียวได้ *Adjustment layer* (เลเยอร์ที่ไม่มีภาพ แต่เอฟเฟกต์ของมันครอบทุกอย่างที่อยู่ใต้มัน) ลากขอบบน timeline เพื่อครอบเฉพาะช่วง ลด Opacity เพื่อผสม — ลอง *Digicam 2002*, *Chrome Haze*, *Glints*
 3. **Organic ที่ฝังอยู่ในภาพ**: แท็บ **Organic** → *Veins · Overgrown / Glass / Negative / Burnt Channels / Chrome Nerves / Beat Pulse* เส้นจะงอกจากขอบ/ด้านบน/ตรงกลาง รับแสงและบิดภาพจากฟุตเทจเอง (ปรับ Growth, Density, Thickness, Grows from ในเอฟเฟกต์ *Veins*)
 4. **Auto-montage**: เลือกสไตล์ *Y2K* หรือ *Organic*; กด ★ ที่คลิปใน Library เพื่อให้ใช้บ่อยขึ้น หรือ ⊘ เพื่อไม่เอา; ติ๊ก *Add a title card* เพื่อได้ไตเติลตอนเปิด
+
+## v0.2.2 — เรียง track + เอฟเฟกต์นิชเพิ่ม
+1. **สลับตำแหน่ง track**: ลากไอคอน ⠿ ที่หัว track ไปวางแถวใหม่ (เส้นสีแสดงตำแหน่งที่จะตก) หรือกดปุ่ม ▲▼ — เสียงอยู่เหนือวิดีโอได้ วิดีโอลงล่างได้ ลำดับของ track วิดีโอเท่านั้นที่กำหนดว่าอะไรทับอะไร ดับเบิลคลิกชื่อเพื่อเปลี่ยนชื่อ กด × ลบ track ว่าง
+2. **แท็บ Looks** (เลเยอร์ปรับสี) เพิ่ม: Anamorphic Night (แสงยาวสีฟ้าพาดทั้งเฟรม), Holo Foil (ฟอยล์รุ้ง), Handheld 1-bit (จอเกมพกพา), Amber Terminal, Camcorder (REC + timecode จริงเดินตามเวลา), Thermal Lock (ภาพความร้อน + เป้าล็อก), Kaleido Trip
+3. **แท็บ Organic** เพิ่ม: Veins · Follow Edges (เส้นเลื้อยตามขอบวัตถุในภาพ), Spores · Bioluminescent (ละอองแสงลอยรับแสงจากภาพ), Cells · Glass (เซลล์กระจกหักเหภาพ), Lichen Bloom (รวมทั้งสามอย่าง)
+4. เอฟเฟกต์ทั้งหมดใช้เดี่ยว ๆ ได้ในปุ่ม Effects ของคลิปใดก็ได้ และผูกกับจังหวะเพลงได้

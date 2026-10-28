@@ -5,7 +5,7 @@ import { visualsFor, drawVisuals } from '../engine/media-cache.js';
 import { planMontage } from '/shared/montage.js';
 import { EFFECT_PRESETS, instantiatePreset } from '/shared/effects-defs.js';
 import { store } from '../store.js';
-import { dissolveInto, moveClips, deleteClips, overlaps, trackEnd, canPlace, clipEnd, projectDuration, moveClip, trimStart, trimEnd, splitClip, deleteClip, addMediaClip, addTrack, clipKind } from '/shared/timeline.js';
+import { dissolveInto, moveClips, deleteClips, overlaps, trackEnd, canPlace, clipEnd, projectDuration, moveClip, trimStart, trimEnd, splitClip, deleteClip, addMediaClip, addTrack, clipKind, moveTrack, removeEmptyTrack } from '/shared/timeline.js';
 import { findMedia, findTrack, uid } from '/shared/project.js';
 
 const LABEL_W = 118;
@@ -60,15 +60,60 @@ export function mountTimeline() {
       });
       for (const clip of project.clips.filter((c) => c.trackId === track.id)) lane.append(clipEl(clip));
 
-      const label = el('div', { class: 'tl-label' }, el('b', { text: track.name }),
+      const idx = project.tracks.indexOf(track), last = project.tracks.length - 1;
+      const name = el('b', { text: track.name, title: 'Double-click to rename' });
+      name.addEventListener('dblclick', () => renameTrack(name, track));
+      const grip = el('span', { class: 'grip', title: 'Drag to move this track up or down (video tracks draw over the ones below them)', 'aria-label': `Move track ${track.name}`, text: '⠿' });
+      grip.addEventListener('pointerdown', (e) => beginTrackDrag(e, track));
+      const label = el('div', { class: 'tl-label' }, el('div', { class: 'tl-name' }, grip, name),
         el('div', {},
           el('button', { class: track.muted ? 'on' : '', text: 'M', title: 'Mute audio on this track', onclick: () => store.mutate(() => { track.muted = !track.muted; }) }),
-          track.kind === 'video' ? el('button', { class: track.hidden ? 'on' : '', text: 'H', title: 'Hide this track in the preview and export', onclick: () => store.mutate(() => { track.hidden = !track.hidden; }) }) : null));
-      content.append(el('div', { class: 'tl-row' }, label, lane));
+          track.kind === 'video' ? el('button', { class: track.hidden ? 'on' : '', text: 'H', title: 'Hide this track in the preview and export', onclick: () => store.mutate(() => { track.hidden = !track.hidden; }) }) : null,
+          el('button', { class: 'mv up', text: '▲', title: 'Move track up', disabled: idx === 0, onclick: () => store.mutate((p) => moveTrack(p, track.id, idx - 1)) }),
+          project.clips.some((c) => c.trackId === track.id) || project.tracks.filter((x) => x.kind === track.kind).length <= 1 ? null
+            : el('button', { class: 'mv rm', text: '×', title: 'Remove this empty track', onclick: () => store.mutate((p) => removeEmptyTrack(p, track.id)) }),
+          el('button', { class: 'mv down', text: '▼', title: 'Move track down', disabled: idx === last, onclick: () => store.mutate((p) => moveTrack(p, track.id, idx + 1)) })));
+      content.append(el('div', { class: 'tl-row', 'data-row': track.id }, label, lane));
     }
     playheadEl = el('div', { class: 'playhead' });
     content.append(playheadEl);
     placePlayhead();
+  }
+
+  function renameTrack(nameEl, track) {
+    const input = el('input', { type: 'text', value: track.name, class: 'tl-rename', maxlength: 14, 'aria-label': 'Track name' });
+    nameEl.replaceWith(input); input.focus(); input.select();
+    let finished = false; // Enter re-renders the timeline, which removes the input and fires blur: only finish once
+    const done = (keep) => { if (finished) return; finished = true; const v = input.value.trim(); if (keep && v && v !== track.name) store.mutate(() => { track.name = v; }); else render(); };
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') done(true); else if (e.key === 'Escape') done(false); });
+    input.addEventListener('blur', () => done(true));
+  }
+
+  // drag a track's grip to a new row: a line shows where it will land, release to drop
+  function beginTrackDrag(e, track) {
+    e.preventDefault();
+    const rows = [...content.querySelectorAll('.tl-row')];
+    const marker = el('div', { class: 'tl-drop' });
+    content.append(marker);
+    const from = store.project.tracks.indexOf(track);
+    let to = from;
+    const place = (ev) => {
+      const rects = rows.map((r) => r.getBoundingClientRect());
+      let i = rects.findIndex((r) => ev.clientY < r.top + r.height / 2);
+      if (i < 0) i = rects.length;            // below the last row
+      to = i > from ? i - 1 : i;             // index after removing the dragged row
+      const y = i >= rects.length ? rects.at(-1).bottom : rects[i].top;
+      marker.style.top = `${y - content.getBoundingClientRect().top}px`;
+      rows[from]?.classList.add('dragging');
+    };
+    place(e);
+    const move = (ev) => place(ev);
+    const up = () => {
+      removeEventListener('pointermove', move); removeEventListener('pointerup', up);
+      marker.remove();
+      if (to !== from) store.mutate((p) => moveTrack(p, track.id, to)); else render();
+    };
+    addEventListener('pointermove', move); addEventListener('pointerup', up);
   }
 
   function clipEl(clip) {

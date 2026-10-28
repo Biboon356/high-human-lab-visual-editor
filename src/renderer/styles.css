@@ -270,3 +270,9 @@ kbd { font: 500 9.5px var(--mono); letter-spacing: .04em; padding: 1px 6px; bord
 .media-acts { display: flex; gap: 2px; align-items: center; }
 .media-acts .pick { opacity: .45; padding: 2px 5px; } .media-item:hover .media-acts .pick, .media-acts .pick.on { opacity: 1; }
 .media-acts .pick.star.on { color: var(--signal, #d8d36a); } .media-acts .pick.skip.on { color: var(--danger); }
+.tl-name { display: flex; align-items: center; gap: 4px; }
+.tl-label .grip { cursor: grab; color: var(--dim); font-size: 12px; line-height: 1; user-select: none; touch-action: none; } .tl-label .grip:hover { color: var(--text); }
+.tl-label button.mv { min-width: 16px; padding: 0 3px; opacity: .55; } .tl-label button.mv:hover:not(:disabled) { opacity: 1; } .tl-label button.mv:disabled { opacity: .18; cursor: default; }
+.tl-rename { width: 70px; height: 16px; font: 500 11px var(--mono); padding: 0 3px; }
+.tl-row.dragging { opacity: .45; }
+.tl-drop { position: absolute; left: 0; right: 0; height: 2px; background: var(--accent2, #7dffb0); box-shadow: 0 0 8px var(--accent2, #7dffb0); pointer-events: none; z-index: 20; }

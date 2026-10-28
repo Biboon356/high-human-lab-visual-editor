@@ -736,6 +736,65 @@ await step('looks: an adjustment layer grades everything under it; glints sparkl
   await shot('22-organic-veins');
 });
 
+await step('timeline tracks reorder: drag the grip or use the arrows, audio can sit above video, rename, remove an empty row, video order changes what draws on top', async () => {
+  await resetProject();
+  await ev(async (c) => { await window.__app.importPaths([c]); const { store } = window.__app; const { addMediaClip } = await import('/shared/timeline.js');
+    store.mutate((p) => { p.settings.width = 480; p.settings.height = 270; addMediaClip(p, p.media[0].id, p.tracks.find((t) => t.kind === 'video').id, 0); }); }, clip);
+  const order = () => ev(() => window.__app.store.project.tracks.map((t) => t.name).join(','));
+  const start = await order(); assert.equal(start, 'V2,V1,A1,A2');
+  // arrows: send the first audio row to the very top
+  const ids = await ev(() => Object.fromEntries(window.__app.store.project.tracks.map((t) => [t.name, t.id])));
+  for (let i = 0; i < 2; i++) await page.click(`.tl-row[data-row="${ids.A1}"] button.mv.up`);
+  assert.equal(await order(), 'A1,V2,V1,A2', 'audio row moved above the video rows with the arrows');
+  // drag: grab V1's grip and drop it above the first row
+  const g = await page.locator(`.tl-row[data-row="${ids.V1}"] .grip`).boundingBox();
+  const top = await page.locator(`.tl-row[data-row="${ids.A1}"]`).boundingBox();
+  await page.mouse.move(g.x + g.width / 2, g.y + g.height / 2); await page.mouse.down();
+  await page.mouse.move(g.x + 4, top.y + 4, { steps: 6 });
+  assert.ok(await page.locator('.tl-drop').count() === 1, 'a drop line shows where it will land');
+  await page.mouse.up();
+  assert.equal(await order(), 'V1,A1,V2,A2', 'dragging the grip moved the video row to the top');
+  assert.equal(await page.locator('.tl-drop').count(), 0, 'the drop line is gone');
+  // the picture follows video order: a text clip on V2 hides under a text clip on V1 only while V1 is the upper row
+  await ev(async ({ v1, v2 }) => { const { store } = window.__app; const TD = await import('/shared/text-defs.js'); const T = await import('/shared/timeline.js');
+    store.mutate((p) => { p.clips = []; for (const [tid, col] of [[v2, '#ff0000'], [v1, '#00ff00']]) { const c = TD.createTextClip(null, 0, 4); c.text.content = 'W'; c.text.size = 0.9; c.text.color = col; c.text.anim = { ...c.text.anim, type: 'none' }; c.trackId = tid; T.addClipRaw(p, c); } }); store.setPlayhead(1); }, { v1: ids.V1, v2: ids.V2 });
+  await settle(600);
+  const dom = () => ev(() => { const d = window.__grab(48, 27); let r = 0, g = 0; for (let i = 0; i < d.length; i += 3) { r += d[i]; g += d[i + 1]; } return g > r ? 'green' : 'red'; });
+  assert.equal(await dom(), 'green', 'V1 is the upper row so its green text draws on top');
+  await page.click(`.tl-row[data-row="${ids.V1}"] button.mv.down`); await page.click(`.tl-row[data-row="${ids.V1}"] button.mv.down`); await settle(600);
+  assert.equal(await dom(), 'red', 'after V1 moves below V2 the red text is on top');
+  // rename + remove an empty row
+  await page.dblclick(`.tl-row[data-row="${ids.A2}"] .tl-name b`); await page.fill('.tl-rename', 'MUSIC'); await page.keyboard.press('Enter');
+  assert.match(await order(), /MUSIC/, 'double-click renames a track');
+  await page.click(`.tl-row[data-row="${ids.A2}"] button.mv.rm`);
+  assert.ok(!(await order()).includes('MUSIC'), 'an empty extra row can be removed');
+  assert.equal(await ev(() => window.__app.store.project.tracks.filter((t) => t.kind === 'audio').length), 1, 'the last audio row stays');
+  assert.equal(await page.locator(`.tl-row[data-row="${ids.A1}"] button.mv.rm`).count(), 0, 'no remove button on the last row of its kind');
+  await ev(() => window.__app.store.undo()); await ev(() => window.__app.store.undo());
+  await shot('25-track-reorder');
+});
+
+await step('niche looks render: dither, holo, kaleidoscope, spores, cells, HUD, edge-following veins each change the picture and compile cleanly', async () => {
+  await resetProject();
+  await ev(async (c) => { await window.__app.importPaths([c]); const { store } = window.__app; const { addMediaClip } = await import('/shared/timeline.js');
+    store.mutate((p) => { p.settings.width = 480; p.settings.height = 270; addMediaClip(p, p.media[0].id, p.tracks.find((t) => t.kind === 'video').id, 0); }); store.setPlayhead(1.2); }, clip);
+  await settle(700);
+  const grab = () => ev(() => window.__grab(96, 54));
+  const diff = (a, b) => { let s = 0; for (let i = 0; i < a.length; i++) s += Math.abs(a[i] - b[i]); return s / a.length; };
+  const base = await grab();
+  const names = ['Anamorphic Night', 'Holo Foil', 'Handheld 1-bit', 'Amber Terminal', 'Camcorder', 'Thermal Lock', 'Kaleido Trip', 'Veins · Follow Edges', 'Spores · Bioluminescent', 'Cells · Glass', 'Lichen Bloom'];
+  const errorsBefore = logs.length;
+  for (const n of names) {
+    await ev(async (n) => { const { store } = window.__app; const A = await import('/shared/adjust-defs.js'); const T = await import('/shared/timeline.js');
+      store.mutate((p) => { p.clips = p.clips.filter((c) => c.type !== 'adjust'); const c = A.createAdjustClip([...A.ADJUST_LOOKS, ...A.ORGANIC_LOOKS].find((l) => l.name === n), 0, 6); c.trackId = T.addTrack(p, 'video').id; T.addClipRaw(p, c); }); store.setPlayhead(5); }, n);
+    await settle(700);
+    const d = diff(base, await grab());
+    assert.ok(d > 1.5, `${n} changes the picture (Δ${d.toFixed(1)})`);
+  }
+  assert.equal(logs.slice(errorsBefore).filter((l) => /shader|compile|GLSL|WebGL/i.test(l)).length, 0, 'no shader errors in the console');
+  await shot('26-niche-looks');
+});
+
 await step('montage v2: favourites and skip flags, hook + calm close, Y2K style grades the whole cut, optional title card, footage sound muted, exports', async () => {
   await resetProject();
   // regression: asking for an analysis while there is no song yet must not wedge the analysis for good

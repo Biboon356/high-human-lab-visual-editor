@@ -7,7 +7,7 @@ import { activeVisualClips, clipKind } from '../src/shared/timeline.js';
 import { createProject } from '../src/shared/project.js';
 
 test('every Y2K look builds a chain of known effects with shaders', () => {
-  assert.ok(ADJUST_LOOKS.length >= 6);
+  assert.ok(ADJUST_LOOKS.length >= 12);
   for (const l of ADJUST_LOOKS) {
     const c = createAdjustClip(l, 2, 5);
     assert.equal(c.type, 'adjust');
@@ -46,15 +46,25 @@ test('veins effect: every shader uniform has a declared param, options in range'
 
 test('organic looks grow in over time and use the veins effect', async () => {
   const { ORGANIC_LOOKS } = await import('../src/shared/adjust-defs.js');
-  assert.ok(ORGANIC_LOOKS.length >= 5);
+  assert.ok(ORGANIC_LOOKS.length >= 9);
   for (const l of ORGANIC_LOOKS) {
     const c = createAdjustClip(l, 0, 8);
-    const v = c.effects.find((e) => e.type === 'veins');
-    assert.ok(v, l.name);
+    assert.ok(c.effects.some((e) => ['veins', 'spores', 'cells'].includes(e.type)), `${l.name} uses an organic effect`);
     for (const e of c.effects) assert.ok(EFFECT_FRAG[e.type], `${l.name}: ${e.type}`);
-    const animated = v.keyframes.growth || v.params.growth === 1;
-    assert.ok(animated, l.name);
+    const v = c.effects.find((e) => e.type === 'veins');
+    if (v) assert.ok(v.keyframes.growth || v.params.growth === 1, `${l.name}: veins either grow in or are fully grown`);
   }
   const grown = createAdjustClip(ORGANIC_LOOKS[0], 0, 8).effects[0].keyframes.growth;
   assert.deepEqual(grown.map((k) => k.v), [0, 1]);
+});
+
+test('new niche effects: every declared param is read by its shader, option counts match', () => {
+  for (const k of ['dither', 'holo', 'kaleido', 'spores', 'cells', 'hud']) {
+    assert.ok(EFFECT_FRAG[k], `${k} has a shader`);
+    for (const d of EFFECTS[k].params) assert.match(EFFECT_FRAG[k], new RegExp(`u_${d.key}\\b`), `${k}.${d.key}`);
+  }
+  assert.equal(EFFECTS.dither.params.find((d) => d.key === 'palette').options.length, 5);
+  assert.equal(EFFECTS.hud.params.find((d) => d.key === 'style').options.length, 3);
+  assert.ok(EFFECTS.veins.params.some((d) => d.key === 'cling'));
+  assert.match(EFFECT_FRAG.veins, /u_cling/);
 });

@@ -219,6 +219,30 @@ export function activeAudioClips(project, t) {
   });
 }
 
+/**
+ * Moves a track to `toIndex` in the list (0 = top row). Any mix of video and audio rows is allowed; only the order among
+ * video rows matters for compositing (upper rows draw over lower ones), so reordering an audio row never changes the picture.
+ * @returns {boolean} whether anything moved
+ */
+export function moveTrack(project, trackId, toIndex) {
+  const from = project.tracks.findIndex((t) => t.id === trackId);
+  if (from < 0) return false;
+  const to = Math.max(0, Math.min(project.tracks.length - 1, Math.round(toIndex)));
+  if (to === from) return false;
+  const [t] = project.tracks.splice(from, 1);
+  project.tracks.splice(to, 0, t);
+  return true;
+}
+
+/** Removes a track only when nothing sits on it (the last video and the last audio row are kept). */
+export function removeEmptyTrack(project, trackId) {
+  const t = findTrack(project, trackId);
+  if (!t || project.clips.some((c) => c.trackId === trackId)) return false;
+  if (project.tracks.filter((x) => x.kind === t.kind).length <= 1) return false;
+  project.tracks = project.tracks.filter((x) => x.id !== trackId);
+  return true;
+}
+
 export function addTrack(project, kind) {
   const same = project.tracks.filter((t) => t.kind === kind);
   const name = `${kind === 'video' ? 'V' : 'A'}${same.length + 1}`;

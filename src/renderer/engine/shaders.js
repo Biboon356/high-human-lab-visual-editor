@@ -195,7 +195,7 @@ vec4 effect(vec2 uv){
   return emit(c.rgb + acc*u_intensity, c.a);
 }`),
   veins: wrap(`
-uniform float u_mode, u_origin, u_growth, u_density, u_thickness, u_warp, u_flow, u_glow, u_seed, u_mix;
+uniform float u_mode, u_origin, u_growth, u_density, u_thickness, u_warp, u_flow, u_glow, u_seed, u_mix, u_cling;
 uniform vec3 u_color;
 // ridged, domain-warped noise: 1 on the crest of a vein, falling off to 0 either side
 float vfield(vec2 p, float t){
@@ -212,6 +212,11 @@ vec4 effect(vec2 uv){
   vec2 p = vec2(uv.x*asp, uv.y)*u_density*1.6;
   float t = u_time*.05*u_flow;
   float f = vfield(p, t);
+  if(u_cling > .001){                                  // veins are drawn to the picture's own edges, so they read as part of the scene
+    vec2 px1 = 1.5/u_res;
+    float e = length(vec2(luma(src(uv+vec2(px1.x,0.)).rgb)-luma(src(uv-vec2(px1.x,0.)).rgb), luma(src(uv+vec2(0.,px1.y)).rgb)-luma(src(uv-vec2(0.,px1.y)).rgb)))*3.2;
+    f = max(f, u_cling*smoothstep(.04, .35, e)*(.55 + .45*vnoise(p*2.+t)) * 1.15);
+  }
   // growth front: a distance field from the chosen origin, roughened so it creeps rather than wipes
   float d;
   int o = int(u_origin + .5);
@@ -244,6 +249,242 @@ vec4 effect(vec2 uv){
     outc = c.rgb*(1.-line*.92) + u_color*edge*u_glow*.8*(.6+.4*pulse);
   }
   return emit(mix(c.rgb, outc, u_mix), c.a);
+}`),
+  dither: wrap(`
+uniform float u_palette, u_levels, u_size, u_mix;
+uniform vec3 u_ink, u_paper;
+float bayer8(vec2 p){
+  vec2 q = floor(mod(p, 8.)); float v = 0.;
+  for(int i=0;i<3;i++){
+    vec2 b = mod(floor(q/exp2(float(i))), 2.);
+    float m = b.x < .5 ? (b.y < .5 ? 0. : 3.) : (b.y < .5 ? 2. : 1.);
+    v = v*4. + m;
+  }
+  return (v+.5)/64.;
+}
+vec3 pal(float t){
+  if(u_palette < .5) return vec3(t);
+  if(u_palette < 1.5){
+    vec3 a = vec3(.059,.22,.059), b = vec3(.188,.384,.188), c = vec3(.545,.675,.059), d = vec3(.608,.737,.059);
+    return t < .333 ? mix(a,b,t*3.) : t < .666 ? mix(b,c,(t-.333)*3.) : mix(c,d,(t-.666)*3.);
+  }
+  if(u_palette < 2.5) return mix(vec3(.05,.02,0.), vec3(1.,.69,0.), t);
+  return mix(u_ink, u_paper, t);
+}
+vec4 effect(vec2 uv){
+  vec4 c = src(uv);
+  vec2 cell = floor(gl_FragCoord.xy/max(1., u_size*(u_res.y/1080.)));
+  float th = bayer8(cell) - .5;
+  float L = max(2., u_levels) - 1.;
+  vec3 outc;
+  if(u_palette > 3.5){
+    outc = floor((c.rgb + th/L)*L + .5)/L;
+  } else {
+    float q = floor((luma(c.rgb) + th/L)*L + .5)/L;
+    outc = pal(clamp(q,0.,1.));
+  }
+  return emit(mix(c.rgb, outc, u_mix), c.a);
+}`),
+  holo: wrap(`
+uniform float u_strength, u_scale, u_angle, u_warp, u_shimmer, u_pastel, u_sparkle;
+vec4 effect(vec2 uv){
+  vec4 c = src(uv);
+  float asp = u_res.x/u_res.y;
+  vec2 p = vec2(uv.x*asp, uv.y);
+  float a = radians(u_angle);
+  vec2 dir = vec2(cos(a), sin(a));
+  float l = luma(c.rgb);
+  float w = fbm(p*1.7 + u_time*u_shimmer*.4) - .5;
+  float h = dot(p, dir)*u_scale + w*u_warp*2.2 + l*1.6 + u_time*u_shimmer;
+  vec3 foil = .5 + .5*cos(6.28318*(fract(h) + vec3(0., .33, .67)));
+  foil = mix(foil, vec3(1.), u_pastel*.55);
+  float mids = 1. - abs(l*2.-1.)*.7;                 // foil reads strongest in the mid-tones, like real film
+  float body = .35 + .65*smoothstep(.02, .3, l);      // black stays mostly black; foil lives on the picture
+  vec3 outc = c.rgb + ((foil - .5)*u_strength*(.35 + .9*mids) + foil*u_strength*.15*smoothstep(.5,1.,l))*body;
+  float sp = hash12(floor(gl_FragCoord.xy/2.) + floor(u_time*8.));
+  outc += u_sparkle*step(.9975, sp)*foil*1.5*(.4+l);
+  return emit(outc, c.a);
+}`),
+  kaleido: wrap(`
+uniform float u_segments, u_rotation, u_spin, u_zoom, u_cx, u_cy, u_mix;
+vec4 effect(vec2 uv){
+  float asp = u_res.x/u_res.y;
+  vec2 p = (uv - vec2(u_cx,u_cy))*vec2(asp,1.);
+  float r = length(p);
+  float a = atan(p.y, p.x) + radians(u_rotation + u_spin*u_time);
+  float seg = 6.28318/max(2., floor(u_segments + .5));
+  a = abs(mod(a, seg) - seg*.5);                     // fold into one mirrored wedge
+  vec2 q = vec2(cos(a), sin(a))*r/max(.05, u_zoom);
+  vec2 s = vec2(q.x/asp, q.y) + vec2(u_cx,u_cy);
+  s = abs(mod(s + 1., 2.) - 1.);                     // mirror-repeat so the sample never leaves the frame
+  vec4 c = src(uv), k = src(s);
+  return emit(mix(c.rgb, k.rgb, u_mix), c.a);
+}`),
+  spores: wrap(`
+uniform float u_density, u_size, u_speed, u_glow, u_flicker, u_lit;
+uniform vec3 u_color;
+vec3 layer(vec2 p, float depth, float t){
+  float sc = mix(5., 15., depth)*u_density;           // far layers: many small dots; near: few big soft ones
+  vec2 q = p*sc + vec2(depth*17., -t*(.15+depth*.5));
+  vec2 id = floor(q), f = fract(q);
+  vec3 acc = vec3(0.);
+  for(int j=-1;j<=1;j++) for(int i=-1;i<=1;i++){
+    vec2 g = vec2(float(i), float(j)), cid = id + g;
+    vec2 h = hash22(cid + depth*31.);
+    float ph = hash12(cid*1.7 + depth);
+    vec2 pos = g + .5 + (h-.5)*.7 + .18*vec2(sin(t*.9+ph*40.), cos(t*.7+ph*30.));
+    float r = (.05 + .09*h.x)*u_size*mix(.7, 2.2, depth);
+    float d = length(f - pos);
+    float soft = mix(.35, 1.3, depth);
+    float tw = 1. - u_flicker*(.5+.5*sin(t*(2.+ph*4.) + ph*50.));
+    float on = step(.45, hash12(cid + 9.1*depth));     // only some cells hold a spore
+    acc += on*tw*exp(-pow(d/(r*soft), 2.))*vec3(1.) * (.4+.6*h.y);
+  }
+  return acc;
+}
+vec4 effect(vec2 uv){
+  vec4 c = src(uv);
+  float asp = u_res.x/u_res.y, t = u_time*u_speed*3.;
+  vec2 p = vec2(uv.x*asp, uv.y);
+  vec3 s = layer(p, 0., t)*.7 + layer(p, .5, t)*.9 + layer(p, 1., t);
+  float lit = mix(1., .25 + 1.6*luma(c.rgb), u_lit);   // spores catch the light that is already in the picture
+  vec3 outc = c.rgb + s*u_color*u_glow*.55*lit;
+  return emit(outc, c.a);
+}`),
+  cells: wrap(`
+uniform float u_scale, u_lens, u_edge, u_glow, u_nucleus, u_drift, u_mix;
+uniform vec3 u_color;
+vec3 voro(vec2 p, float t){                            // returns F1, F2 and a cell id
+  vec2 i = floor(p), f = fract(p);
+  float d1 = 9., d2 = 9.; vec2 c1 = vec2(0.);
+  for(int j=-1;j<=1;j++) for(int k=-1;k<=1;k++){
+    vec2 g = vec2(float(k), float(j));
+    vec2 o = hash22(i + g);
+    o = .5 + .5*sin(t*u_drift + 6.2831*o);
+    vec2 r = g + o - f;
+    float d = dot(r, r);
+    if(d < d1){ d2 = d1; d1 = d; c1 = r; } else if(d < d2) d2 = d;
+  }
+  return vec3(sqrt(d1), sqrt(d2), hash12(c1*13.7+i));
+}
+vec4 effect(vec2 uv){
+  vec4 c0 = src(uv);
+  float asp = u_res.x/u_res.y;
+  vec2 p = vec2(uv.x*asp, uv.y)*u_scale;
+  vec2 i = floor(p);
+  vec3 v = voro(p, u_time);
+  // pull the picture toward each cell's centre: every cell is a little lens
+  vec2 e = vec2(.02, 0.);
+  vec2 grad = vec2(voro(p+e.xy, u_time).x - voro(p-e.xy, u_time).x, voro(p+e.yx, u_time).x - voro(p-e.yx, u_time).x)/(2.*e.x);
+  vec2 s = uv - grad*u_lens*.035*vec2(1./asp, 1.)*(1.+.0*v.z);
+  vec3 col = src(s).rgb;
+  float edge = 1. - smoothstep(0., u_edge*2., v.y - v.x);
+  float rim = smoothstep(.25, .75, v.x);               // cells are slightly darker toward their wall
+  col *= 1. - .18*rim*u_lens;
+  col += u_color*edge*u_glow*(.5 + .5*luma(col)*1.6);
+  float nuc = 1. - smoothstep(.04, .13, v.x);
+  col = mix(col, col*.55 + u_color*.35, nuc*u_nucleus*step(.5, v.z));
+  return emit(mix(c0.rgb, col, u_mix), c0.a);
+}`),
+  hud: wrap(`
+uniform float u_style, u_scale, u_rec, u_timecode, u_grid;
+uniform vec3 u_color, u_alert;
+float box(vec2 p, vec2 c, vec2 h){ vec2 d = abs(p - c) - h; return 1. - smoothstep(-.6, .6, max(d.x, d.y)); }
+// 7-segment digit: bits a(top) b c d e f g(mid), drawn from boxes in a 6x10 cell
+float seg7(vec2 p, int n){
+  int m = n==0?63 : n==1?6 : n==2?91 : n==3?79 : n==4?102 : n==5?109 : n==6?125 : n==7?7 : n==8?127 : 111;
+  float v = 0.;
+  if((m&1)!=0)  v = max(v, box(p, vec2(3.,9.),  vec2(2.4,.7)));
+  if((m&2)!=0)  v = max(v, box(p, vec2(5.5,7.),  vec2(.7,2.)));
+  if((m&4)!=0)  v = max(v, box(p, vec2(5.5,3.),  vec2(.7,2.)));
+  if((m&8)!=0)  v = max(v, box(p, vec2(3.,1.),  vec2(2.4,.7)));
+  if((m&16)!=0) v = max(v, box(p, vec2(.5,3.),  vec2(.7,2.)));
+  if((m&32)!=0) v = max(v, box(p, vec2(.5,7.),  vec2(.7,2.)));
+  if((m&64)!=0) v = max(v, box(p, vec2(3.,5.),  vec2(2.4,.7)));
+  return v;
+}
+float glyph(vec2 p, int g){                              // R, E, C as 5x7 bitmaps (one int per row, bit 4 = left)
+  if(p.x < 0. || p.x >= 5. || p.y < 0. || p.y >= 7.) return 0.;
+  int row = 6 - int(floor(p.y)), col = 4 - int(floor(p.x));
+  int r;
+  if(g==0){ int R[7] = int[7](30,17,17,30,20,18,17); r = R[row]; }
+  else if(g==1){ int E[7] = int[7](31,16,16,30,16,16,31); r = E[row]; }
+  else { int C[7] = int[7](14,17,16,16,16,17,14); r = C[row]; }
+  return float((r >> col) & 1);
+}
+float digits(vec2 p, float val, int count){            // right-aligned run of digits, 8 units per digit
+  float v = 0.;
+  for(int k=0;k<4;k++){
+    if(k >= count) break;
+    float place = pow(10., float(count-1-k));
+    int dgt = int(mod(floor(val/place), 10.));
+    v = max(v, seg7(p - vec2(float(k)*8., 0.), dgt));
+  }
+  return v;
+}
+vec4 effect(vec2 uv){
+  vec4 c = src(uv);
+  float k = (u_res.y/1080.)*u_scale;
+  vec2 P = (gl_FragCoord.xy)/k;                         // pixel space of a 1080p frame, y up
+  vec2 R = u_res/k;
+  vec3 col = vec3(0.); float a = 0.;
+  float m = 60., arm = 70., th = 2.5;
+  // corner brackets
+  for(int ix=0;ix<2;ix++) for(int iy=0;iy<2;iy++){
+    vec2 corner = vec2(ix==0 ? m : R.x-m, iy==0 ? m : R.y-m);
+    vec2 sx = vec2(ix==0 ? 1. : -1., iy==0 ? 1. : -1.);
+    a = max(a, box(P, corner + vec2(sx.x*arm*.5, 0.), vec2(arm*.5, th)));
+    a = max(a, box(P, corner + vec2(0., sx.y*arm*.5), vec2(th, arm*.5)));
+  }
+  vec2 mid = R*.5;
+  if(u_style < 1.5){
+    // centre focus frame + cross ticks
+    float ft = 1.;
+    if(u_style > .5) ft = 2.;
+    float fs = u_style < .5 ? 46. : 90.;
+    vec2 d = abs(P - mid);
+    float frame = u_style < .5 ? step(max(d.x,d.y), fs+th)*step(fs-th, max(d.x,d.y)) * step(min(d.x,d.y), fs*.35) : 0.;
+    a = max(a, frame);
+    a = max(a, box(P, mid, vec2(12., th*.5))*step(u_style, .5)); a = max(a, box(P, mid, vec2(th*.5, 12.))*step(u_style, .5));
+    if(u_style > .5){                                    // target lock: rotating square with notches and range ticks
+      float rot = u_time*.8;
+      vec2 q = mat2(cos(rot), -sin(rot), sin(rot), cos(rot))*(P - mid);
+      vec2 dq = abs(q);
+      float sq = step(max(dq.x,dq.y), fs+th)*step(fs-th, max(dq.x,dq.y))*step(min(dq.x,dq.y), fs*.55);
+      a = max(a, sq);
+      a = max(a, box(P, mid, vec2(26., th*.5))*.9); a = max(a, box(P, mid, vec2(th*.5, 26.))*.9);
+      for(int t=0;t<5;t++) a = max(a, box(P, vec2(R.x-m-8., mid.y - 80. + float(t)*40.), vec2(float(t==2?18:10), 1.5)));
+    }
+  }
+  // thirds grid (faint)
+  float g = 0.;
+  for(int t=1;t<3;t++){
+    g = max(g, box(P, vec2(R.x*float(t)/3., R.y*.5), vec2(.7, R.y*.5)));
+    g = max(g, box(P, vec2(R.x*.5, R.y*float(t)/3.), vec2(R.x*.5, .7)));
+  }
+  col = u_color*a;
+  vec3 outc = c.rgb + col + u_color*g*u_grid;
+  if(u_style < 1.5){
+    float blink = step(.5, fract(u_time*.9));
+    if(u_rec > .5){                                      // REC dot (blinking) or PLAY triangle
+      vec2 rp = vec2(m + 6., R.y - m - 40.);
+      float dot_ = (1. - smoothstep(13., 15., length(P - rp - vec2(14.,14.))))*blink;
+      outc = mix(outc, u_alert, dot_);
+      float bars = 0.;                                    // 'REC' in a 5x7 pixel face
+      vec2 gp = (P - (rp + vec2(40., 2.)))/4.2;
+      bars = max(glyph(gp, 0), max(glyph(gp - vec2(6.,0.), 1), glyph(gp - vec2(12.,0.), 2)));
+      outc = mix(outc, u_color, bars);
+    }
+    if(u_timecode > .5){                                  // MM:SS:FF counting up with the clip's own time
+      float t = u_time, mm = floor(t/60.), ss = floor(mod(t,60.)), ff = floor(fract(t)*30.);
+      vec2 o = vec2(R.x - m - 6.*8. - 7.*8. - 30., R.y - m - 34.);
+      vec2 q = (P - o)/1.55;
+      float dg = max(digits(q, mm, 2), max(digits(q - vec2(24.,0.), ss, 2), digits(q - vec2(48.,0.), ff, 2)));
+      dg = max(dg, max(box(q, vec2(19.,6.), vec2(.9,.9)), max(box(q, vec2(19.,3.5), vec2(.9,.9)), max(box(q, vec2(43.,6.), vec2(.9,.9)), box(q, vec2(43.,3.5), vec2(.9,.9))))));
+      outc = mix(outc, u_color, dg);
+    }
+  }
+  return emit(outc, c.a);
 }`),
   film: wrap(`
 uniform float u_grain, u_halation, u_contrast, u_lift, u_vignette, u_weave;
