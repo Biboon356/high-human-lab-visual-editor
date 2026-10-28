@@ -3,7 +3,7 @@ import { createClip, defaultProps } from './project.js';
 import { createEffect } from './effects-defs.js';
 
 export const FONTS = [
-  'Pinyon Script', 'Instrument Serif', 'Inter Tight', 'DM Mono', 'Helvetica Neue', 'Arial Black', 'Impact', 'Futura', 'Courier New', 'Menlo', 'Consolas',
+  'DotGothic16', 'Zen Antique', 'Dela Gothic One', 'Michroma', 'Orbitron', 'Press Start 2P', 'UnifrakturCook', 'Pirata One', 'Pinyon Script', 'Instrument Serif', 'Inter Tight', 'DM Mono', 'Helvetica Neue', 'Arial Black', 'Impact', 'Futura', 'Courier New', 'Menlo', 'Consolas',
   'Georgia', 'Times New Roman', 'Didot', 'Bodoni 72', 'Baskerville', 'Playfair Display', 'Hiragino Sans', 'Yu Gothic', 'Noto Sans JP', 'sans-serif', 'serif', 'monospace',
 ];
 
@@ -44,7 +44,9 @@ export function defaultText() {
     bg: { enabled: false, color: '#1c4d33', pad: 0.25 },
     anim: { type: 'none', duration: 1, speed: 1 },
     // premium finish: 0..1 strengths (split = RGB fringe, shadow/glow = depth), optional vertical gradient fill
-    fx: { split: 0, shadow: 0, glow: 0, gradient: false, grad1: '#ffffff', grad2: '#7d8f85' },
+    fx: { split: 0, shadow: 0, glow: 0, gradient: false, grad1: '#ffffff', grad2: '#7d8f85', gradStops: null },
+    vertical: false, colSpacing: 1.35, // tategaki (upright columns, right to left) for Japanese
+    outline2: null, // { width, color }: a second, wider rim outside the outline (sticker / bubble chrome)
   };
 }
 
@@ -60,6 +62,40 @@ export const TEXT_PRESETS = [
     { content: 'IN', font: 'Instrument Serif', weight: 400, size: 0.06, uppercase: true, color: '#ff3a6e',
       anim: { type: 'fade', duration: 0.5, speed: 1 }, fx: { shadow: 0.4 } },
     { x: 0.03, y: 0.15, tracking: 0.18 }),
+  // ---- niche pack: Japanese, Y2K chrome, techno, pixel, blackletter, digicam ----
+  mk('Cyber Katakana (pixel)',
+    { content: 'サイバー・シティ', font: 'DotGothic16', weight: 400, size: 0.11, fit: 0.86, color: '#a8ffe0', strokeWidth: 0, anim: { type: 'typewriter', duration: 1.4, speed: 1 }, fx: { glow: 0.85, split: 0.35, shadow: 0.2 } },
+    { tracking: 0.08 }, [createEffect('crt', { scan: 0.3, curve: 0.03 })]),
+  mk('Tokyo Vertical (mincho)',
+    { content: '東京\n夜行', font: 'Zen Antique', weight: 400, size: 0.085, vertical: true, colSpacing: 1.5, lineHeight: 1.12, color: '#f4efe3', anim: { type: 'fade', duration: 1.2, speed: 1 }, fx: { shadow: 0.55, glow: 0.12 } },
+    { x: 0.32 }),
+  mk('Y2K Chrome Bubble',
+    { content: 'FUTURE\nPROOF', font: 'Dela Gothic One', weight: 400, size: 0.16, fit: 0.84, uppercase: true, lineHeight: 0.98, color: '#dfe9ff', strokeWidth: 0.02, strokeColor: '#16226b',
+      outline2: { width: 0.05, color: '#f2f6ff' }, anim: { type: 'slam', duration: 0.6, speed: 1 },
+      fx: { gradient: true, gradStops: [[0, '#ffffff'], [0.4, '#92b8ff'], [0.5, '#1c2e80'], [0.53, '#d6e6ff'], [0.78, '#6f93e6'], [1, '#ffffff']], shadow: 0.9, glow: 0.45 } },
+    { tracking: -0.02 }, [createEffect('bloom', { intensity: 0.45, threshold: 0.55 })]),
+  mk('Techno Spec Sheet',
+    { content: 'SYS//ORGANIC  v2.00\nSIGNAL 98.6 — LAT 35.68N', font: 'Michroma', weight: 400, size: 0.03, align: 'left', uppercase: true, color: '#f2f2ee', lineHeight: 1.7,
+      anim: { type: 'typewriter', duration: 1.8, speed: 1 }, fx: { shadow: 0.3 } },
+    { x: -0.2, y: 0.4, tracking: 0.14 }),
+  mk('Pixel Dialog',
+    { content: 'PRESS START', font: 'Press Start 2P', weight: 400, size: 0.045, color: '#ffffff', bg: { enabled: true, color: '#0d0d2b', pad: 0.9 }, strokeWidth: 0, anim: { type: 'strobe', duration: 1, speed: 0.5 }, fx: { shadow: 0 } },
+    { y: -0.3 }),
+  mk('Gothic Drop (blackletter)',
+    { content: 'Night Garden', font: 'UnifrakturCook', weight: 700, size: 0.17, fit: 0.84, color: '#f6f1e7', strokeWidth: 0, anim: { type: 'fade', duration: 1.1, speed: 1 }, fx: { shadow: 0.7, glow: 0.35 } },
+    { tracking: 0.01 }, [createEffect('film', { grain: 0.3, halation: 0.45 })]),
+  mk('Pirata Poster',
+    { content: 'NO REST\nFOR THE WICKED', font: 'Pirata One', weight: 400, size: 0.13, fit: 0.88, uppercase: true, lineHeight: 0.92, color: '#ffffff', strokeWidth: 0, anim: { type: 'stutter', duration: 0.7, speed: 1 }, fx: { split: 0.4, shadow: 0.5 } },
+    { tracking: 0.02 }),
+  mk('Orbitron Loading (Y2K)',
+    { content: 'LOADING... 99%', font: 'Orbitron', weight: 900, size: 0.05, uppercase: true, color: '#8fd3ff', strokeWidth: 0, anim: { type: 'flicker', duration: 1, speed: 0.6 }, fx: { glow: 0.9, split: 0.25 } },
+    { tracking: 0.4, y: -0.34 }),
+  mk('Digicam Date Stamp',
+    { content: '\u201902 10 27   18:46', font: 'Orbitron', weight: 500, size: 0.034, align: 'right', color: '#ff9a1f', anim: { type: 'none', duration: 1, speed: 1 }, fx: { glow: 0.35, shadow: 0.35 } },
+    { x: 0.24, y: -0.4, tracking: 0.1 }),
+  mk('REC Overlay',
+    { content: '\u25CF REC  00:00:12', font: 'Orbitron', weight: 500, size: 0.035, align: 'left', color: '#ff3b3b', anim: { type: 'strobe', duration: 1, speed: 0.35 }, fx: { glow: 0.4 } },
+    { x: -0.3, y: 0.4, tracking: 0.12 }),
   mk('Hollow Glitch Block',
     { content: 'ROCKY', font: 'Arial Black', weight: 900, size: 0.3, fit: 0.92, uppercase: true, color: '#ffffff', hollow: true, fillAlpha: 0.12, strokeWidth: 0.012, strokeColor: '#ffffff',
       anim: { type: 'stutter', duration: 0.6, speed: 1 }, fx: { split: 0.55 } },
@@ -136,11 +172,25 @@ export function createTextClip(preset, start, duration = 4) {
   });
 }
 
+/** Kicker + title pairs. Each side names a preset and the text to put in it (kicker also carries position overrides). */
+export const LOCKUPS = [
+  { name: 'Rose script', kicker: { preset: 'Script Kicker (small caps)', text: 'IN' }, title: { preset: 'Script Title (rose)', text: 'Moore Next Door' } },
+  { name: 'Y2K × 日本語', kicker: { preset: 'Cyber Katakana (pixel)', text: 'サイバー・ガーデン', size: 0.04, fit: 0.5, y: 0.17 }, title: { preset: 'Y2K Chrome Bubble', text: 'CYBER\nGARDEN', y: -0.02 } },
+  { name: 'Gothic × 明朝', kicker: { preset: 'Tokyo Vertical (mincho)', text: '夜の庭', vertical: false, size: 0.045, x: 0, y: 0.17, tracking: 0.35 }, title: { preset: 'Gothic Drop (blackletter)', text: 'Night Garden', y: -0.02 } },
+  { name: 'Techno spec', kicker: { preset: 'Techno Spec Sheet', text: 'SYSTEM // 01', align: 'center', x: 0, y: 0.15, size: 0.03 }, title: { preset: 'Orbitron Loading (Y2K)', text: 'ORGANIC OS', size: 0.12, fit: 0.82, y: 0, tracking: 0.12, color: '#e9f4ff', anim: 'fade' } },
+];
+
 /** The two-line title card from the editorial reference: kicker above, script title below. Returns [kicker, title] (not yet on a track). */
-export function createTitleLockup(start, duration = 4, { kicker = 'IN', title = 'Moore Next Door' } = {}) {
-  const find = (n) => TEXT_PRESETS.find((p) => p.name === n);
-  const k = createTextClip(find('Script Kicker (small caps)'), start, duration), t = createTextClip(find('Script Title (rose)'), start, duration);
-  k.text.content = kicker; k.name = `Kicker · ${kicker}`;
-  t.text.content = title; t.name = `Title · ${title}`;
-  return [k, t];
+export function createTitleLockup(start, duration = 4, { lockup = 'Rose script', kicker, title } = {}) {
+  const L = LOCKUPS.find((x) => x.name === lockup) || LOCKUPS[0];
+  const build = (side, override, label) => {
+    const c = createTextClip(TEXT_PRESETS.find((p) => p.name === side.preset), start, duration);
+    const text = override ?? side.text;
+    c.text.content = text; c.name = `${label} · ${text.replace(/\n/g, ' ')}`;
+    for (const k of ['size', 'fit', 'vertical', 'align', 'color']) if (side[k] !== undefined) c.text[k] = side[k];
+    if (side.anim) c.text.anim = { ...c.text.anim, type: side.anim };
+    for (const k of ['x', 'y', 'tracking']) if (side[k] !== undefined) c.props[k] = side[k];
+    return c;
+  };
+  return [build(L.kicker, kicker, 'Kicker'), build(L.title, title, 'Title')];
 }

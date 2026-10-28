@@ -75,6 +75,7 @@
         <button data-tab="media" class="on"><i>01</i>Media</button>
         <button data-tab="type"><i>02</i>Type</button>
         <button data-tab="organic"><i>03</i>Organic</button>
+        <button data-tab="looks"><i>04</i>Looks</button>
       </nav>
       <section data-pane="media" class="pane on">
         <header class="pane-head"><h2>Library</h2><span>Footage, sound, stills</span></header>
@@ -84,13 +85,21 @@
       <section data-pane="type" class="pane">
         <header class="pane-head"><h2>Typography</h2><span>Lettering as material</span></header>
         <div class="pane-actions"><button id="add-text"><svg class="ic"><use href="#i-plus"/></svg>Text clip</button><button id="add-lockup" title="Small serif kicker over a script title — the editorial title card"><svg class="ic"><use href="#i-plus"/></svg>Title lockup</button></div>
+        <div id="lockup-list" class="preset-list lockups"></div>
         <p class="hint pad">Presets add a text clip at the playhead.</p>
         <div id="text-presets" class="preset-list"></div>
       </section>
       <section data-pane="organic" class="pane">
         <header class="pane-head"><h2>Organic</h2><span>Roots, mycelium, terrain</span></header>
-        <p class="hint pad">Procedural generators render live in the compositor. Add one, then shape it in the inspector.</p>
+        <p class="hint pad">Grown on your footage: an adjustment layer whose veins take light from the picture and bend it. Drag its edges to cover a section.</p>
+        <div id="organic-looks" class="preset-list"></div>
+        <p class="hint pad sub">Stand-alone generators — roots, mycelium and terrain drawn as their own layer.</p>
         <div id="gen-presets" class="preset-list"></div>
+      </section>
+      <section data-pane="looks" class="pane">
+        <header class="pane-head"><h2>Looks</h2><span>Y2K, grade the whole frame</span></header>
+        <p class="hint pad">An adjustment layer grades everything under it. Drag its edges on the timeline to cover a section; lower its opacity to blend.</p>
+        <div id="look-list" class="preset-list"></div>
       </section>
     </aside>
 

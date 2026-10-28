@@ -103,7 +103,7 @@ export function drawTextClip(ctx, W, H, clip, t, p) {
   if (alpha <= 0.001 || !content) return;
 
   let px0 = T.size * H * scale;
-  if (T.fit > 0) { // size the text so its widest line spans `fit` of the frame width, whatever the aspect ratio
+  if (T.fit > 0 && !T.vertical) { // size the text so its widest line spans `fit` of the frame width, whatever the aspect ratio
     ctx.save();
     ctx.font = fontString(T, 100); ctx.letterSpacing = `${p.tracking * 100}px`;
     const full = (T.uppercase ? T.content.toUpperCase() : T.content).split('\n');
@@ -121,11 +121,19 @@ export function drawTextClip(ctx, W, H, clip, t, p) {
   ctx.lineJoin = 'round';
   ctx.globalAlpha = Math.min(1, alpha);
 
-  const lines = content.split('\n');
+  let lines = content.split('\n');
   const lh = T.lineHeight * px;
+  let vpos = null, vcols = 0, vrows = 0;
+  const colGap = (T.colSpacing || 1.35) * px;
+  if (T.vertical) { // tategaki: every character is its own row, columns run right to left
+    const cols = lines.map((l) => [...l]);
+    vcols = cols.length; vrows = Math.max(1, ...cols.map((c) => c.length));
+    vpos = []; lines = [];
+    cols.forEach((chars, c) => chars.forEach((ch, r) => { lines.push(ch); vpos.push({ x: ((cols.length - 1) / 2 - c) * colGap, y: (r - (chars.length - 1) / 2) * lh }); }));
+  }
   const widths = lines.map((l) => ctx.measureText(l).width);
-  const blockW = Math.max(...widths, 1);
-  const blockH = lines.length * lh;
+  const blockW = vpos ? vcols * colGap : Math.max(...widths, 1);
+  const blockH = vpos ? vrows * lh : lines.length * lh;
 
   let cx = W / 2 + p.x * W + dx;
   if (a.type === 'ticker') {
@@ -142,8 +150,8 @@ export function drawTextClip(ctx, W, H, clip, t, p) {
     ctx.fillStyle = T.bg.color;
     ctx.fillRect(-bw / 2, -blockH / 2 - pad * 0.6, bw, blockH + pad * 1.2);
   }
-  const lineX = (i) => (T.align === 'left' ? -blockW / 2 : T.align === 'right' ? blockW / 2 - widths[i] : -widths[i] / 2);
-  const lineY = (i) => (i - (lines.length - 1) / 2) * lh;
+  const lineX = (i) => (vpos ? vpos[i].x - widths[i] / 2 : T.align === 'left' ? -blockW / 2 : T.align === 'right' ? blockW / 2 - widths[i] : -widths[i] / 2);
+  const lineY = (i) => (vpos ? vpos[i].y : (i - (lines.length - 1) / 2) * lh);
   const baseIndex = lines.map((_, i) => lines.slice(0, i).reduce((n, l) => n + [...l].length, 0));
   const absStart = lines.map((_, i) => lines.slice(0, i).reduce((n, l) => n + l.length + 1, 0)); // offsets into the text incl. newlines
   let fillOverride = null;
@@ -167,7 +175,8 @@ export function drawTextClip(ctx, W, H, clip, t, p) {
   let fill = T.color;
   if (FX.gradient) { // chrome-style vertical gradient with a bright band near the middle
     const g = ctx.createLinearGradient(0, -blockH / 2, 0, blockH / 2);
-    g.addColorStop(0, FX.grad1); g.addColorStop(0.48, FX.grad2); g.addColorStop(0.52, FX.grad1); g.addColorStop(1, FX.grad2);
+    if (Array.isArray(FX.gradStops) && FX.gradStops.length) for (const [at, col] of FX.gradStops) g.addColorStop(at, col); // multi-stop chrome (presets)
+    else { g.addColorStop(0, FX.grad1); g.addColorStop(0.48, FX.grad2); g.addColorStop(0.52, FX.grad1); g.addColorStop(1, FX.grad2); }
     fill = g;
   }
   // karaoke "box" mode: a rounded plate behind the word being spoken
@@ -211,6 +220,7 @@ export function drawTextClip(ctx, W, H, clip, t, p) {
       ctx.lineWidth = sw * px; ctx.strokeStyle = T.strokeColor || T.color; ctx.strokeText(l, x, y);
       return;
     }
+    if (T.outline2?.width > 0) { ctx.lineWidth = (sw + T.outline2.width) * px; ctx.strokeStyle = T.outline2.color; ctx.strokeText(l, x, y); } // sticker / bubble-chrome outer rim
     if (sw > 0) { ctx.lineWidth = sw * px; ctx.strokeStyle = T.strokeColor; ctx.strokeText(l, x, y); }
     ctx.fillStyle = fillOverride || fill;
     ctx.fillText(l, x, y);

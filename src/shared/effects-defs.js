@@ -81,6 +81,34 @@ export const EFFECTS = {
       { key: 'radius', label: 'Radius (px @1080p)', min: 2, max: 120, step: 1, def: 36 },
     ],
   },
+  glints: {
+    label: 'Glints (star sparkle)',
+    params: [
+      { key: 'threshold', label: 'Threshold', min: 0.2, max: 0.98, step: 0.01, def: 0.72 },
+      { key: 'length', label: 'Ray length (px @1080p)', min: 10, max: 400, step: 1, def: 120 },
+      { key: 'intensity', label: 'Intensity', min: 0, max: 3, step: 0.01, def: 1 },
+      { key: 'points', label: 'Rays (2 per line)', min: 1, max: 3, step: 1, def: 2 },
+      { key: 'rotation', label: 'Rotation', min: 0, max: 180, step: 1, def: 0 },
+      { key: 'twinkle', label: 'Twinkle', min: 0, max: 1, step: 0.01, def: 0.5 },
+      { key: 'tint', label: 'Tint', kind: 'color', def: '#cfe3ff' },
+    ],
+  },
+  veins: {
+    label: 'Veins (grows on the image)',
+    params: [
+      { key: 'mode', label: 'Mode', options: ['Glow', 'Refract', 'Invert inside', 'Cutout'], def: 0 },
+      { key: 'origin', label: 'Grows from', options: ['Top', 'Bottom', 'Left', 'Right', 'Center', 'All edges'], def: 5 },
+      { key: 'growth', label: 'Growth', min: 0, max: 1, step: 0.005, def: 1 },
+      { key: 'density', label: 'Density', min: 0.5, max: 8, step: 0.05, def: 2.4 },
+      { key: 'thickness', label: 'Thickness', min: 0.02, max: 0.6, step: 0.005, def: 0.16 },
+      { key: 'warp', label: 'Wander', min: 0, max: 2, step: 0.01, def: 0.9 },
+      { key: 'flow', label: 'Flow / pulse', min: 0, max: 3, step: 0.01, def: 0.5 },
+      { key: 'glow', label: 'Glow / strength', min: 0, max: 2, step: 0.01, def: 0.9 },
+      { key: 'seed', label: 'Seed', min: 0, max: 100, step: 0.1, def: 7 },
+      { key: 'color', label: 'Vein colour', kind: 'color', def: '#7dffb0' },
+      { key: 'mix', label: 'Mix', min: 0, max: 1, step: 0.01, def: 1 },
+    ],
+  },
   film: {
     label: 'Film 35mm',
     params: [
@@ -266,6 +294,7 @@ export function instantiatePreset(preset) {
   return preset.chain.map((e) => {
     const effect = createEffect(e.type, e.params);
     effect.bindings = structuredClone(e.bindings || {});
+    if (e.grow) effect.keyframes.growth = [{ t: 0, v: 0 }, { t: e.grow, v: 1 }]; // grows in over `grow` seconds
     return effect;
   });
 }

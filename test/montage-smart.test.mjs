@@ -107,7 +107,9 @@ test('planSmartMontage: gapless, covers the song, deterministic by seed, differe
 
 test('planSmartMontage: matches shot energy to the music, never straddles a scene cut, avoids repeats and reuse', () => {
   const { segments } = run();
-  const calm = segments.filter((s) => s.energy < 0.3), full = segments.filter((s) => s.energy > 0.8);
+  // the hook and the closing shot are chosen for picture quality, not for matching the bar's energy
+  const plain = segments.filter((s) => s.role === 'cut');
+  const calm = plain.filter((s) => s.energy < 0.3), full = plain.filter((s) => s.energy > 0.8);
   const motionOf = { calm: 0.01, cut: 0.06, wild: 0.12 };
   const meanMotion = (xs) => xs.reduce((a, s) => a + motionOf[s.mediaId], 0) / xs.length;
   assert.ok(meanMotion(full) > meanMotion(calm) + 0.03, `shots in full bars move more (${meanMotion(full).toFixed(3)}) than in calm bars (${meanMotion(calm).toFixed(3)})`);
@@ -167,4 +169,27 @@ test('tempoAnalysis: a steady click is a valid "song" — even beats, flat mediu
   assert.ok(segments.length >= 8);
   assert.ok(Math.abs(segments.at(-1).start + segments.at(-1).duration - 20) < 1e-6);
   segments.forEach((s, i) => { if (i) assert.ok(a.beats.some((b) => Math.abs(b - s.start) < 1e-6), `cut ${s.start} is on the click`); });
+});
+
+test('v2: hook opens, calm shot closes, favourites win, skipped clips are never used, colour match is gentle', async () => {
+  const { planSmartMontage, matchColour, MONTAGE_STYLES } = await import('../src/shared/smart-montage.js');
+  const base = run();
+  assert.equal(base.segments[0].role === 'hook' || base.segments[0].role === 'hero', true);
+  assert.equal(base.segments.at(-1).role, 'outro');
+  assert.equal(base.summary.hook, 1);
+
+  const second = run({ sources: SOURCES().map((s) => (s.id === 'calm' ? { ...s, pick: 'star' } : s)) });
+  const share = (r, id) => r.segments.filter((s) => s.mediaId === id).reduce((a, s) => a + s.duration, 0);
+  assert.ok(share(second, 'calm') > share(base, 'calm'), 'a starred clip gets more screen time');
+
+  const skipped = run({ sources: SOURCES().map((s) => (s.id === 'wild' ? { ...s, pick: 'skip' } : s)) });
+  assert.ok(!skipped.segments.some((s) => s.mediaId === 'wild'));
+  assert.equal(skipped.summary.skipped, 1);
+
+  const segs = [{ luma: 0.5, sat: 0.4 }, { luma: 0.52, sat: 0.41 }, { luma: 0.2, sat: 0.4 }, { luma: 0.5, sat: 0.9 }, { luma: 0.5, sat: 0.4 }];
+  matchColour(segs);
+  assert.ok(segs[2].match.brightness > 0 && segs[2].match.brightness <= 0.14, 'a dark shot is lifted, capped');
+  assert.ok(segs[3].match.saturation < 1 && segs[3].match.saturation >= 0.8, 'an over-saturated shot is eased');
+  assert.equal(segs[0].match, undefined, 'shots near the median are left alone');
+  for (const k of ['y2k', 'organic']) assert.ok(MONTAGE_STYLES[k].adjust);
 });

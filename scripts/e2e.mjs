@@ -621,7 +621,9 @@ await step('smart montage with no music: the dialog explains and offers a steady
     return store.project.clips.filter((c) => c.trackId === track.id).sort((a, b) => a.start - b.start).map((c) => ({ s: c.start, d: c.duration })); });
   assert.ok(r.length >= 4, `cuts: ${r.length}`); assert.ok(Math.abs(r.at(-1).s + r.at(-1).d - 10) < 0.05, 'runs for the chosen length');
   for (const c of r.slice(1)) assert.ok(Math.abs(c.s / 0.5 - Math.round(c.s / 0.5)) < 1e-3, `cut at ${c.s} is on the 120 BPM click`);
+  await page.waitForFunction(() => !document.getElementById('mt-run').disabled); // Close is ignored while the run is still finishing
   await ev(() => [...document.querySelectorAll('.modal button')].find((b) => b.textContent === 'Close').click());
+  await page.waitForSelector('#montage-modal', { state: 'detached' });
 });
 
 await step('cross-dissolve mixes the two pictures (and undoes in one step); the script title lockup draws in the bundled font', async () => {
@@ -660,6 +662,118 @@ await step('cross-dissolve mixes the two pictures (and undoes in one step); the 
   const pink = await ev(() => { const d = window.__grab(96, 54); let n = 0; for (let i = 0; i < d.length; i += 3) if (d[i] > 180 && d[i + 1] < 110 && d[i + 2] > 40 && d[i + 2] < 190) n++; return n; });
   assert.ok(pink > 25, `the pink script title is in the picture (${pink} pink cells)`);
   await shot('19-script-title');
+});
+
+await step('type pack: vertical Japanese runs top-to-bottom in its own font, chrome bubble type renders lit, the lockup list adds two clips', async () => {
+  await resetProject();
+  await ev(() => { window.__app.store.mutate((p) => { p.settings.width = 480; p.settings.height = 270; }); });
+  await page.click('#panel-left [data-tab="type"]');
+  const names = await ev(() => [...document.querySelectorAll('#text-presets button')].map((b) => b.firstChild.textContent));
+  for (const n of ['Tokyo Vertical', 'Y2K Chrome Bubble', 'Cyber Katakana']) assert.ok(names.some((x) => x.startsWith(n)), `preset list has ${n}`);
+  await ev(async () => { await document.fonts.load('40px "Zen Antique"', '東京'); await document.fonts.load('40px "Dela Gothic One"', 'FUTURE'); });
+  const bbox = async (preset, content) => {
+    await ev(async ([n, words]) => { const { store } = window.__app; const TD = await import('/shared/text-defs.js'); const T = await import('/shared/timeline.js');
+      store.mutate((p) => { p.clips = []; const c = TD.createTextClip(TD.TEXT_PRESETS.find((x) => x.name.startsWith(n)), 0, 4); if (words) c.text.content = words; c.text.anim = { ...c.text.anim, type: 'none' }; c.trackId = p.tracks.find((t) => t.kind === 'video').id; T.addClipRaw(p, c); }); store.setPlayhead(2); }, [preset, content]);
+    await settle(700);
+    return ev(() => { const W = 96, H = 54, d = window.__grab(W, H); let x0 = W, x1 = -1, y0 = H, y1 = -1, n = 0;
+      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = (y * W + x) * 3; if (d[i] + d[i + 1] + d[i + 2] > 120) { n++; x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); } }
+      return { n, w: x1 - x0 + 1, h: y1 - y0 + 1 }; });
+  };
+  const v = await bbox('Tokyo Vertical', '東京夜行'); // one column of four characters assert.ok(v.n > 20, `vertical text is drawn (${v.n} cells)`); assert.ok(v.h > v.w * 1.2, `vertical text is taller than wide (${v.w}×${v.h})`);
+  const c = await bbox('Y2K Chrome Bubble'); assert.ok(c.n > 40, `chrome type is drawn (${c.n} cells)`);
+  await shot('24-type-pack');
+  const before = await ev(() => window.__app.store.project.clips.length);
+  await ev(() => document.querySelector('#lockup-list button').click());
+  assert.equal(await ev(() => window.__app.store.project.clips.length), before + 2, 'a lockup adds a kicker and a title clip');
+});
+
+await step('looks: an adjustment layer grades everything under it; glints sparkle; Organic veins grow in from the edge and bend the picture', async () => {
+  await resetProject();
+  await ev(async (c) => { await window.__app.importPaths([c]); const { store } = window.__app; const { addMediaClip } = await import('/shared/timeline.js');
+    store.mutate((p) => { p.settings.width = 480; p.settings.height = 270; addMediaClip(p, p.media[0].id, p.tracks.find((t) => t.kind === 'video').id, 0); }); store.setPlayhead(0.6); }, clip);
+  await settle(700);
+  const grab = () => ev(() => window.__grab(96, 54));
+  const diff = (a, b) => { let s = 0; for (let i = 0; i < a.length; i++) s += Math.abs(a[i] - b[i]); return s / a.length; };
+  const base = await grab();
+  await page.click('#panel-left [data-tab="looks"]');
+  assert.ok((await ev(() => document.querySelectorAll('#look-list button').length)) >= 6, 'the Looks pane lists the Y2K looks');
+  await page.click('#look-list [data-look="Cyber CRT"]'); await settle(700);
+  const st = await ev(() => { const { store } = window.__app; const c = store.project.clips.find((x) => x.type === 'adjust'); const media = store.project.clips.find((x) => x.type === 'media');
+    return { n: store.project.clips.filter((x) => x.type === 'adjust').length, sameTrack: c.trackId === media.trackId, fx: c.effects.map((e) => e.type), selected: store.selection === c.id, card: document.querySelector('#inspector .card h3, #inspector .card-title, #inspector')?.textContent || '' }; });
+  assert.equal(st.n, 1); assert.ok(!st.sameTrack, 'the layer gets its own track'); assert.ok(st.fx.includes('crt'));
+  assert.match(st.card, /Adjustment layer/);
+  const graded = await grab(); assert.ok(diff(base, graded) > 4, `the layer changes the picture beneath it (Δ${diff(base, graded).toFixed(1)})`);
+  await ev(() => { const { store } = window.__app; store.project.clips.find((x) => x.type === 'adjust').props.opacity = 0; store.touch('project'); }); await settle(500);
+  assert.ok(diff(base, await grab()) < 1.5, 'opacity 0 puts the original back');
+  await shot('21-adjustment-layer');
+
+  // glints: a dark frame with a few bright dots gets rays that were not there before
+  const dots = path.join(dir, 'dots.png');
+  sh(FFMPEG, ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'color=c=0x101830:s=480x270,drawbox=x=120:y=80:w=8:h=8:c=white:t=fill,drawbox=x=300:y=150:w=10:h=10:c=white:t=fill', '-frames:v', '1', dots]);
+  await resetProject();
+  await ev(async (d) => { await window.__app.importPaths([d]); const { store } = window.__app; const { addMediaClip } = await import('/shared/timeline.js'); const { createAdjustClip } = await import('/shared/adjust-defs.js'); const { createEffect } = await import('/shared/effects-defs.js');
+    store.mutate((p) => { p.settings.width = 480; p.settings.height = 270; addMediaClip(p, p.media[0].id, p.tracks.find((t) => t.kind === 'video').id, 0); });
+    store.mutate((p) => { const c = createAdjustClip(null, 0, 4); c.effects = []; c.trackId = p.tracks[0].id; p.clips.push(c); }); store.setPlayhead(0.5); }, dots);
+  await settle(500); const lum = (d) => { let n = 0; for (let i = 0; i < d.length; i += 3) n += d[i] + d[i + 1] + d[i + 2]; return n; };
+  const dotsLum = lum(await grab());
+  await ev(async () => { const { createEffect } = await import('/shared/effects-defs.js'); const { store } = window.__app; store.project.clips.find((x) => x.type === 'adjust').effects = [createEffect('glints', { threshold: 0.5, length: 180, intensity: 2, twinkle: 0 })]; store.touch('project'); });
+  await settle(500); const glintLum = lum(await grab());
+  assert.ok(glintLum > dotsLum * 1.03, `glints add light around the highlights (${dotsLum} → ${glintLum})`);
+  await resetProject();
+  await ev(async (c) => { await window.__app.importPaths([c]); const { store } = window.__app; const { addMediaClip } = await import('/shared/timeline.js');
+    store.mutate((p) => { p.settings.width = 480; p.settings.height = 270; addMediaClip(p, p.media[0].id, p.tracks.find((t) => t.kind === 'video').id, 0); }); store.setPlayhead(0.6); }, clip);
+  await settle(500);
+
+  // Organic: veins grow in over time and refract the footage
+  const base2 = await grab();
+  await page.click('#panel-left [data-tab="organic"]');
+  await page.click('#organic-looks [data-look="Veins · Glass"]');
+  const span = await ev(() => { const c = window.__app.store.project.clips.find((x) => x.type === 'adjust'); return { start: c.start, d: c.duration, grow: c.effects[0].keyframes.growth.at(-1).t }; });
+  await ev((t) => window.__app.store.setPlayhead(t), span.start + 0.02); await settle(600); const seedling = await grab();
+  await ev((t) => window.__app.store.setPlayhead(t), span.start + Math.min(span.d - 0.1, span.grow)); await settle(700); const grown = await grab();
+  assert.ok(diff(base2, seedling) < 2, `at the start the veins have not appeared (Δ${diff(base, seedling).toFixed(1)})`);
+  assert.ok(diff(seedling, grown) > 2, `later they have grown over the footage (Δ${diff(seedling, grown).toFixed(1)})`);
+  await shot('22-organic-veins');
+});
+
+await step('montage v2: favourites and skip flags, hook + calm close, Y2K style grades the whole cut, optional title card, footage sound muted, exports', async () => {
+  await resetProject();
+  // regression: asking for an analysis while there is no song yet must not wedge the analysis for good
+  await ev(async ([a, b, c]) => { await window.__app.importPaths([a, b, c]); const { store } = window.__app; const { addMediaClip } = await import('/shared/timeline.js');
+    await window.__app.runAnalysis({ quiet: true });
+    store.mutate((p) => addMediaClip(p, p.media.find((m) => m.kind === 'audio').id, p.tracks.find((t) => t.kind === 'audio').id, 0)); }, [clip, pic, kick]);
+  const nb = await ev(async () => { const a = await window.__app.runAnalysis({ quiet: true }); return a ? a.beats.length : -1; });
+  assert.ok(nb > 4, `the song has beats before the montage (${nb})`);
+  const picName = path.basename(pic);
+  await page.click('#panel-left [data-tab="media"]');
+  await ev((n) => { [...document.querySelectorAll('#media-list .media-item')].find((i) => i.textContent.includes(n)).querySelector('.pick.skip').click(); }, picName);
+  assert.equal(await ev((n) => window.__app.store.project.media.find((m) => m.name === n).pick, picName), 'skip', 'the ⊘ button marks the clip');
+
+  assert.equal(await ev(() => document.querySelectorAll('#media-list .pick').length > 0 && !document.querySelector('#media-list .media-item .k.audio')?.closest('.media-item').querySelector('.pick')), true, 'audio has no flags');
+  await page.click('#tl-montage'); await page.waitForSelector('#montage-modal');
+  await page.click('#montage-modal [data-style="y2k"]');
+  await page.check('#mt-title'); await page.fill('#mt-kicker', 'HIGH HUMAN LAB'); await page.fill('#mt-titletext', 'Night Bloom');
+  await page.click('#mt-run'); await page.waitForSelector('#montage-modal .mt-result .mt-lines, #montage-modal .errbox', { timeout: 90000 });
+  assert.equal(await ev(() => document.querySelector('#montage-modal .errbox')?.textContent || ''), '', 'the montage ran without an error');
+  const text = await ev(() => document.querySelector('#montage-modal .mt-result').textContent);
+  assert.match(text, /strongest shot/); assert.match(text, /adjustment layer: Digicam 2002/); assert.match(text, /1 clip left out/);
+  const r = await ev((n) => { const { store } = window.__app; const P = store.project; const skipped = P.media.find((m) => m.name === n).id;
+    const adj = P.clips.filter((c) => c.type === 'adjust'); const texts = P.clips.filter((c) => c.type === 'text');
+    const cuts = P.clips.filter((c) => c.type === 'media' && P.media.find((m) => m.id === c.mediaId).kind === 'video').sort((a, b) => a.start - b.start);
+    return { skippedUsed: P.clips.some((c) => c.mediaId === skipped), adj: adj.map((c) => ({ s: c.start, d: c.duration })), texts: texts.map((c) => c.text.content), muted: cuts.every((c) => c.volume === 0), vols: cuts.map((c) => c.volume).join(), lastFade: cuts.at(-1).fadeOut, dur: store.analysis.duration, n: cuts.length }; }, picName);
+  assert.equal(r.skippedUsed, false, 'a skipped clip is never used');
+  assert.equal(r.adj.length, 1); assert.ok(Math.abs(r.adj[0].d - r.dur) < 0.1, 'the look covers the whole cut');
+  assert.ok(r.texts.includes('Night Bloom') && r.texts.includes('HIGH HUMAN LAB'), `title card added: ${r.texts}`);
+  assert.ok(r.muted, `the footage sound is muted under the song (${r.vols})`); assert.ok(r.lastFade > 0, 'the closing shot fades out');
+  await page.click('#mt-undo'); await page.waitForTimeout(200);
+  assert.equal(await ev(() => window.__app.store.project.clips.filter((c) => c.type === 'adjust' || c.type === 'text').length), 0, 'one Undo removes the cut, the look and the title');
+  await page.click('#mt-run'); await page.waitForSelector('#montage-modal .mt-result .mt-lines', { timeout: 90000 });
+  const out = path.join(dir, 'montage-v2.mp4'); await ev((o) => window.__app.exportTo(o, { width: 192, height: 108, fps: 10 }), out);
+  const v = probe(out); assert.ok(Math.abs(Number(v.format.duration) - r.dur) < 0.3, 'the Y2K montage exports to the length of the song');
+  await shot('23-montage-y2k');
+  await page.waitForFunction(() => !document.getElementById('mt-run').disabled);
+  await ev(() => [...document.querySelectorAll('.modal button')].find((b) => b.textContent === 'Close').click());
+  await page.waitForSelector('#montage-modal', { state: 'detached' });
 });
 
 await step('in-app updates: a staged update runs from the data folder, a broken or unconfirmed one rolls back, GitHub check stages a verified bundle, a different shell asks for an installer', async () => {

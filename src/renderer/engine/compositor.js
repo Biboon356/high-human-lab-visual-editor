@@ -239,6 +239,12 @@ export class Compositor {
         this._clear(this.fbos.a, 0, 0, 0, 0);
         this._drawLayer(tex, this.w / 2, this.h / 2, 0, 0, 0, 1);
         ready = true;
+      } else if (clip.type === 'adjust') {
+        // adjustment layer: everything composited so far becomes this clip's input; its effects grade the whole stack below
+        this._target(this.fbos.a);
+        gl.disable(gl.BLEND);
+        this._drawLayer(this.fbos.acc.tex, this.w / 2, this.h / 2, 0, 0, 0, 1);
+        ready = true;
       } else if (clip.type === 'generator') {
         this._runGenerator(clip, tl, features, t);
         // generator fills the frame; scale/position don't apply, opacity does

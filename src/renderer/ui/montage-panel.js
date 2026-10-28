@@ -5,12 +5,14 @@ import { runSmartMontage, buildPlan, applyPlan, suggestedSeconds, MONTAGE_STYLES
 import { importResults } from './media-bin.js';
 import { addMediaClip } from '/shared/timeline.js';
 import { audioSources } from '/shared/export-plan.js';
+import { LOCKUPS } from '/shared/text-defs.js';
 import { runAnalysis } from './reactive-ui.js';
 import { autoMontage } from './timeline-ui.js';
 
 const KEY = 'hhlab.montage.opts';
-const loadOpts = () => { try { return { ...MONTAGE_DEFAULTS, ...JSON.parse(localStorage.getItem(KEY) || '{}'), seed: Date.now() % 1e6 }; } catch { return { ...MONTAGE_DEFAULTS, seed: Date.now() % 1e6 }; } };
-const saveOpts = (o) => { try { localStorage.setItem(KEY, JSON.stringify({ style: o.style, intensity: o.intensity, reframe: o.reframe })); } catch { /* storage unavailable */ } };
+// the title card is a per-run choice: never carried over from a previous session
+const loadOpts = () => { try { return { ...MONTAGE_DEFAULTS, ...JSON.parse(localStorage.getItem(KEY) || '{}'), title: false, seed: Date.now() % 1e6 }; } catch { return { ...MONTAGE_DEFAULTS, seed: Date.now() % 1e6 }; } };
+const saveOpts = (o) => { try { localStorage.setItem(KEY, JSON.stringify({ style: o.style, intensity: o.intensity, reframe: o.reframe, match: o.match, muteSource: o.muteSource, lockup: o.lockup })); } catch { /* storage unavailable */ } };
 const SOURCE_COLORS = ['#93b57f', '#b9a8e8', '#d8d36a', '#d9a36a', '#7fb5b0', '#c97f9a'];
 
 let open = false;
@@ -51,6 +53,14 @@ export function openMontageDialog() {
   const reframe = el('input', { type: 'checkbox', checked: !!opts.reframe });
   reframe.addEventListener('change', () => { opts.reframe = reframe.checked; saveOpts(opts); });
 
+  const check = (key, label, id) => { const i = el('input', { type: 'checkbox', checked: !!opts[key], id }); i.addEventListener('change', () => { opts[key] = i.checked; saveOpts(opts); }); return el('label', { class: 'chk ae-chk' }, i, label); };
+  const text = (key, ph, id) => { const i = el('input', { type: 'text', value: opts[key] || '', placeholder: ph, id }); i.addEventListener('input', () => { opts[key] = i.value; saveOpts(opts); }); return i; };
+  const lockupSel = el('select', { id: 'mt-lockup', 'aria-label': 'Title style' }, LOCKUPS.map((L) => el('option', { value: L.name, text: L.name, ...(L.name === opts.lockup ? { selected: true } : {}) })));
+  lockupSel.addEventListener('change', () => { opts.lockup = lockupSel.value; saveOpts(opts); });
+  const titleRow = el('div', { class: 'ae-row', hidden: !opts.title, id: 'mt-title-row' }, el('label', { text: 'Title' }), el('div', { class: 'ae-ctl' }, text('titleKicker', 'kicker', 'mt-kicker'), text('titleText', 'title', 'mt-titletext'), lockupSel));
+  const titleChk = check('title', 'Add a title card at the start (editorial type lockup)', 'mt-title');
+  titleChk.querySelector('input').addEventListener('change', (e) => { titleRow.hidden = !e.target.checked; });
+
   const steps = el('div', { class: 'ae-steps' }), result = el('div');
   const STEP = { audio: 'Analyse the music', footage: 'Look at the footage', music: 'Read the music structure', plan: 'Choose shots', apply: 'Build the timeline' };
   const setStep = (k, t) => {
@@ -80,6 +90,10 @@ export function openMontageDialog() {
       `Music: ${secs}${sm.drops.length ? ` · drop${sm.drops.length > 1 ? 's' : ''} at ${sm.drops.map((d) => `${d.toFixed(1)}s`).join(', ')}` : ''}`,
       `${sm.cuts} cuts, ${sm.avgCut.toFixed(1)} s on average — ${new Set(sm.sections.map((x) => x.label)).size > 1 ? 'slow while the music is calm, rapid on full bars' : 'the music keeps a steady energy, so the cut rate stays even'}, every cut on a beat`,
       `Used ${sm.sourcesUsed} of ${sm.sourcesTotal} clips; best moments picked (sharp, steady, well exposed, no scene change inside a shot)`,
+      sm.hook ? 'Opens on the strongest shot, closes on a calm one that fades out' : null,
+      sm.starred || sm.skipped ? `${sm.starred ? `${sm.starred} favourite${sm.starred > 1 ? 's' : ''} favoured` : ''}${sm.starred && sm.skipped ? ', ' : ''}${sm.skipped ? `${sm.skipped} clip${sm.skipped > 1 ? 's' : ''} left out` : ''}` : null,
+      sm.slowmo ? 'The hero shot at the drop plays in slow motion' : null,
+      sm.adjust ? `Whole cut graded with an adjustment layer: ${sm.adjust}` : null,
       hero ? `Hero shot at ${fmtTime(hero.start).slice(3, 8)}: ${hero.why}` : null,
       sm.unused.length ? `Not used: ${names(sm.unused).join(', ')}` : null,
       prep.failed.length ? `Could not analyse: ${prep.failed.map((f) => f.name).join(', ')} (placed without scoring)` : null,
@@ -146,7 +160,11 @@ export function openMontageDialog() {
     el('div', { class: 'hint', text: hasMusic ? 'Cuts follow the music; shots are chosen from what the footage actually looks like. Everything is analysed on your computer.' : 'No music on the timeline yet — you can add a song, or cut to a steady tempo.' }),
     el('section', { class: 'ae-sec' }, el('h4', { text: 'Style · สไตล์' }), styleBtns,
       el('div', { class: 'ae-row' }, el('label', { text: 'Cut rate' }), el('div', { class: 'ae-ctl' }, el('span', { class: 'hint', text: 'calmer' }), intensity, el('span', { class: 'hint', text: 'frantic' }))),
-      el('label', { class: 'chk ae-chk' }, reframe, 'Crop wide footage to fit the canvas, following the action')),
+      el('label', { class: 'chk ae-chk' }, reframe, 'Crop wide footage to fit the canvas, following the action'),
+      check('match', 'Even out exposure and colour between shots', 'mt-match'),
+      check('muteSource', 'Mute the footage’s own sound (the song is the soundtrack)', 'mt-mute'),
+      titleChk, titleRow,
+      el('div', { class: 'hint', text: 'Tip: ★ a clip in the Library to make it a favourite, ⊘ to keep it out.' })),
     steps, result,
     el('div', { class: 'actions' }, classic, el('span', { class: 'grow' }), cancel, undo, reroll, closeBtn, run));
   open = true;

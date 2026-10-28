@@ -1,8 +1,9 @@
 import { el, toast, fmtTime } from './dom.js';
 import { store } from '../store.js';
 import { addMediaClip, trackEnd, addTrack, overlaps } from '/shared/timeline.js';
-import { createTextClip, createTitleLockup, TEXT_PRESETS } from '/shared/text-defs.js';
+import { createTextClip, createTitleLockup, LOCKUPS, TEXT_PRESETS } from '/shared/text-defs.js';
 import { createGeneratorClip, GEN_PRESETS } from '/shared/organic-defs.js';
+import { createAdjustClip, ADJUST_LOOKS, ORGANIC_LOOKS } from '/shared/adjust-defs.js';
 import { addClipRaw, projectDuration } from '/shared/timeline.js';
 import { uid } from '/shared/project.js';
 
@@ -90,6 +91,30 @@ export function appendToTimeline(mediaId) {
   if (clip) store.select(clip.id);
 }
 
+// an adjustment layer needs a track to itself above the footage it grades, so it never shares a lane with another clip
+function addAdjustLayer(look) {
+  const start = Math.max(0, store.playhead);
+  const rest = projectDuration(store.project) - start;
+  const len = rest >= 1 ? rest : 8; // cover what is left of the cut; an empty timeline gets a default length
+  const clip = store.mutate((p) => {
+    const c = createAdjustClip(look, start, len);
+    const top = p.tracks.find((t) => t.kind === 'video');
+    const t = top && !overlaps(p, top.id, start, len) ? top : addTrack(p, 'video');
+    c.trackId = t.id;
+    return addClipRaw(p, c);
+  });
+  store.select(clip.id);
+  return clip;
+}
+
+// ★ favourite / ⊘ leave out: read by Auto-montage (favourites get more screen time, skipped clips never appear)
+function pickBtn(m, kind) {
+  const on = m.pick === kind;
+  return el('button', { class: `pick ${kind}${on ? ' on' : ''}`, 'data-pick': kind, 'aria-pressed': String(on), text: kind === 'star' ? (on ? '★' : '☆') : '⊘',
+    title: kind === 'star' ? 'Favourite — Auto-montage will use it more' : 'Leave out of Auto-montage',
+    onclick: () => store.mutate((p) => { const x = p.media.find((q) => q.id === m.id); if (x) { if (x.pick === kind) delete x.pick; else x.pick = kind; } }) });
+}
+
 function addOverlayClip(make) {
   const track = store.project.tracks.find((t) => t.kind === 'video'); // top video track
   const clip = store.mutate((p) => {
@@ -111,8 +136,9 @@ export function mountMediaBin({ onImport }) {
         el('div', { class: `k ${m.kind}`, text: m.kind === 'video' ? 'VID' : m.kind === 'audio' ? 'AUD' : 'IMG' }),
         el('div', {}, el('div', { class: 'n', text: m.name }),
           el('div', { class: 'm', text: m.missing ? 'FILE MISSING — relink by re-importing' : [m.kind !== 'image' ? fmtTime(m.duration).replace(/^00:/, '') : '', m.width ? `${m.width}×${m.height}` : '', m.fps ? `${m.fps}fps` : ''].filter(Boolean).join(' · ') })),
-        m.missing ? el('button', { text: 'Relink…', title: 'Choose the file again', onclick: async () => relinkMedia(m.id, await window.hh.pickMedia()) })
-          : el('button', { text: '＋', title: 'Add to timeline at playhead', onclick: () => appendToTimeline(m.id) }));
+        el('div', { class: 'media-acts' },
+          m.missing ? el('button', { text: 'Relink…', title: 'Choose the file again', onclick: async () => relinkMedia(m.id, await window.hh.pickMedia()) })
+            : [...(m.kind === 'audio' ? [] : [pickBtn(m, 'star'), pickBtn(m, 'skip')]), el('button', { text: '＋', title: 'Add to timeline at playhead', onclick: () => appendToTimeline(m.id) })]));
       item.addEventListener('dragstart', (e) => { e.dataTransfer.setData('application/x-hh-media', m.id); e.dataTransfer.effectAllowed = 'copy'; });
       item.addEventListener('dblclick', () => appendToTimeline(m.id));
       list.append(item);
@@ -135,9 +161,9 @@ export function mountMediaBin({ onImport }) {
   const tp = document.getElementById('text-presets');
   for (const p of TEXT_PRESETS) tp.append(el('button', { onclick: () => addOverlayClip((s) => createTextClip(p, s, 4)) }, p.name, el('small', { text: `${p.text.font} · ${p.text.anim?.type || 'static'}` })));
   document.getElementById('add-text').onclick = () => addOverlayClip((s) => createTextClip(null, s, 4));
-  document.getElementById('add-lockup').onclick = () => {
+  const addLockup = (name) => {
     const start = Math.max(0, store.playhead), len = 4;
-    const [kicker, title] = createTitleLockup(start, len);
+    const [kicker, title] = createTitleLockup(start, len, { lockup: name });
     const t = store.mutate((p) => {
       // two clips that share the same time need two tracks: reuse free video tracks from the top, add one if needed
       const free = (avoid) => p.tracks.filter((x) => x.kind === 'video').find((x) => x.id !== avoid && !overlaps(p, x.id, start, len)) || addTrack(p, 'video');
@@ -147,6 +173,13 @@ export function mountMediaBin({ onImport }) {
     });
     store.select(t.id);
   };
+  document.getElementById('add-lockup').onclick = () => addLockup(LOCKUPS[0].name);
+  const ll = document.getElementById('lockup-list');
+  for (const L of LOCKUPS.slice(1)) ll.append(el('button', { 'data-lockup': L.name, title: `Adds two text clips: ${L.kicker.preset} + ${L.title.preset}`, onclick: () => addLockup(L.name) }, L.name, el('small', { text: 'kicker + title' })));
+  const lk = document.getElementById('look-list');
+  for (const L of ADJUST_LOOKS) lk.append(el('button', { 'data-look': L.name, title: L.note, onclick: () => addAdjustLayer(L) }, L.name, el('small', { text: L.note })));
+  const ol = document.getElementById('organic-looks');
+  for (const L of ORGANIC_LOOKS) ol.append(el('button', { 'data-look': L.name, title: L.note, onclick: () => addAdjustLayer(L) }, L.name, el('small', { text: L.note })));
   const gp = document.getElementById('gen-presets');
   for (const p of GEN_PRESETS) gp.append(el('button', { onclick: () => addOverlayClip((s) => createGeneratorClip(p, s, 6)) }, p.name, el('small', { text: `style: ${p.style}` })));
 }

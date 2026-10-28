@@ -79,3 +79,9 @@ Preset: **Xerox Photocopy** (คอนทราสต์สูง + toner noise 
 2. วางไตเติลทับช็อตเปิด (วิวถนน/ตึก) แล้วต่อด้วยช็อตคนพูด
 3. เลือกคลิปที่ต้องการให้ "จางเข้า" แล้วกดปุ่ม **Dissolve** (เลือกความยาว 0.25–1.5 วินาที) — คลิปจะซ้อนทับท้ายคลิปก่อนหน้าและผสมภาพกันจริง Undo ได้ครั้งเดียว
 4. ใช้ซ้ำกับคลิปถัดไปได้ ระบบสลับแทร็กให้เอง (คลิปบนจะจางเข้า/จางออกทับคลิปล่าง)
+
+## สายนิช / Y2K (v0.2.1)
+1. **ตัวอักษร**: แท็บ **Type** → ลองพรีเซ็ต *Y2K Chrome Bubble*, *Tokyo Vertical* (แนวตั้งญี่ปุ่น), *Cyber Katakana*, *Digicam Date Stamp*, *REC Overlay* หรือปุ่ม lockup ใต้ Title lockup (Y2K × 日本語, Gothic × 明朝, Techno spec). ติ๊ก **Vertical** ใน Inspector เพื่อเขียนแนวตั้งกับข้อความอะไรก็ได้
+2. **เกรดทั้งเฟรม**: แท็บ **Looks** → กดลุคเดียวได้ *Adjustment layer* (เลเยอร์ที่ไม่มีภาพ แต่เอฟเฟกต์ของมันครอบทุกอย่างที่อยู่ใต้มัน) ลากขอบบน timeline เพื่อครอบเฉพาะช่วง ลด Opacity เพื่อผสม — ลอง *Digicam 2002*, *Chrome Haze*, *Glints*
+3. **Organic ที่ฝังอยู่ในภาพ**: แท็บ **Organic** → *Veins · Overgrown / Glass / Negative / Burnt Channels / Chrome Nerves / Beat Pulse* เส้นจะงอกจากขอบ/ด้านบน/ตรงกลาง รับแสงและบิดภาพจากฟุตเทจเอง (ปรับ Growth, Density, Thickness, Grows from ในเอฟเฟกต์ *Veins*)
+4. **Auto-montage**: เลือกสไตล์ *Y2K* หรือ *Organic*; กด ★ ที่คลิปใน Library เพื่อให้ใช้บ่อยขึ้น หรือ ⊘ เพื่อไม่เอา; ติ๊ก *Add a title card* เพื่อได้ไตเติลตอนเปิด

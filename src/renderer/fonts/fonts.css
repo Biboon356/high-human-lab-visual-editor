@@ -7,3 +7,13 @@
 @font-face { font-family: "DM Mono"; font-style: normal; font-weight: 400; font-display: swap; src: url(dm-mono-latin-400-normal.woff2) format("woff2"); }
 @font-face { font-family: "DM Mono"; font-style: normal; font-weight: 500; font-display: swap; src: url(dm-mono-latin-500-normal.woff2) format("woff2"); }
 @font-face { font-family: "Pinyon Script"; font-style: normal; font-weight: 400; font-display: swap; src: url(pinyon-script-latin-400-normal.woff2) format("woff2"); }
+/* Y2K / techno / niche display faces (subset: Latin, kana and JIS level-1 kanji for the Japanese ones) */
+@font-face { font-family: "Michroma"; font-weight: 400; font-display: swap; src: url(michroma-400.woff2) format("woff2"); }
+@font-face { font-family: "Orbitron"; font-weight: 500; font-display: swap; src: url(orbitron-500.woff2) format("woff2"); }
+@font-face { font-family: "Orbitron"; font-weight: 900; font-display: swap; src: url(orbitron-900.woff2) format("woff2"); }
+@font-face { font-family: "Press Start 2P"; font-weight: 400; font-display: swap; src: url(press-start-2p-400.woff2) format("woff2"); }
+@font-face { font-family: "UnifrakturCook"; font-weight: 700; font-display: swap; src: url(unifrakturcook-700.woff2) format("woff2"); }
+@font-face { font-family: "Pirata One"; font-weight: 400; font-display: swap; src: url(pirata-one-400.woff2) format("woff2"); }
+@font-face { font-family: "DotGothic16"; font-weight: 400; font-display: swap; src: url(dotgothic16-400.woff2) format("woff2"); }
+@font-face { font-family: "Dela Gothic One"; font-weight: 400; font-display: swap; src: url(dela-gothic-one-400.woff2) format("woff2"); }
+@font-face { font-family: "Zen Antique"; font-weight: 400; font-display: swap; src: url(zen-antique-400.woff2) format("woff2"); }

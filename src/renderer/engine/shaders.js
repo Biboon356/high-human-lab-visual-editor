@@ -165,6 +165,86 @@ vec4 effect(vec2 uv){
   }
   return emit(c.rgb + acc/float(N)*u_intensity*3., c.a);
 }`),
+  glints: wrap(`
+uniform float u_threshold, u_length, u_intensity, u_points, u_rotation, u_twinkle;
+uniform vec3 u_tint;
+vec4 effect(vec2 uv){
+  vec4 c = src(uv);
+  float len = u_length*(u_res.y/1080.);
+  float aspect = u_res.x/u_res.y;
+  vec3 acc = vec3(0.);
+  const int N = 16;
+  for(int l=0;l<3;l++){
+    if(float(l) >= u_points) break;
+    float a = radians(u_rotation) + float(l)*3.14159265/u_points;
+    vec2 dir = vec2(cos(a), sin(a));
+    for(int sgn=0;sgn<2;sgn++){
+      float sg = sgn==0 ? 1. : -1.;
+      for(int i=1;i<=N;i++){
+        float d = pow(float(i)/float(N), 1.6);
+        vec2 q = uv + sg*dir*d*len/u_res;
+        vec3 s = src(q).rgb;
+        float b = max(0., luma(s)-u_threshold)/max(1.-u_threshold, .02);
+        float ph = hash12(floor(q*vec2(26.*aspect, 26.)));
+        float tw = 1. - u_twinkle*(.5+.5*sin(u_time*(3.+ph*5.)+ph*40.));
+        float fall = (1.-d); fall *= fall;
+        acc += b*fall*tw*mix(s, u_tint, .6)/float(N)*2.2;
+      }
+    }
+  }
+  return emit(c.rgb + acc*u_intensity, c.a);
+}`),
+  veins: wrap(`
+uniform float u_mode, u_origin, u_growth, u_density, u_thickness, u_warp, u_flow, u_glow, u_seed, u_mix;
+uniform vec3 u_color;
+// ridged, domain-warped noise: 1 on the crest of a vein, falling off to 0 either side
+float vfield(vec2 p, float t){
+  vec2 q = p + u_seed*3.7;
+  vec2 w = vec2(fbm(q*.7 + vec2(0., t)), fbm(q*.7 + vec2(5.2, 1.3) - vec2(t, 0.)));
+  q += (w-.5)*2.4*u_warp;
+  float big = 1. - abs(2.*fbm(q*.9)-1.);
+  float small = 1. - abs(2.*vnoise(q*3.1+13.)-1.);
+  return max(pow(big, 2.2), .55*pow(small, 3.)*smoothstep(.2,.9,big));
+}
+vec4 effect(vec2 uv){
+  vec4 c = src(uv);
+  float asp = u_res.x/u_res.y;
+  vec2 p = vec2(uv.x*asp, uv.y)*u_density*1.6;
+  float t = u_time*.05*u_flow;
+  float f = vfield(p, t);
+  // growth front: a distance field from the chosen origin, roughened so it creeps rather than wipes
+  float d;
+  int o = int(u_origin + .5);
+  if(o==0) d = 1.-uv.y; else if(o==1) d = uv.y; else if(o==2) d = uv.x; else if(o==3) d = 1.-uv.x;
+  else if(o==4) d = length((uv-.5)*vec2(asp,1.))*1.15;
+  else d = min(min(uv.x,1.-uv.x), min(uv.y,1.-uv.y))*2.;   // all edges: 0 at the frame edge, 1 in the middle
+  float rough = fbm(p*.6+3.1);
+  float reach = u_growth*1.45 - .08;
+  float grown = smoothstep(reach, reach-.22, d + (rough-.5)*.45);
+  float th = clamp(u_thickness, .02, .6);
+  float line = smoothstep(1.-th, 1.-th*.35, f) * grown;
+  // slope of the field = which way the vein wall faces; used to bend the picture through it
+  const float h = .03;
+  vec2 g = vec2(vfield(p+vec2(h,0.), t)-f, vfield(p+vec2(0.,h), t)-f)/h;
+  float pulse = .5+.5*sin(d*18. - u_time*u_flow*3. + f*6.);
+  vec3 outc = c.rgb;
+  if(u_mode < .5){                                   // Glow: light drawn from the picture's own colour
+    vec3 lit = mix(u_color, c.rgb*1.8+.1, .35);
+    outc = c.rgb*(1.-.25*line) + lit*line*u_glow*(.55+.45*pulse);
+  } else if(u_mode < 1.5){                           // Refract: the veins are glass lenses over the footage
+    vec2 off = g*(.9*u_warp+.3)*grown*.0035*vec2(1./asp,1.);
+    vec3 r = src(uv + off*(1.+line*3.)).rgb;
+    float rim = smoothstep(.0,.6,line)*(.5+.5*pulse);
+    outc = mix(c.rgb, r, grown*smoothstep(0.,.5,line+.25)) + u_color*rim*u_glow*.35;
+  } else if(u_mode < 2.5){                           // Invert inside: the veins are negative-film cuts
+    outc = mix(c.rgb, 1.-c.rgb, line);
+    outc += u_color*smoothstep(.0,.2,line)*(1.-line)*u_glow*.4*pulse;
+  } else {                                           // Cutout: the veins burn dark channels with a lit edge
+    float edge = smoothstep(.3,.9,line)*(1.-smoothstep(.9,1.,line));
+    outc = c.rgb*(1.-line*.92) + u_color*edge*u_glow*.8*(.6+.4*pulse);
+  }
+  return emit(mix(c.rgb, outc, u_mix), c.a);
+}`),
   film: wrap(`
 uniform float u_grain, u_halation, u_contrast, u_lift, u_vignette, u_weave;
 vec4 effect(vec2 uv){

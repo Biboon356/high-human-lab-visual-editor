@@ -4,11 +4,15 @@ import { store } from '../store.js';
 import { analyze, sampleFeatures } from '/shared/audio-analysis.js';
 import { audioSources } from '/shared/export-plan.js';
 
-let running = null;
+let running = null, runningSig = null;
 
 export async function runAnalysis({ quiet = false } = {}) {
+  // an analysis already in flight is reused only if the audio has not changed since it started; otherwise its result is stale (e.g. started before a song was added)
+  while (running && runningSig !== store.audioSignature()) await running.catch(() => {});
   if (running) return running;
+  runningSig = store.audioSignature();
   running = (async () => {
+    await null; // let `running` be assigned first: the no-audio path below returns at once and its `finally` must clear the finished job, not a stale one
     try {
       if (!audioSources(store.project).length) { store.analysis = null; store.analysisStale = false; store.analysisSig = store.audioSignature(); if (!quiet) toast('No audio in the project to analyze.'); return null; }
       const sig = store.audioSignature();

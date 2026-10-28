@@ -104,7 +104,9 @@ store.on('dirty', syncChrome); store.on('reset', syncChrome); store.on('project'
 mountTooltips();
 mountUpdateButton();
 // bundled faces must be loaded before the canvas draws with them; redraw once they are ready
-Promise.all(['400 40px "Pinyon Script"', '400 40px "Instrument Serif"', 'italic 400 40px "Instrument Serif"', '500 40px "Inter Tight"', '400 40px "DM Mono"'].map((f) => document.fonts.load(f)))
+Promise.all([['400 40px "Pinyon Script"'], ['400 40px "Instrument Serif"'], ['italic 400 40px "Instrument Serif"'], ['500 40px "Inter Tight"'], ['400 40px "DM Mono"'],
+  ['400 40px "Michroma"'], ['500 40px "Orbitron"'], ['900 40px "Orbitron"'], ['400 40px "Press Start 2P"'], ['700 40px "UnifrakturCook"'], ['400 40px "Pirata One"'],
+  ['400 40px "DotGothic16"', 'サイバー東京'], ['400 40px "Dela Gothic One"', 'FUTURE'], ['400 40px "Zen Antique"', '東京夜行の庭']].map(([f, t]) => document.fonts.load(f, t)))
   .then(() => store.emit('render')).catch(() => {});
 $('tl-montage').onclick = openMontageDialog;
 
