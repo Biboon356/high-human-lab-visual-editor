@@ -114,7 +114,7 @@ function buildMenu() {
       { label: 'Undo', accelerator: 'CmdOrCtrl+Z', click: send('undo') },
       { label: 'Redo', accelerator: 'CmdOrCtrl+Shift+Z', click: send('redo') },
       { label: 'Duplicate Clip', accelerator: 'CmdOrCtrl+D', click: send('duplicate') },
-      { type: 'separator' }, { role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { role: 'selectAll' },
+      { type: 'separator' }, { role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { label: 'Select All', accelerator: 'CmdOrCtrl+A', click: send('selectAll') },
     ] },
     { label: 'Tools', submenu: [{ label: 'TikTok Auto-Edit…', accelerator: 'CmdOrCtrl+Shift+A', click: send('autoedit') }, { label: 'Captions & Vocabulary…', click: send('captions') }, { type: 'separator' }, { label: 'Check for Updates…', click: send('checkUpdates') }] },
     { label: 'View', submenu: [{ role: 'reload' }, { role: 'toggleDevTools' }, { role: 'togglefullscreen' }] },

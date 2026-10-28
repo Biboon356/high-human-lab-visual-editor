@@ -8,6 +8,7 @@ import { store } from '../store.js';
 import { dissolveInto, moveClips, deleteClips, overlaps, trackEnd, canPlace, clipEnd, projectDuration, moveClip, trimStart, trimEnd, splitClip, deleteClip, addMediaClip, addTrack, clipKind, moveTrack, removeEmptyTrack } from '/shared/timeline.js';
 import { findMedia, findTrack, uid } from '/shared/project.js';
 import { reverseSelected, freezeAtPlayhead } from '../engine/edit-tools.js';
+import { activeRange, markRange } from '/shared/timeline.js';
 
 const LABEL_W = 118;
 const SNAP_PX = 8;
@@ -40,6 +41,16 @@ export function mountTimeline() {
     }
     // detected beats (every 4th drawn taller as a "bar")
     store.analysis?.beats.forEach((b, i) => rl.append(el('div', { class: `beat ${i % 4 === 0 ? 'bar' : ''}`, style: `left:${px(b)}px` })));
+    // render range: shaded stretch with an In and an Out flag you can drag
+    const rng = activeRange(project);
+    if (rng) {
+      rl.append(el('div', { class: 'range-fill', style: `left:${px(rng.in)}px;width:${px(rng.out - rng.in)}px` }));
+      for (const which of ['in', 'out']) {
+        const f = el('div', { class: `range-flag ${which}`, style: `left:${px(rng[which])}px`, title: which === 'in' ? 'Render starts here — drag to move (I sets it at the playhead)' : 'Render ends here — drag to move (O sets it at the playhead)', text: which === 'in' ? 'IN' : 'OUT' });
+        f.addEventListener('pointerdown', (e) => beginRangeDrag(e, which, f, rl));
+        rl.append(f);
+      }
+    }
     ruler.append(rl);
     content.append(ruler);
     rl.addEventListener('pointerdown', (e) => scrub(e, rl));
@@ -47,7 +58,7 @@ export function mountTimeline() {
     // tracks
     for (const track of project.tracks) {
       const lane = el('div', { class: `tl-lane ${track.kind}`, 'data-track': track.id, style: `width:${lw}px` });
-      lane.addEventListener('pointerdown', (e) => { if (e.target === lane) { store.select(null); scrub(e, lane); } });
+      lane.addEventListener('pointerdown', (e) => { if (e.target === lane) beginMarquee(e, lane); });
       lane.addEventListener('dragover', (e) => { if ([...e.dataTransfer.types].includes('application/x-hh-media')) { e.preventDefault(); lane.classList.add('over'); } });
       lane.addEventListener('dragleave', () => lane.classList.remove('over'));
       lane.addEventListener('drop', (e) => {
@@ -154,55 +165,181 @@ export function mountTimeline() {
     addEventListener('pointermove', move); addEventListener('pointerup', up);
   }
 
-  function snapTargets(excludeId) {
+  function snapTargets(exclude) {
     const ts = [0, store.playhead];
+    const r = store.project.range;
+    if (r) ts.push(r.in, r.out);
     if (beatSnap.checked && store.analysis) ts.push(...store.analysis.beats);
-    for (const c of store.project.clips) if (c.id !== excludeId) ts.push(c.start, clipEnd(c));
+    for (const c of store.project.clips) if (!exclude.has(c.id)) ts.push(c.start, clipEnd(c));
     return ts;
   }
-  function snap(t, excludeId, also = []) {
-    if (!snapBox.checked) return t;
-    let best = t, bd = SNAP_PX / store.zoom;
-    for (const s of snapTargets(excludeId)) for (const off of [0, ...also]) {
+  /** Nearest snap point for time t (also tries t + each offset, e.g. the clip's end). Returns {t, at} where `at` is the snap line, or null. */
+  function snapInfo(t, exclude, also = []) {
+    if (!snapBox.checked) return { t, at: null };
+    let best = t, bd = SNAP_PX / store.zoom, at = null;
+    for (const s of snapTargets(exclude)) for (const off of [0, ...also]) {
       const d = Math.abs(t + off - s);
-      if (d < bd) { bd = d; best = s - off; }
+      if (d < bd) { bd = d; best = s - off; at = s; }
     }
-    return best;
+    return { t: best, at };
   }
+  const snap = (t, excludeId, also = []) => snapInfo(t, new Set([excludeId]), also).t;
+
+  // ---- drag helpers: everything below touches only the DOM until the pointer is released ----
+  let snapLine = null;
+  const showSnap = (at) => {
+    if (at == null) { snapLine?.remove(); snapLine = null; return; }
+    if (!snapLine || !snapLine.isConnected) { snapLine = el('div', { class: 'snap-line' }); content.append(snapLine); }
+    snapLine.style.left = `${LABEL_W + px(at)}px`;
+  };
+  /** Scrolls the timeline when a drag nears its edge, so long moves don't need the wheel. */
+  function edgeScroll(ev) {
+    const r = scroll.getBoundingClientRect(), m = 36;
+    if (ev.clientX > r.right - m) scroll.scrollLeft += Math.min(24, (ev.clientX - (r.right - m)) / 2);
+    else if (ev.clientX < r.left + LABEL_W + m && scroll.scrollLeft > 0) scroll.scrollLeft -= Math.min(24, (r.left + LABEL_W + m - ev.clientX) / 2);
+    if (ev.clientY > r.bottom - m) scroll.scrollTop += 10; else if (ev.clientY < r.top + m + 20) scroll.scrollTop -= 10;
+  }
+  const rowAt = (clientY) => {
+    const rows = [...content.querySelectorAll('.tl-row')];
+    if (!rows.length) return null;
+    const hit = rows.find((r) => { const b = r.getBoundingClientRect(); return clientY >= b.top && clientY < b.bottom; });
+    return hit || (clientY < rows[0].getBoundingClientRect().top ? rows[0] : rows.at(-1));
+  };
+  const nodeOf = (id) => content.querySelector(`.clip[data-clip="${id}"]`);
 
   function beginDrag(e, clip, node) {
     if (e.button !== 0) return;
     e.stopPropagation();
     if (e.shiftKey || e.metaKey || e.ctrlKey) { store.toggleSelect(clip.id); return; } // build a multi-selection, no drag
-    const group = store.multi.has(clip.id) && store.multi.size > 1 && !e.target.dataset.h;
-    if (!group) store.select(clip.id); else { store.selection = clip.id; store.emit('selection'); }
-    const mode = e.target.dataset.h || 'move';
+    const handle = e.target.dataset.h;
+    const inGroup = store.multi.has(clip.id) && store.multi.size > 1 && !handle;
+    if (!inGroup) store.select(clip.id); else { store.selection = clip.id; store.emit('selection'); }
     const startX = e.clientX;
-    const orig = { start: clip.start, duration: clip.duration, in: clip.in, trackId: clip.trackId };
-    let snapped = false;
-    const ensure = () => { if (!snapped) { store.snapshot(); snapped = true; } };
-    const move = (ev) => {
-      const dt = (ev.clientX - startX) / store.zoom;
-      if (Math.abs(ev.clientX - startX) < 3 && !snapped) return;
-      ensure();
-      if (mode === 'move' && group) {
-        // move the whole selection together on its own tracks; snapping follows the clip being dragged
-        moveClips(store.project, [...store.multi], snap(orig.start + dt, clip.id, [clip.duration]) - clip.start);
-      } else if (mode === 'move') {
-        const target = document.elementFromPoint(ev.clientX, ev.clientY)?.closest?.('.tl-lane');
-        const trackId = target?.dataset.track || clip.trackId;
-        let s = snap(orig.start + dt, clip.id, [clip.duration]);
-        s = Math.max(0, s);
-        // keep last valid position if the new one would overlap or mismatch the track kind
-        moveClip(store.project, clip.id, s, trackId);
-      } else if (mode === 'l') {
-        trimStart(store.project, clip.id, snap(orig.start + dt, clip.id));
-      } else {
-        trimEnd(store.project, clip.id, snap(orig.start + orig.duration + dt, clip.id));
+    if (handle) return beginTrim(e, clip, handle);
+
+    // The moving set: the whole selection (or just this clip). Positions are computed against the untouched project and only
+    // written back on release, as one undo step — nothing is rebuilt while the pointer moves, so long drags stay smooth.
+    const ids = inGroup ? [...store.multi] : [clip.id];
+    const moving = ids.map((id) => store.project.clips.find((c) => c.id === id)).filter(Boolean);
+    const exclude = new Set(ids);
+    const trackIdx = (id) => store.project.tracks.findIndex((t) => t.id === id);
+    const base = moving.map((c) => ({ c, start: c.start, ti: trackIdx(c.trackId) }));
+    const minStart = Math.min(...base.map((b) => b.start));
+    const primaryTi = trackIdx(clip.trackId);
+    let result = null; // last valid {dt, dTrack}
+    let moved = false;
+
+    const valid = (dt, dTrack) => base.every(({ c, start, ti }) => {
+      const track = store.project.tracks[ti + dTrack];
+      if (!track || !canPlace(store.project, c, track)) return false;
+      const ns = start + dt;
+      return !store.project.clips.some((o) => !exclude.has(o.id) && o.trackId === track.id && ns < clipEnd(o) - 1e-6 && ns + c.duration > o.start + 1e-6);
+    });
+    const apply = (dt, dTrack) => {
+      for (const { c, start, ti } of base) {
+        const n = nodeOf(c.id); if (!n) continue;
+        n.style.left = `${px(start + dt)}px`;
+        n.classList.add('dragging');
+        const lane = content.querySelector(`.tl-lane[data-track="${store.project.tracks[ti + dTrack].id}"]`);
+        if (lane && n.parentElement !== lane) lane.append(n);
       }
+    };
+    const move = (ev) => {
+      if (!moved && Math.abs(ev.clientX - startX) < 3 && Math.abs(ev.clientY - e.clientY) < 3) return;
+      moved = true;
+      edgeScroll(ev);
+      let dt = (ev.clientX - startX) / store.zoom;
+      dt = Math.max(dt, -minStart);                                         // nothing may start before 0
+      const s = snapInfo(clip.start + dt, exclude, [clip.duration]);        // snap the dragged clip's start or end to other clips, the playhead, beats, range marks
+      dt = Math.max(s.t - clip.start, -minStart);
+      const row = rowAt(ev.clientY);
+      const dTrack = row ? trackIdx(row.dataset.row) - primaryTi : 0;
+      let ok = valid(dt, dTrack) ? { dt, dTrack } : valid(dt, 0) ? { dt, dTrack: 0 } : valid(0, dTrack) ? { dt: 0, dTrack } : null; // fall back gracefully instead of freezing
+      if (!ok) return;
+      result = ok;
+      showSnap(s.at != null && ok.dt === dt ? s.at : null);
+      apply(ok.dt, ok.dTrack);
+    };
+    const up = () => {
+      removeEventListener('pointermove', move); removeEventListener('pointerup', up);
+      showSnap(null);
+      if (!moved || !result || (result.dt === 0 && result.dTrack === 0)) { render(); return; }
+      store.snapshot();
+      for (const { c, start, ti } of base) { c.start = Math.max(0, start + result.dt); c.trackId = store.project.tracks[ti + result.dTrack].id; }
       store.touch('project');
     };
-    const up = () => { removeEventListener('pointermove', move); removeEventListener('pointerup', up); };
+    addEventListener('pointermove', move); addEventListener('pointerup', up);
+  }
+
+  /** Trim: edits the project directly but only moves this one node while dragging; a full rebuild happens on release. */
+  function beginTrim(e, clip, which) {
+    const startX = e.clientX, orig = { start: clip.start, duration: clip.duration };
+    const exclude = new Set([clip.id]);
+    const node = nodeOf(clip.id);
+    let snapped = false;
+    const move = (ev) => {
+      if (!snapped && Math.abs(ev.clientX - startX) < 3) return;
+      if (!snapped) { store.snapshot(); snapped = true; }
+      edgeScroll(ev);
+      const dt = (ev.clientX - startX) / store.zoom;
+      const s = snapInfo(which === 'l' ? orig.start + dt : orig.start + orig.duration + dt, exclude);
+      if (which === 'l') trimStart(store.project, clip.id, s.t); else trimEnd(store.project, clip.id, s.t);
+      showSnap(s.at);
+      if (node) { node.style.left = `${px(clip.start)}px`; node.style.width = `${Math.max(4, px(clip.duration))}px`; }
+      store.touch('render');
+    };
+    const up = () => { removeEventListener('pointermove', move); removeEventListener('pointerup', up); showSnap(null); if (snapped) store.touch('project'); };
+    addEventListener('pointermove', move); addEventListener('pointerup', up);
+  }
+
+  /** Drag on an empty stretch of a lane: a rubber band selects every clip it touches (Shift adds to the selection). A plain click moves the playhead. */
+  function beginMarquee(e, lane) {
+    if (e.button !== 0) return;
+    const add = e.shiftKey || e.metaKey || e.ctrlKey;
+    const rect0 = content.getBoundingClientRect();
+    const sx = e.clientX, sy = e.clientY;
+    const keep = add ? new Set(store.multi) : new Set();
+    let band = null, active = false;
+    const sel = (ev) => {
+      const x0 = Math.min(sx, ev.clientX), x1 = Math.max(sx, ev.clientX), y0 = Math.min(sy, ev.clientY), y1 = Math.max(sy, ev.clientY);
+      const r = content.getBoundingClientRect();
+      Object.assign(band.style, { left: `${x0 - r.left}px`, top: `${y0 - r.top}px`, width: `${x1 - x0}px`, height: `${y1 - y0}px` });
+      const hit = new Set(keep);
+      for (const n of content.querySelectorAll('.clip')) { const b = n.getBoundingClientRect(); if (b.right >= x0 && b.left <= x1 && b.bottom >= y0 && b.top <= y1) hit.add(n.dataset.clip); }
+      store.multi = hit; store.selection = [...hit].pop() ?? null;
+      store.emit('selection', 'render');
+    };
+    const move = (ev) => {
+      if (!active) { if (Math.hypot(ev.clientX - sx, ev.clientY - sy) < 4) return; active = true; band = el('div', { class: 'marquee' }); content.append(band); }
+      edgeScroll(ev);
+      sel(ev);
+    };
+    const up = (ev) => {
+      removeEventListener('pointermove', move); removeEventListener('pointerup', up);
+      band?.remove();
+      if (!active) { if (!add) store.select(null); store.setPlayhead(Math.max(0, (sx - lane.getBoundingClientRect().left) / store.zoom)); }
+    };
+    addEventListener('pointermove', move); addEventListener('pointerup', up);
+  }
+
+  /** Drag an In/Out flag along the ruler (snaps like clips do); the range is written once on release. */
+  function beginRangeDrag(e, which, flag, lane) {
+    e.stopPropagation(); e.preventDefault();
+    const startX = e.clientX, orig = store.project.range[which];
+    let moved = false;
+    const move = (ev) => {
+      if (!moved && Math.abs(ev.clientX - startX) < 2) return;
+      if (!moved) { store.snapshot(); moved = true; }
+      edgeScroll(ev);
+      const t = snapInfo(Math.max(0, orig + (ev.clientX - startX) / store.zoom), new Set()).t;
+      markRange(store.project, which, t);
+      const r = store.project.range;
+      flag.style.left = `${px(r[which])}px`;
+      const fill = lane.querySelector('.range-fill');
+      if (fill) { fill.style.left = `${px(r.in)}px`; fill.style.width = `${px(r.out - r.in)}px`; }
+      const other = lane.querySelector(`.range-flag.${which === 'in' ? 'out' : 'in'}`); if (other) other.style.left = `${px(r[which === 'in' ? 'out' : 'in'])}px`;
+    };
+    const up = () => { removeEventListener('pointermove', move); removeEventListener('pointerup', up); if (moved) store.touch('project'); };
     addEventListener('pointermove', move); addEventListener('pointerup', up);
   }
 
@@ -239,11 +376,15 @@ export function mountTimeline() {
   document.getElementById('tl-ripple').onclick = () => deleteSelected({ ripple: true });
   document.getElementById('tl-reverse').onclick = () => reverseSelected();
   document.getElementById('tl-freeze').onclick = () => freezeAtPlayhead(Number(document.getElementById('tl-freeze-d').value));
+  document.getElementById('tl-mark-in').onclick = () => setMark('in');
+  document.getElementById('tl-mark-out').onclick = () => setMark('out');
+  document.getElementById('tl-mark-clear').onclick = () => clearRange();
   document.getElementById('tl-split').onclick = () => splitSelected();
   document.getElementById('tl-duplicate').onclick = () => duplicateSelected();
 
-  store.on('project', render);
+  store.on('project', () => { render(); rangeLabel(); });
   store.on('analysis', render);
+  rangeLabel();
   store.on('mediavis', render);
   document.getElementById('tl-cut-beats').onclick = () => cutOnBeats(Number(document.getElementById('tl-beat-n').value));
   store.on('selection', () => { for (const n of content.querySelectorAll('.clip')) n.classList.toggle('sel', store.multi.has(n.dataset.clip)); });
@@ -251,6 +392,24 @@ export function mountTimeline() {
   render();
   addEventListener('resize', render);
   return { render, setZoom };
+}
+
+function rangeLabel() {
+  const lab = document.getElementById('tl-range'); if (!lab) return;
+  const r = activeRange(store.project);
+  lab.textContent = r ? `Render range ${fmtT(r.in)} → ${fmtT(r.out)} (${(r.out - r.in).toFixed(1)} s)` : 'No render range — whole project';
+  lab.classList.toggle('on', !!r);
+  document.getElementById('tl-mark-clear').disabled = !r;
+}
+const fmtT = (t) => `${Math.floor(t / 60)}:${(t % 60).toFixed(2).padStart(5, '0')}`;
+/** I / O: mark where rendering starts / ends at the playhead. One undo step. */
+export function setMark(which) {
+  store.mutate((p) => { markRange(p, which, store.playhead); });
+  toast(`${which === 'in' ? 'In' : 'Out'} point set at ${fmtT(store.playhead)}.`);
+}
+export function clearRange() {
+  if (!store.project.range) return;
+  store.mutate((p) => { delete p.range; });
 }
 
 /** Cross-dissolve into each selected clip from the picture clip before it. One undo step. */

@@ -292,3 +292,15 @@ kbd { font: 500 9.5px var(--mono); letter-spacing: .04em; padding: 1px 6px; bord
 .tabs[data-tabs="left"] button { font-size: 8.5px; letter-spacing: .08em; gap: 3px; min-width: 0; padding: 0 2px; }
 .preset-list.presets .preset-row .p-clip small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .preset-list.presets .preset-row .p-layer { writing-mode: horizontal-tb; align-self: stretch; }
+/* preview selection box */
+.pick-box { position: absolute; border: 1px dashed var(--accent2, #7dffb0); pointer-events: none; z-index: 4; box-shadow: 0 0 0 1px rgba(0,0,0,.35); }
+.pick-box .pick-h { position: absolute; right: -6px; bottom: -6px; width: 11px; height: 11px; background: var(--accent2, #7dffb0); border: 1px solid #0b0f0c; pointer-events: auto; cursor: nwse-resize; }
+/* timeline: marquee, snap guide, a clip being carried */
+.marquee { position: absolute; border: 1px solid var(--accent2, #7dffb0); background: color-mix(in srgb, var(--accent2, #7dffb0) 14%, transparent); pointer-events: none; z-index: 30; }
+.snap-line { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--accent2, #7dffb0); box-shadow: 0 0 6px var(--accent2, #7dffb0); pointer-events: none; z-index: 29; }
+.clip.dragging { z-index: 8; filter: brightness(1.2); box-shadow: 0 0 0 1px var(--text), 0 6px 14px rgba(0,0,0,.45); transition: none; }
+/* render range markers on the ruler */
+.range-fill { position: absolute; top: 0; bottom: 0; background: color-mix(in srgb, var(--accent2, #7dffb0) 16%, transparent); border-top: 2px solid var(--accent2, #7dffb0); pointer-events: none; }
+.range-flag { position: absolute; top: 0; bottom: 0; width: 28px; padding: 0 3px; font: 600 8px var(--mono); letter-spacing: .08em; color: #0b0f0c; background: var(--accent2, #7dffb0); cursor: ew-resize; display: flex; align-items: center; z-index: 6; user-select: none; }
+.range-flag.in { transform: translateX(0); border-radius: 0 0 0 0; } .range-flag.out { transform: translateX(-100%); justify-content: flex-end; }
+#tl-range { margin-left: 6px; } #tl-range.on { color: var(--accent2, #7dffb0); }

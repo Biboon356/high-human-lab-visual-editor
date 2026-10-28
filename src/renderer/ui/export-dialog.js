@@ -2,7 +2,7 @@ import { el, toast } from './dom.js';
 import { store } from '../store.js';
 import { RESOLUTIONS } from '/shared/project.js';
 import { QUALITY, FORMATS } from '/shared/export-plan.js';
-import { projectDuration } from '/shared/timeline.js';
+import { projectDuration, activeRange } from '/shared/timeline.js';
 import { renderProject, ExportCancelled } from '../engine/exporter.js';
 import { runAnalysis } from './reactive-ui.js';
 
@@ -34,6 +34,9 @@ export function openExportDialog({ preset } = {}) {
     const p = await window.hh.pickExportPath(store.project.name || 'export', format.value);
     if (p) pathIn.value = p;
   } });
+  const rng = activeRange(store.project);
+  const useRange = el('input', { type: 'checkbox', id: 'ex-range', checked: !!rng });
+  const rangeRow = rng ? el('label', { class: 'chk ae-chk', title: 'Marked with I and O on the timeline' }, useRange, `Render only the marked range: ${rng.in.toFixed(2)} s → ${rng.out.toFixed(2)} s (${(rng.out - rng.in).toFixed(2)} s)`) : null;
   const status = el('div');
   const bar = el('div', { class: 'progress' }, el('b'));
   bar.hidden = true;
@@ -45,6 +48,7 @@ export function openExportDialog({ preset } = {}) {
   const modal = el('div', { class: 'modal-back' }, el('div', { class: 'modal' },
     el('h3', { text: 'EXPORT VIDEO' }),
     el('div', { class: 'grid' }, 'Preset', platform, 'Resolution', res, 'Frame rate', fps, 'Quality', quality, 'Format', format, 'Output', el('div', { style: 'display:flex;gap:6px' }, pathIn, pick)),
+    rangeRow,
     el('div', { class: 'hint', text: `Duration ${projectDuration(store.project).toFixed(2)}s. Frames are rendered offline with the same engine as the preview, then encoded by ffmpeg.` }),
     bar, status, el('div', { class: 'actions' }, cancel, close, start)));
   root.replaceChildren(modal);
@@ -65,7 +69,7 @@ export function openExportDialog({ preset } = {}) {
       const needsAudioData = JSON.stringify(store.project).includes('"bindings":{"');
       if (needsAudioData && (store.analysisStale || !store.analysis)) { status.textContent = 'Analyzing audio for reactive parameters…'; await runAnalysis({ quiet: true }); }
       const result = await renderProject({
-        project: structuredClone(store.project), settings, analysis: store.analysis, signal,
+        project: structuredClone(store.project), settings, analysis: store.analysis, signal, range: rng && useRange.checked ? rng : null,
         onProgress: (p) => {
           bar.firstChild.style.width = `${(p.fraction * 100).toFixed(1)}%`;
           status.textContent = p.finalizing ? 'Finalizing file…' : `Frame ${p.frame}/${p.total} · ${(p.fraction * 100).toFixed(0)}% · ~${Math.ceil(p.eta)}s left`;

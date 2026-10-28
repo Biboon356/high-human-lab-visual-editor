@@ -1,10 +1,11 @@
 import { reverseSelected, freezeAtPlayhead } from './engine/edit-tools.js';
 import { mountPresetLibrary } from './ui/preset-library-ui.js';
+import { mountPreviewEdit } from './ui/preview-edit.js';
 import { store } from './store.js';
 import { toast } from './ui/dom.js';
 import { createProject } from '/shared/project.js';
 import { mountPreview } from './ui/preview.js';
-import { mountTimeline, splitSelected, deleteSelected, duplicateSelected, copySelected, pasteClip, cutOnBeats, autoMontage } from './ui/timeline-ui.js';
+import { mountTimeline, setMark, clearRange, splitSelected, deleteSelected, duplicateSelected, copySelected, pasteClip, cutOnBeats, autoMontage } from './ui/timeline-ui.js';
 import { mountInspector } from './ui/inspector.js';
 import { mountMediaBin, importResults } from './ui/media-bin.js';
 import { mountReactive, runAnalysis } from './ui/reactive-ui.js';
@@ -85,9 +86,11 @@ const actions = {
   new: newProject, open: openProject, save: () => save(false), saveAs: () => save(true),
   import: importMedia, export: openExportDialog, autoedit: openAutoEdit, captions: openCaptionEditor, checkUpdates: () => checkNow(),
   undo: () => store.undo(), redo: () => store.redo(), duplicate: duplicateSelected,
+  selectAll: () => { if (inTextField()) document.execCommand('selectAll'); else selectAllClips(); },
 };
 document.querySelectorAll('[data-act]').forEach((b) => b.addEventListener('click', () => actions[b.dataset.act]()));
 hh.onMenu((a) => actions[a]?.());
+function selectAllClips() { const ids = store.project.clips.map((c) => c.id); store.multi = new Set(ids); store.selection = ids.at(-1) ?? null; store.emit('selection', 'render'); }
 
 // ---- project name + dirty
 const nameIn = $('project-name');
@@ -123,6 +126,7 @@ if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
 
 // ---- mount modules
 const preview = mountPreview();
+const previewEdit = mountPreviewEdit({ preview });
 const timeline = mountTimeline();
 mountInspector($('inspector'));
 mountMediaBin({ onImport: importResults });
@@ -147,6 +151,7 @@ $('t-still').onclick = async () => {
 addEventListener('keydown', (e) => {
   const tag = document.activeElement?.tagName;
   if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag) && !(tag === 'INPUT' && ['range', 'checkbox'].includes(document.activeElement.type))) return;
+  if (e.altKey && !e.metaKey && !e.ctrlKey && (e.key === 'x' || e.key === 'X' || e.code === 'KeyX')) { e.preventDefault(); clearRange(); return; }
   if (e.metaKey || e.ctrlKey || e.altKey) return; // menu accelerators own these
   const fps = store.project.settings.fps;
   switch (e.key) {
@@ -156,6 +161,9 @@ addEventListener('keydown', (e) => {
     case 'ArrowLeft': e.preventDefault(); preview.pause(); store.setPlayhead(store.playhead - (e.shiftKey ? 1 : 1 / fps)); break;
     case 'ArrowRight': e.preventDefault(); preview.pause(); store.setPlayhead(store.playhead + (e.shiftKey ? 1 : 1 / fps)); break;
     case 'Home': store.setPlayhead(0); break;
+    case 'i': case 'I': setMark('in'); break;
+    case 'o': case 'O': setMark('out'); break;
+    case 'Escape': store.select(null); break;
     case '+': case '=': timeline.setZoom(store.zoom * 1.25); break;
     case '-': timeline.setZoom(store.zoom / 1.25); break;
     default: break;
@@ -165,17 +173,17 @@ addEventListener('error', (e) => toast(`Unexpected error: ${e.message}`, 'error'
 addEventListener('unhandledrejection', (e) => toast(`Unexpected error: ${e.reason?.message || e.reason}`, 'error'));
 
 // Clip copy/paste rides on the native Edit menu's copy/paste events, so text fields keep normal behaviour.
-const inTextField = () => ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName) && !['range', 'checkbox'].includes(document.activeElement.type);
+function inTextField() { return ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName) && !['range', 'checkbox'].includes(document.activeElement.type); }
 document.addEventListener('copy', (e) => { if (!inTextField() && copySelected()) { e.preventDefault(); toast('Clip copied.'); } });
 document.addEventListener('paste', (e) => { if (!inTextField() && store.clipboard) { e.preventDefault(); pasteClip(); } });
 
 // ---- automation hook (used by scripts/e2e.mjs; harmless in normal use)
 window.__app = {
-  reverseSelected, freezeAtPlayhead, store, preview, timeline, autoEdit: autoEditEngine, captionEdit: { applyCaptionEdits }, smartMontage, autosave: { writeNow, offerRecovery }, runAnalysis, cutOnBeats, autoMontage, importPaths: async (paths) => importResults(await hh.probePaths(paths)),
+  reverseSelected, freezeAtPlayhead, previewEdit, store, preview, timeline, autoEdit: autoEditEngine, captionEdit: { applyCaptionEdits }, smartMontage, autosave: { writeNow, offerRecovery }, runAnalysis, cutOnBeats, autoMontage, importPaths: async (paths) => importResults(await hh.probePaths(paths)),
   exportTo: async (outPath, overrides = {}) => {
     const s = store.project.settings;
-    const settings = { width: s.width, height: s.height, fps: s.fps, quality: 'draft', format: outPath.endsWith('.webm') ? 'webm' : 'mp4', ...overrides, outPath };
+    const { range: _r, ...ov } = overrides; const settings = { width: s.width, height: s.height, fps: s.fps, quality: "draft", format: outPath.endsWith(".webm") ? "webm" : "mp4", ...ov, outPath };
     if (JSON.stringify(store.project).includes('"bindings":{"') && (store.analysisStale || !store.analysis)) await runAnalysis({ quiet: true });
-    return renderProject({ project: structuredClone(store.project), settings, analysis: store.analysis, onProgress: () => {}, signal: { cancelled: false } });
+    return renderProject({ project: structuredClone(store.project), settings, analysis: store.analysis, onProgress: () => {}, signal: { cancelled: false }, range: overrides.range || null });
   },
 };

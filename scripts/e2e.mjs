@@ -736,6 +736,116 @@ await step('looks: an adjustment layer grades everything under it; glints sparkl
   await shot('22-organic-veins');
 });
 
+await step('preview editing: click selects a title or picture, drag moves it (one undo), the corner handle scales, double-click edits words, empty space deselects', async () => {
+  await resetProject();
+  await ev(async (c) => { await window.__app.importPaths([c]); const { store } = window.__app; const TD = await import('/shared/text-defs.js'); const T = await import('/shared/timeline.js');
+    store.mutate((p) => { p.settings.width = 640; p.settings.height = 360; const t = TD.createTextClip(null, 0, 4); t.text.content = 'HELLO'; t.text.size = 0.18; t.text.anim = { ...t.text.anim, type: 'none' }; t.trackId = p.tracks[0].id; T.addClipRaw(p, t); }); store.select(null); store.setPlayhead(1); }, clip);
+  await settle(900);
+  const info = await ev(() => { const { store, previewEdit } = window.__app; const t = store.project.clips.find((c) => c.type === 'text'); const b = previewEdit.boxFor(t); const ctr = previewEdit.toScreen((b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2); const off = previewEdit.toScreen(40, 330); return { id: t.id, vid: store.project.clips.find((c) => c.type === 'media').id, ctr, off, w: b.x1 - b.x0 }; });
+  assert.ok(info.w > 50, `the title has a measurable box (${info.w.toFixed(0)} px wide)`);
+  await page.mouse.click(info.ctr.x, info.ctr.y);
+  assert.equal(await ev(() => window.__app.store.selection), info.id, 'clicking the title selects it');
+  await settle(250);
+  assert.equal(await page.locator('.pick-box:not([hidden])').count(), 1, 'a selection box is drawn around it');
+  await page.mouse.click(info.off.x, info.off.y);
+  assert.equal(await ev(() => window.__app.store.selection), info.vid, 'clicking the picture away from the title selects the picture');
+  await page.mouse.click(info.ctr.x, info.ctr.y);
+  const undo0 = await ev(() => window.__app.store.undoStack.length);
+  await page.mouse.move(info.ctr.x, info.ctr.y); await page.mouse.down(); await page.mouse.move(info.ctr.x + 60, info.ctr.y + 30, { steps: 8 }); await page.mouse.up();
+  const moved = await ev(() => { const t = window.__app.store.selectedClip; return { x: t.props.x, y: t.props.y, undo: window.__app.store.undoStack.length }; });
+  assert.ok(moved.x > 0.05 && moved.y < -0.03, `dragging moved the title right and down (${moved.x.toFixed(3)}, ${moved.y.toFixed(3)})`);
+  assert.equal(moved.undo - undo0, 1, 'the whole drag is one undo step');
+  await ev(() => window.__app.store.undo()); assert.equal(await ev(() => window.__app.store.selectedClip.props.x), 0, 'undo puts it back');
+  // the corner handle scales
+  await settle(300);
+  const hb = await page.locator('.pick-h').boundingBox();
+  await page.mouse.move(hb.x + 5, hb.y + 5); await page.mouse.down(); await page.mouse.move(hb.x + 60, hb.y + 40, { steps: 6 }); await page.mouse.up();
+  assert.ok((await ev(() => window.__app.store.selectedClip.props.scale)) > 1.1, 'dragging the corner handle scales the title');
+  // double-click focuses the words field; clicking empty canvas away from everything deselects
+  const c2 = await ev(() => { const { store, previewEdit } = window.__app; const t = store.selectedClip; const b = previewEdit.boxFor(t); return previewEdit.toScreen((b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2); });
+  await page.mouse.dblclick(c2.x, c2.y);
+  await page.waitForFunction(() => document.activeElement?.tagName === 'TEXTAREA', null, { timeout: 4000 }).catch(() => {});
+  assert.equal(await ev(() => document.activeElement?.tagName), 'TEXTAREA', 'double-click puts the cursor in the title text box');
+  await ev(() => document.activeElement.blur());
+  await shot('29-preview-edit');
+  await ev(() => window.__app.timeline.setZoom(60));
+});
+
+await step('timeline editing: group drag across tracks is one undo step and never freezes, marquee selects, overlaps are refused, no rebuild while dragging', async () => {
+  await resetProject();
+  await ev(async (c) => { await window.__app.importPaths([c]); const { store } = window.__app; const TD = await import('/shared/text-defs.js'); const T = await import('/shared/timeline.js');
+    store.mutate((p) => { p.clips = []; const [v2, v1] = p.tracks.filter((t) => t.kind === 'video');
+      for (const [n, tr, start] of [['A', v1, 0], ['B', v1, 3], ['C', v1, 6], ['D', v2, 9]]) { const t = TD.createTextClip(null, start, 2); t.name = n; t.text.content = n; t.trackId = tr.id; p.clips.push(t); } });
+    store.select(null); }, clip);
+  await ev(() => document.getElementById('tl-fit').click()); await settle(300);
+  const geo = () => ev(() => { const r = {}; for (const n of document.querySelectorAll('.clip')) { const b = n.getBoundingClientRect(); r[n.title] = { x: b.x + b.width / 2, y: b.y + b.height / 2, w: b.width }; } const rows = {}; for (const row of document.querySelectorAll('.tl-row')) { const b = row.getBoundingClientRect(); rows[row.dataset.row] = b.y + b.height / 2; } const { store } = window.__app; return { r, rows, v2: store.project.tracks.filter((t) => t.kind === 'video')[0].id, v1: store.project.tracks.filter((t) => t.kind === 'video')[1].id }; });
+  const state = () => ev(() => Object.fromEntries(window.__app.store.project.clips.map((c) => [c.name, { s: +c.start.toFixed(2), t: window.__app.store.project.tracks.find((x) => x.id === c.trackId).name }])));
+  let g = await geo();
+  assert.ok(g.r.A && g.r.B && g.r.C && g.r.D, `all four clips are drawn (${Object.keys(g.r)})`);
+  const pxPerSec = g.r.A.w / 2;
+  // multi-select A + B with Ctrl-click, then drag A up one row and 1 s later: B must follow
+  await page.keyboard.down('Control'); await page.mouse.click(g.r.A.x, g.r.A.y); await page.mouse.click(g.r.B.x, g.r.B.y); await page.keyboard.up('Control');
+  assert.equal(await ev(() => window.__app.store.multi.size), 2, 'two clips selected');
+  await ev(() => { window.__rebuilds = 0; const content = document.getElementById('tl-content'); window.__mo = new MutationObserver((m) => { for (const x of m) for (const n of x.removedNodes) if (n.classList?.contains('tl-row')) window.__rebuilds++; }); window.__mo.observe(content, { childList: true }); });
+  const undo0 = await ev(() => window.__app.store.undoStack.length);
+  await page.mouse.move(g.r.A.x, g.r.A.y); await page.mouse.down();
+  for (let i = 1; i <= 12; i++) await page.mouse.move(g.r.A.x + (pxPerSec * i) / 12, g.r.A.y + ((g.rows[g.v2] - g.rows[g.v1]) * i) / 12);
+  const midRebuilds = await ev(() => window.__rebuilds);
+  assert.equal(midRebuilds, 0, `the timeline is not rebuilt while dragging (${midRebuilds} rebuilds)`);
+  await page.mouse.up(); await settle(300);
+  let st = await state();
+  assert.deepEqual([st.A.t, st.B.t, st.C.t], ['V2', 'V2', 'V1'], 'the two selected clips moved up a track together');
+  assert.ok(Math.abs(st.A.s - 1) < 0.2 && Math.abs(st.B.s - 4) < 0.2, `…and 1 s later (${st.A.s}, ${st.B.s})`);
+  assert.equal((await ev(() => window.__app.store.undoStack.length)) - undo0, 1, 'one undo step for the whole group move');
+  await ev(() => window.__mo.disconnect());
+  await ev(() => window.__app.store.undo()); st = await state(); assert.deepEqual([st.A.t, st.B.t, st.A.s, st.B.s], ['V1', 'V1', 0, 3], 'undo restores both');
+  // a move that would land on another clip is refused (the clip stays where the last valid spot was)
+  g = await geo();
+  const uBefore = await ev(() => window.__app.store.undoStack.length);
+  await page.mouse.click(g.r.B.x, g.r.B.y);
+  await page.mouse.move(g.r.B.x, g.r.B.y); await page.mouse.down(); await page.mouse.move(g.r.C.x + 10, g.r.B.y, { steps: 8 }); await page.mouse.up(); await settle(200);
+  st = await state(); assert.ok(st.B.s + 2 <= st.C.s + 1e-6 || st.B.s >= st.C.s + 2 - 1e-6, `no overlap with C (B ${st.B.s}, C ${st.C.s})`);
+  assert.equal(await ev(() => window.__app.store.undoStack.length), uBefore, 'a refused move leaves no undo step behind');
+  // marquee: drag across empty lane space around A and B selects exactly those
+  g = await geo(); const laneY = g.rows[g.v1];
+  await page.mouse.move(g.r.A.x - 40, laneY - 22); await page.mouse.down(); await page.mouse.move(g.r.B.x + 20, laneY + 14, { steps: 8 });
+  assert.equal(await page.locator('.marquee').count(), 1, 'a rubber band is shown');
+  await page.mouse.up();
+  const picked = await ev(() => [...window.__app.store.multi].map((id) => window.__app.store.project.clips.find((c) => c.id === id).name).sort().join(''));
+  assert.equal(picked, 'AB', `the rubber band selected A and B (${picked})`);
+  await page.keyboard.press('Escape'); assert.equal(await ev(() => window.__app.store.multi.size), 0, 'Escape clears the selection');
+  await shot('30-timeline-multi');
+  await ev(() => window.__app.timeline.setZoom(60));
+});
+
+await step('render range: I/O mark the ruler, the export renders only that stretch (picture and sound), Alt+X clears', async () => {
+  const ramp2 = path.join(dir, 'ramp.mp4');
+  if (!fs.existsSync(ramp2)) sh(FFMPEG, ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'color=c=white:s=160x90:d=4:r=15,fade=t=in:st=0:d=4', '-f', 'lavfi', '-i', 'sine=frequency=440:d=4', '-shortest', '-pix_fmt', 'yuv420p', '-c:a', 'aac', ramp2]);
+  await resetProject();
+  await ev(async (c) => { await window.__app.importPaths([c]); const { store } = window.__app; store.mutate((p) => { p.settings.width = 160; p.settings.height = 90; }); }, ramp2);
+  await ev(() => document.getElementById('tl-fit').click());
+  await ev(() => window.__app.store.setPlayhead(1)); await page.keyboard.press('i');
+  await ev(() => window.__app.store.setPlayhead(3)); await page.keyboard.press('o');
+  const rg = await ev(() => ({ r: window.__app.store.project.range, label: document.getElementById('tl-range').textContent, flags: document.querySelectorAll('.range-flag').length }));
+  assert.deepEqual([Math.round(rg.r.in * 10) / 10, Math.round(rg.r.out * 10) / 10], [1, 3]); assert.equal(rg.flags, 2, 'IN and OUT flags on the ruler'); assert.match(rg.label, /2\.0 s/);
+  // drag the OUT flag a little: the range follows
+  const fb = await page.locator('.range-flag.out').boundingBox();
+  const dxPx = await ev(() => window.__app.store.zoom * 0.5);
+  await page.mouse.move(fb.x + 8, fb.y + fb.height / 2); await page.mouse.down(); await page.mouse.move(fb.x + 8 + dxPx, fb.y + fb.height / 2, { steps: 6 }); await page.mouse.up(); await settle(200);
+  const dragged = await ev(() => window.__app.store.project.range.out); assert.ok(dragged > 3.2, `dragging the OUT flag moved it (${dragged.toFixed(2)})`);
+  await ev(() => { window.__app.store.project.range = { in: 1, out: 3 }; window.__app.store.touch('project'); });
+  const out = path.join(dir, 'range.mp4');
+  const res = await ev((o) => window.__app.exportTo(o, { width: 160, height: 90, fps: 10, range: window.__app.store.project.range }), out);
+  const v = probe(out);
+  assert.ok(Math.abs(Number(v.format.duration) - 2) < 0.35, `the file is 2 s long (${v.format.duration})`); assert.ok(v.streams.some((s) => s.codec_type === 'audio'), 'sound came along');
+  const mean = (t) => { const f = path.join(dir, `rg-${t}.raw`); sh(FFMPEG, ['-v', 'error', '-y', '-ss', String(t), '-i', out, '-frames:v', '1', '-pix_fmt', 'gray', '-f', 'rawvideo', f]); const b = fs.readFileSync(f); let s = 0; for (const x of b) s += x; return s / b.length; };
+  const first = mean(0), last = mean(1.8);
+  assert.ok(first > 40 && first < 100, `the first frame is the ramp at 1 s (~64): ${first.toFixed(0)}`); assert.ok(last > 150 && last < 235, `the last frame is the ramp near 3 s (~190): ${last.toFixed(0)}`);
+  await page.keyboard.press('Alt+x'); assert.equal(await ev(() => window.__app.store.project.range === undefined), true, 'Alt+X clears the range');
+  await shot('31-render-range');
+  await ev(() => window.__app.timeline.setZoom(60));
+});
+
 await step('basic edits: reverse plays backwards (picture + sound) and undoes, freeze frame holds a frame, flip mirrors, 3D tilt narrows the picture, crop cuts it', async () => {
   const ramp = path.join(dir, 'ramp.mp4'), half = path.join(dir, 'half.png'), white = path.join(dir, 'white.png');
   sh(FFMPEG, ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'color=c=white:s=160x90:d=4:r=15,fade=t=in:st=0:d=4', '-f', 'lavfi', '-i', 'sine=frequency=440:d=4', '-shortest', '-pix_fmt', 'yuv420p', '-c:a', 'aac', ramp]);

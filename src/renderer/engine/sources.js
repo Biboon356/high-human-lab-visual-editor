@@ -161,8 +161,10 @@ export class Sources {
     if (!st) {
       const k = Math.min(1, this.maxDim / Math.max(media.width, media.height));
       const w = Math.max(2, Math.round(media.width * k)), h = Math.max(2, Math.round(media.height * k));
-      await window.hh.exportOpenDecoder({ id: clip.id, path: media.path, start: clip.in, duration: clip.duration * (clip.speed || 1) + 0.5, speed: clip.speed || 1, fps, width: w, height: h });
-      st = { next: 0, frame: null, pending: null, w, h };
+      // a render that starts part-way into a clip (a marked range) opens the decoder there instead of decoding and dropping the head
+      const skip = Math.max(0, Math.round((t - clip.start) * fps)), off = skip / fps, sp = clip.speed || 1; // on the clip's own frame grid, so a normal render still opens at the clip start exactly
+      await window.hh.exportOpenDecoder({ id: clip.id, path: media.path, start: clip.in + off * sp, duration: (clip.duration - off) * sp + 0.5, speed: sp, fps, width: w, height: h });
+      st = { next: skip, frame: null, pending: null, w, h };
       this.dec.set(clip.id, st);
     }
     const want = Math.max(0, Math.round((t - clip.start) * fps));

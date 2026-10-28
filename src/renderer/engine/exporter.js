@@ -3,7 +3,7 @@
 import { Compositor } from './compositor.js';
 import { Sources } from './sources.js';
 import { sampleFeatures } from '/shared/audio-analysis.js';
-import { projectDuration } from '/shared/timeline.js';
+import { projectDuration, activeRange } from '/shared/timeline.js';
 
 export class ExportCancelled extends Error {}
 
@@ -11,9 +11,14 @@ export class ExportCancelled extends Error {}
  * @param {{project, settings:{width,height,fps,quality,format,outPath}, analysis, onProgress:(p:{frame,total,fraction,eta})=>void, signal:{cancelled:boolean}}} o
  * @returns {Promise<{path,bytes,duration,width,height,hasAudio,frames}>}
  */
-export async function renderProject({ project, settings, analysis, onProgress, signal }) {
-  const duration = projectDuration(project);
-  if (duration <= 0) throw new Error('The timeline is empty — nothing to render.');
+export async function renderProject({ project, settings, analysis, onProgress, signal, range = null }) {
+  const full = projectDuration(project);
+  if (full <= 0) throw new Error('The timeline is empty — nothing to render.');
+  // a marked range renders only [in, out): frame i shows timeline time in + i/fps, and the sound is cut to the same window
+  const r = range ? activeRange({ ...project, range }) : null;
+  if (range && !r) throw new Error('The marked range is empty — set an In and an Out point that are apart.');
+  const t0 = r ? r.in : 0;
+  const duration = r ? r.out - r.in : full;
   const { fps } = settings;
   const total = Math.max(1, Math.round(duration * fps));
   const canvas = document.createElement('canvas');
@@ -24,13 +29,13 @@ export async function renderProject({ project, settings, analysis, onProgress, s
   let started_ = false;
   let pendingFrame = null;
   try {
-    await window.hh.exportStart(project, { ...settings, duration });
+    await window.hh.exportStart(project, { ...settings, duration, range: r });
     started_ = true;
     let pending = Promise.resolve();
     pendingFrame = pending;
     for (let i = 0; i < total; i++) {
       if (signal.cancelled) throw new ExportCancelled('Export cancelled.');
-      const t = i / fps;
+      const t = t0 + i / fps;
       globalThis.__exportState = { frame: i, total, t, phase: 'decode' };
       await sources.seekAll(project, t + 1e-4, fps);
       globalThis.__exportState.phase = 'render';

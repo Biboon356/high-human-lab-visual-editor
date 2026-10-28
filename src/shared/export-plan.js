@@ -45,7 +45,7 @@ export function fadeFilters(clip) {
  * Returns {inputs:[path...], filter:string|null, mapLabel:string|null} for the audio mix of the project.
  * Input indexes start at `firstInput` so callers can prepend the raw video input.
  */
-export function buildAudioGraph(project, firstInput = 0, sampleRate = 48000) {
+export function buildAudioGraph(project, firstInput = 0, sampleRate = 48000, range = null) {
   const srcs = audioSources(project);
   if (!srcs.length) return { inputs: [], filter: null, mapLabel: null };
   const parts = [];
@@ -61,7 +61,7 @@ export function buildAudioGraph(project, firstInput = 0, sampleRate = 48000) {
     labels.push(`[a${n}]`);
   });
   const total = Math.max(0.1, projectDuration(project));
-  parts.push(`${labels.join('')}amix=inputs=${labels.length}:normalize=0:duration=longest,apad=whole_dur=${total.toFixed(4)},atrim=end=${total.toFixed(4)}${project.audio?.normalize ? `,${LOUDNORM}` : ''}[aout]`);
+  parts.push(`${labels.join('')}amix=inputs=${labels.length}:normalize=0:duration=longest,apad=whole_dur=${total.toFixed(4)},atrim=end=${total.toFixed(4)}${range ? `,atrim=start=${range.in.toFixed(4)}:end=${range.out.toFixed(4)},asetpts=PTS-STARTPTS` : ''}${project.audio?.normalize ? `,${LOUDNORM}` : ''}[aout]`);
   return { inputs: srcs.map((s) => s.media.path), filter: parts.join(';'), mapLabel: '[aout]' };
 }
 
@@ -93,7 +93,7 @@ export function buildExportArgs(project, s) {
   const w = even(s.width), h = even(s.height);
   const args = ['-hide_banner', '-y', '-progress', 'pipe:2', '-nostats',
     '-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', `${s.width}x${s.height}`, '-framerate', String(s.fps), '-i', 'pipe:0'];
-  const audio = buildAudioGraph(project, 1);
+  const audio = buildAudioGraph(project, 1, 48000, s.range || null);
   audio.inputs.forEach((p) => args.push('-i', p));
   // Frames arrive bottom-up from glReadPixels, hence vflip.
   const v = `[0:v]vflip,scale=${w}:${h}:flags=lanczos,format=yuv420p[vout]`;

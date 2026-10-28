@@ -243,6 +243,26 @@ export function removeEmptyTrack(project, trackId) {
   return true;
 }
 
+/** The marked render range as {in, out} clamped to the project, or null when there is none (or it is empty). */
+export function activeRange(project) {
+  const r = project.range;
+  if (!r || !Number.isFinite(r.in) || !Number.isFinite(r.out)) return null;
+  const d = projectDuration(project);
+  const a = Math.max(0, Math.min(r.in, d)), b = Math.max(0, Math.min(r.out, d));
+  return b - a >= 0.05 ? { in: a, out: b } : null;
+}
+
+/** Sets one end of the range at time t (the other end defaults to the project's start/end). Returns the new range. */
+export function markRange(project, which, t) {
+  const d = projectDuration(project);
+  const cur = project.range && Number.isFinite(project.range.in) ? { ...project.range } : { in: 0, out: d };
+  t = Math.max(0, Math.min(t, d));
+  if (which === 'in') { cur.in = t; if (cur.out - cur.in < 0.1) cur.out = Math.min(d, cur.in + 0.1); if (cur.out - cur.in < 0.1) cur.in = Math.max(0, cur.out - 0.1); }
+  else { cur.out = t; if (cur.out - cur.in < 0.1) cur.in = Math.max(0, cur.out - 0.1); if (cur.out - cur.in < 0.1) cur.out = Math.min(d, cur.in + 0.1); }
+  project.range = cur;
+  return cur;
+}
+
 /** Source-file window a clip plays: [in, in + duration × speed). */
 export function sourceSpan(clip) {
   return { start: clip.in || 0, duration: clip.duration * (clip.speed || 1) };
