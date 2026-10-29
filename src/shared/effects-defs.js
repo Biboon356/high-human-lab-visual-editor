@@ -227,6 +227,22 @@ export const EFFECTS = {
       { key: 'paper', label: 'Paper colour', kind: 'color', def: '#ece6d6' },
     ],
   },
+  pattern: {
+    label: 'Pattern (mandala, jali, rangoli, paisley, truck-art)',
+    params: [
+      { key: 'style', label: 'Pattern', options: ['Mandala', 'Jali lattice', 'Rangoli dots', 'Paisley field', 'Truck-art frame'], def: 0 },
+      { key: 'scale', label: 'Size / repeat', min: 0.2, max: 4, step: 0.01, def: 1 },
+      { key: 'detail', label: 'Detail (petals / layers)', min: 4, max: 24, step: 1, def: 12 },
+      { key: 'rotate', label: 'Rotate (deg)', min: -180, max: 180, step: 1, def: 0 },
+      { key: 'speed', label: 'Drift / spin', min: -1, max: 1, step: 0.01, def: 0.08 },
+      { key: 'line', label: 'Line width (px)', min: 0.5, max: 10, step: 0.1, def: 2 },
+      { key: 'glow', label: 'Glow', min: 0, max: 2, step: 0.01, def: 0.6 },
+      { key: 'fill', label: 'Fill', min: 0, max: 1, step: 0.01, def: 0.4 },
+      { key: 'color', label: 'Line colour', kind: 'color', def: '#ffd27d' },
+      { key: 'color2', label: 'Fill colour', kind: 'color', def: '#c4162a' },
+      { key: 'mix', label: 'Mix', min: 0, max: 1, step: 0.01, def: 1 },
+    ],
+  },
   object3d: {
     label: '3D Object (wrap the picture on a shape)',
     params: [

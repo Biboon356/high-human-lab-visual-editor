@@ -571,6 +571,98 @@ vec4 effect(vec2 uv){
   vec3 outc = mix(vec3(0.), col, inside);
   return vec4(outc*(inside*c.a) , a);
 }`),
+  pattern: wrap(`
+uniform float u_style, u_scale, u_detail, u_rotate, u_speed, u_line, u_glow, u_fill, u_mix; uniform vec3 u_color, u_color2;
+const float PI = 3.14159265;
+vec2 rot2(vec2 p, float a){ float c = cos(a), s = sin(a); return vec2(c*p.x - s*p.y, s*p.x + c*p.y); }
+// each pattern returns: x = distance to the nearest line (pattern units), y = fill (0..1), z = a second accent (dots)
+float roundCone(vec2 p, vec2 a, vec2 b, float r1, float r2){ vec2 ba = b - a; float h = clamp(dot(p - a, ba)/dot(ba, ba), 0., 1.); return length(p - a - ba*h) - mix(r1, r2, h); }
+vec3 mandala(vec2 p){
+  float N = max(4., floor(u_detail/2.)*2.);
+  float r = length(p), a = atan(p.y, p.x), sec = PI/N;
+  float af = abs(mod(a + sec*.5, 2.*sec) - sec);            // fold the plane into mirrored wedges
+  vec2 q = r*vec2(cos(af), sin(af));
+  float d = 1e3, fill = 0., dots = 0.;
+  d = min(d, abs(r - .985)); d = min(d, abs(r - .93)); d = min(d, abs(r - .2)); d = min(d, abs(r - .52)); d = min(d, abs(r - .73));
+  float leaf = max(length(q - vec2(.36, .085)) - .21, length(q - vec2(.36, -.085)) - .21);     // inner pointed petals
+  d = min(d, abs(leaf)); if(leaf < 0.) fill = max(fill, .85);
+  float leaf2 = max(length(q - vec2(.7, .13)) - .3, length(q - vec2(.7, -.13)) - .3);        // outer long petals
+  d = min(d, abs(leaf2)); if(leaf2 < 0. && r < .9) fill = max(fill, .45);
+  float scal = abs(length(q - vec2(.88, 0.)) - .09); d = min(d, scal);                        // beads between the petal tips
+  dots = max(dots, 1. - smoothstep(.012, .02, length(q - vec2(.2 + .12*(.5 + .5*cos(a*N)), 0.)) - .0));
+  float rose = abs(r - .1*(.55 + .45*cos(N*a))); d = min(d, rose); if(r < .1*(.55 + .45*cos(N*a))) fill = max(fill, 1.);
+  if(r > 1.) d = 1e3;
+  return vec3(d, fill, dots);
+}
+vec3 jali(vec2 g){                                          // overlapping-circle lattice: the pointed arches of a carved stone window
+  vec2 c = fract(g) - .5;
+  float d = abs(length(abs(c) - .5) - .5);
+  float fill = step(length(abs(c) - .5), .5) * step(.5, length(c) + .12) * .0;
+  vec2 g2 = fract(g*2. + .5) - .5;
+  float d2 = abs(length(abs(g2) - .5) - .5)*.5; if(u_detail < 8.) d2 = 1e3;
+  float lens = length(abs(c) - .5);
+  fill = (lens < .5 && length(c) > .27) ? .5 : 0.;
+  float dots = 1. - smoothstep(.03, .045, length(c));
+  return vec3(min(d, d2), fill, dots);
+}
+vec3 rangoli(vec2 g){                                       // pulli kolam: a lattice of dots wrapped in loops
+  vec2 f = fract(g) - .5, f2 = fract(g + .5) - .5;
+  float d = min(abs(length(f) - .36), abs(length(f2) - .17));
+  float fill = (length(f2) < .17) ? .7 : 0.;
+  float dots = max(1. - smoothstep(.035, .05, length(f)), 1. - smoothstep(.025, .035, length(f2)));
+  return vec3(d, fill, dots);
+}
+vec3 paisley(vec2 g){
+  vec2 id = floor(g), f = fract(g) - .5;
+  float flip = mod(id.x + id.y, 2.) < 1. ? 1. : -1.;
+  f = rot2(f*vec2(flip, 1.), .55*flip);
+  f.x += .1*sin(f.y*5. + 1.);
+  float body = roundCone(f, vec2(-.02, -.16), vec2(.07, .36), .22, .012);
+  float inner = roundCone(f, vec2(-.02, -.12), vec2(.05, .25), .13, .01);
+  float bead = length(f - vec2(-.02, -.14)) - .05;
+  float d = min(abs(body), min(abs(inner), abs(bead)));
+  float fill = body < 0. ? (inner < 0. ? .9 : .45) : 0.;
+  return vec3(d, fill, bead < 0. ? 1. : 0.);
+}
+vec3 border(vec2 uv, float asp, float w){                   // truck-art frame: a rim, then a band of scallops and flowers
+  vec2 e = vec2(min(uv.x, 1. - uv.x)*asp, min(uv.y, 1. - uv.y));
+  float edge = min(e.x, e.y);
+  float along = e.x < e.y ? uv.y : uv.x*asp;
+  float L = w*1.15, cell = floor(along/L), t = (fract(along/L) - .5)*L;
+  float bw = w, y = edge;
+  float d = min(abs(y - bw), abs(y - bw*.88));
+  d = min(d, abs(length(vec2(t, y - bw*.42)) - L*.46));    // scallop arches
+  float flower = length(vec2(t, y - bw*.42)) - L*.16; d = min(d, abs(flower));
+  float fill = (y < bw && y > bw*.88) ? .6 : 0.;
+  if(y < bw*.88 && length(vec2(t, y - bw*.42)) < L*.46) fill = mod(cell, 2.) < 1. ? .95 : .55;
+  if(y > bw*1.02) d = 1e3;
+  float dots = (y < bw*.88 && flower < 0.) ? 1. : 0.;
+  return vec3(d, fill, dots);
+}
+vec4 effect(vec2 uv){
+  vec4 c = src(uv);
+  float asp = u_res.x/u_res.y;
+  vec2 p = (uv - .5)*vec2(asp, 1.);
+  float tt = u_time*u_speed;
+  float rad = radians(u_rotate);
+  float hpx = 1./u_res.y, w = u_line*hpx;                  // line width in height units
+  vec3 s; float k;                                          // k: pattern units per frame height
+  int st = int(u_style + .5);
+  if(st == 0){ k = 2./max(u_scale, .05); s = mandala(rot2(p, rad + tt)*k); }
+  else if(st == 1){ k = u_scale*3.; s = jali(rot2(p, rad)*k + vec2(tt, tt*.5)); }
+  else if(st == 2){ k = u_scale*3.; s = rangoli(rot2(p, rad)*k + vec2(tt, 0.)); }
+  else if(st == 3){ k = u_scale*2.5; s = paisley(rot2(p, rad)*k + vec2(0., tt)); }
+  else { k = 1.; s = border(uv, asp, .09*u_scale); }
+  float wp = w*k;                                           // line width in pattern units
+  float line = 1. - smoothstep(wp*.5, wp*.5 + 1.4*hpx*k, s.x);
+  float glow = exp(-s.x/max(wp*7., 1e-4))*u_glow*(st == 3 ? .12 : .5); // paisley cells are drawn one at a time, so a wide glow would show the cell edges
+  float fillm = s.y*u_fill;
+  vec3 col = mix(c.rgb, u_color2, fillm*(.35 + .65*step(.01, fillm)));
+  col = mix(col, u_color, clamp(max(line, s.z), 0., 1.));
+  col += u_color*glow*(1. - line);
+  float a = max(c.a, max(max(line, s.z), max(fillm, glow*.6)));
+  return emit(mix(c.rgb, col, u_mix), mix(c.a, a, u_mix));
+}`),
   object3d: wrap(`
 uniform float u_shape, u_material, u_background, u_size, u_x, u_y, u_rx, u_ry, u_rz, u_sx, u_sy, u_sz, u_shine;
 uniform vec3 u_tint;
