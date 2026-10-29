@@ -43,6 +43,7 @@ export function shapeBox(s, W, H) {
 
 export function createShapeClip(kind, start = 0, duration = 4, overrides = {}) {
   const shape = { ...defaultShape(kind), ...overrides };
+  if (overrides.color && !overrides.strokeColor) shape.strokeColor = overrides.color; // an outline follows the colour you picked
   return createClip({ type: 'shape', name: SHAPES[kind]?.label || 'Shape', start, duration, shape, props: defaultProps() });
 }
 

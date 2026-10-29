@@ -115,6 +115,7 @@ Promise.all([['400 40px "Pinyon Script"'], ['400 40px "Instrument Serif"'], ['it
   ['400 40px "DotGothic16"', 'サイバー東京'], ['400 40px "Dela Gothic One"', 'FUTURE'], ['400 40px "Zen Antique"', '東京夜行の庭'],
   ...[['Rozha One', 400], ['Yatra One', 400], ['Modak', 400], ['Tiro Devanagari Hindi', 400], ['Eczar', 800], ['Teko', 700], ['Khand', 700], ['Kalam', 700], ['Amita', 700], ['Martel', 900]].map(([f, w]) => [`${w} 40px "${f}"`, 'हिन्दी Hindi']),
   ...[['Rubik Distressed', 400], ['Londrina Solid', 900], ['Reenie Beanie', 400], ['Covered By Your Grace', 400], ['Courier Prime', 700], ['Monoton', 400], ['Shrikhand', 400], ['Righteous', 400], ['Audiowide', 400], ['Space Grotesk', 700], ['Space Mono', 700], ['Syne', 800], ['Unbounded', 900], ['Big Shoulders Display', 900], ['Metal Mania', 400], ['New Rocker', 400], ['Cinzel Decorative', 900], ['Grenze Gotisch', 900], ['IM Fell English SC', 400]].map(([f, w]) => [`${w} 40px "${f}"`, 'HIGH HUMAN']),
+  ...[['Inknut Antiqua', 400], ['Inknut Antiqua', 800], ['Tillana', 700], ['Dekko', 400], ['Jaini', 400], ['Sarpanch', 800], ['Gotu', 400], ['Kurale', 400]].map(([f, w]) => [`${w} 40px "${f}"`, 'ध्यान शांति Hindi']),
   ...['Anton', 'Permanent Marker', 'Special Elite', 'Rubik Spray Paint', 'Black Ops One', 'Rubik Glitch', 'Archivo Black', 'Rock Salt', 'Bungee', 'Bebas Neue'].map((f) => [`400 40px "${f}"`, 'HIGH HUMAN'])].map(([f, t]) => document.fonts.load(f, t)))
   .then(() => store.emit('render')).catch(() => {});
 $('tl-montage').onclick = openMontageDialog;

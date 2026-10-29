@@ -1,7 +1,7 @@
 import { el, toast, fmtTime } from './dom.js';
 import { store } from '../store.js';
 import { addMediaClip, trackEnd, addTrack, overlaps } from '/shared/timeline.js';
-import { createTextClip, createTitleLockup, lockupFonts, LOCKUPS, TEXT_PRESETS } from '/shared/text-defs.js';
+import { createTextClip, createLockupClips, lockupFonts, LOCKUPS, TEXT_PRESETS } from '/shared/text-defs.js';
 import { placeAdlibs, adlibWordsDefault } from '../engine/rhythm-tools.js';
 import { SHAPES, SHAPE_KINDS, createShapeClip } from '/shared/shape-defs.js';
 import { createGeneratorClip, GEN_PRESETS } from '/shared/organic-defs.js';
@@ -173,15 +173,10 @@ export function mountMediaBin({ onImport }) {
   document.getElementById('adlib-place').onclick = () => placeAdlibs({ words: aw.value, every: Number(document.getElementById('adlib-every').value) });
   const addLockup = (name) => {
     const start = Math.max(0, store.playhead), len = 4;
-    const [kicker, title, sub] = createTitleLockup(start, len, { lockup: name });
-    const t = store.mutate((p) => {
-      // clips that share the same time need their own tracks: reuse free video tracks from the top, add one if needed
-      const used = new Set();
-      const free = () => { const x = p.tracks.filter((tr) => tr.kind === 'video').find((tr) => !used.has(tr.id) && !overlaps(p, tr.id, start, len)) || addTrack(p, 'video'); used.add(x.id); return x; };
-      for (const c of [title, kicker, sub].filter(Boolean)) { c.trackId = free().id; addClipRaw(p, c); }
-      return title;
-    });
-    store.select(t.id);
+    const { clips, title } = createLockupClips(start, len, { lockup: name });
+    // every part gets a track of its own, laid bottom → top so the ornaments sit behind the words and above the footage
+    store.mutate((p) => { for (const c of clips) { c.trackId = addTrack(p, 'video').id; addClipRaw(p, c); } });
+    store.select(title.id);
   };
   document.getElementById('add-lockup').onclick = () => addLockup(LOCKUPS[0].name);
   const ll = document.getElementById('lockup-list');

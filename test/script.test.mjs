@@ -35,9 +35,9 @@ test('Devanagari and street fonts are bundled with a Devanagari/Latin face per f
 });
 
 test('Hindi presets only use fonts that have Devanagari glyphs bundled, and their text is Devanagari', () => {
-  const dev = new Set(['Rozha One', 'Yatra One', 'Modak', 'Tiro Devanagari Hindi', 'Eczar', 'Teko', 'Khand', 'Kalam', 'Amita', 'Martel']);
+  const dev = new Set(['Rozha One', 'Yatra One', 'Modak', 'Tiro Devanagari Hindi', 'Eczar', 'Teko', 'Khand', 'Kalam', 'Amita', 'Martel', 'Inknut Antiqua', 'Tillana', 'Dekko', 'Jaini', 'Sarpanch', 'Gotu', 'Kurale']);
   const hindi = TEXT_PRESETS.filter((p) => hasDevanagari(p.text.content));
-  assert.ok(hindi.length >= 10, `${hindi.length} Hindi presets`);
+  assert.ok(hindi.length >= 16, `${hindi.length} Hindi presets`);
   for (const p of hindi) { assert.ok(dev.has(p.text.font), `${p.name}: ${p.text.font}`); assert.ok(!p.text.vertical, `${p.name}: not vertical`); assert.ok(!(p.props?.tracking > 0), `${p.name}: no spacing`); }
 });
 

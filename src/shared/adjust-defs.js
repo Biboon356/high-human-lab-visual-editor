@@ -62,6 +62,17 @@ export const ADJUST_LOOKS = [
   { name: 'Fade out to white', note: 'the last 1.5 s flares to white', fade: 'out', chain: [fx('color', { brightness: 1, contrast: 1 })] },
 ];
 
+// Pattern layers that lockups lay behind their words (not listed in the Looks tab). They only add line work, they do not regrade the footage.
+export const VEIL_LOOKS = [
+  { name: 'Gold mandala veil', note: 'a slow gold line mandala behind a title', chain: [fx('pattern', { style: 0, scale: 1.25, detail: 12, speed: 0.05, line: 1.6, glow: 0.7, fill: 0.12, color: '#e8c36a', color2: '#7a2a10', mix: 0.55 })] },
+  { name: 'Lattice veil', note: 'a stone-lattice window behind a title', chain: [fx('pattern', { style: 1, scale: 1.1, detail: 12, speed: 0.01, line: 1.8, glow: 0.2, fill: 0.2, color: '#d9c27a', color2: '#1a1208', mix: 0.28 })] },
+  { name: 'Rangoli veil', note: 'glowing rangoli dots behind a title', chain: [fx('pattern', { style: 2, scale: 1.1, speed: 0.03, line: 1.8, glow: 0.8, fill: 0.2, color: '#ffb36b', color2: '#5a1a2a', mix: 0.35 })] },
+  { name: 'Paisley veil', note: 'faint paisleys behind a title', chain: [fx('pattern', { style: 3, scale: 1.1, speed: 0.04, line: 1.6, glow: 0.3, fill: 0.2, color: '#e8c36a', color2: '#3a1a5a', mix: 0.3 })] },
+  { name: 'Truck-art border veil', note: 'a painted truck border around the frame', chain: [fx('pattern', { style: 4, scale: 1, line: 2.2, glow: 0.2, fill: 0.9, color: '#ffe066', color2: '#d1002f', mix: 1 })] },
+  { name: 'Xerox veil', note: 'photocopy grain behind a title', chain: [fx('xerox', { contrast: 1.6, streaks: 0.5, dots: 0.3, ink: '#0b0b0b', paper: '#e9e4d4', mix: 0.35 })] },
+  { name: 'Scan veil', note: 'faint scanlines and a vignette', chain: [fx('crt', { scan: 0.22, bleed: 0.002, curve: 0.02 }), fx('film', { grain: 0.2, vignette: 0.55, halation: 0.1 })] },
+];
+
 // Organic looks live INSIDE the picture: veins that grow in from an edge, take their light from the footage and bend it.
 export const ORGANIC_LOOKS = [
   { name: 'Veins · Overgrown', note: 'green light creeping in from every edge', chain: [fx('veins', { mode: 0, origin: 5, density: 2.4, thickness: 0.16, glow: 1, color: '#7dffb0', seed: 7 }, {}, 5), fx('grain', { amount: 0.18 })] },

@@ -1021,14 +1021,14 @@ await step('type packs: every lockup (2 and 3 fonts, Hindi and street) lays out 
   await resetProject();
   await page.click('#panel-left [data-tab="type"]');
   await ev(() => { const { store } = window.__app; store.mutate((p) => { p.settings.width = 960; p.settings.height = 540; }); });
-  const names = await ev(async () => (await import('/shared/text-defs.js')).LOCKUPS.map((l) => ({ name: l.name, n: l.sub ? 3 : 2 })));
+  const names = await ev(async () => { const T = await import('/shared/text-defs.js'); return T.LOCKUPS.map((l) => ({ name: l.name, n: T.createLockupClips(0, 4, { lockup: l.name }).clips.length })); });
   assert.ok(names.length >= 20, `${names.length} lockups`);
   const logsBefore = logs.length;
   let i = 0;
   for (const L of names) {
     await ev(() => { const { store } = window.__app; store.mutate((p) => { p.clips = []; }); store.setPlayhead(0); });
     if (L.name === 'Rose script') await page.click('#add-lockup'); else await page.click(`[data-lockup="${L.name}"]`);
-    const info = await ev(() => { const { store } = window.__app; const tracks = new Set(store.project.clips.map((c) => c.trackId)); store.setPlayhead(2.2); return { clips: store.project.clips.length, tracks: tracks.size, fonts: [...new Set(store.project.clips.map((c) => c.text.font))] }; });
+    const info = await ev(() => { const { store } = window.__app; const tracks = new Set(store.project.clips.map((c) => c.trackId)); store.setPlayhead(2.2); return { clips: store.project.clips.length, tracks: tracks.size, fonts: [...new Set(store.project.clips.filter((c) => c.type === 'text').map((c) => c.text.font))] }; });
     assert.equal(info.clips, L.n, `${L.name}: ${L.n} clips`); assert.equal(info.tracks, L.n, `${L.name}: each part on its own track`);
     await settle(650);
     const lit = await ev(() => { const d = window.__grab(96, 54); let n = 0; for (let k = 0; k < d.length; k += 3) if (d[k] + d[k + 1] + d[k + 2] > 120) n++; return n / (d.length / 3); });

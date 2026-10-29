@@ -611,3 +611,20 @@ Copyright 2020 The Grenze Gotisch Project Authors (https://github.com/Omnibus-Ty
 --- IM Fell English SC ---
 Google Inc.
 (Each is licensed under the SIL Open Font License 1.1, reproduced above.)
+
+=== Hindi pack II (v0.6.0): Dekko, Gotu, Inknut Antiqua, Jaini, Kurale, Sarpanch, Tillana ===
+--- Inknut Antiqua ---
+Copyright (c) 2014 by Claus Eggers Srensen (es@forthehearts.net). InknutAntiqua-Regular.ttf: Copyright (c) 2014 by Claus Eggers Srensen (es@forthehearts.net). InknutAntiqua-Medium.ttf: Copyright (c) 2014 by Claus Eggers Srensen (es@forthehearts.net). InknutAntiqua-SemiBold.ttf: Copyright (c) 2014 by
+--- Tillana ---
+Copyright (c) 2014 Indian Type Foundry (info@indiantypefoundry.com) Tillana-Medium.ttf: Copyright (c) 2014 Indian Type Foundry (info@indiantypefoundry.com) Tillana-SemiBold.ttf: Copyright (c) 2014 Indian Type Foundry (info@indiantypefoundry.com) Tillana-Bold.ttf: Copyright (c) 2014 Indian Type Found
+--- Dekko ---
+Copyright (c) 2000, Modular Infotech, Pune, INDIA. Copyright (c) 2014, Sorkin Type Co, Boston, MA, USA (www.sorkintype.com)
+--- Jaini ---
+Copyright 2023 The Jaini Project Authors (https://github.com/EkType/Jaini)
+--- Sarpanch ---
+Copyright (c) 2014 Indian Type Foundry (info@indiantypefoundry.com) Sarpanch-Medium.ttf: Copyright (c) 2014 Indian Type Foundry (info@indiantypefoundry.com) Sarpanch-SemiBold.ttf: Copyright (c) 2014 Indian Type Foundry (info@indiantypefoundry.com) Sarpanch-Bold.ttf: Copyright (c) 2014 Indian Type Fo
+--- Gotu ---
+Copyright (c) 2016, Ek Type. All rights reserved.
+--- Kurale ---
+Copyright 2013 The Kurale Project Authors (edu@tipo.net.ar)
+(Each is licensed under the SIL Open Font License 1.1, reproduced above.)

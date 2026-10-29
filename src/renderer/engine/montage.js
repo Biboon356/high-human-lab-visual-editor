@@ -8,7 +8,7 @@ import { audioSources } from '/shared/export-plan.js';
 import { planSmartMontage, MONTAGE_STYLES, reframeFor } from '/shared/smart-montage.js';
 import { EFFECT_PRESETS, instantiatePreset, createEffect } from '/shared/effects-defs.js';
 import { ADJUST_LOOKS, ORGANIC_LOOKS, createAdjustClip } from '/shared/adjust-defs.js';
-import { createTitleLockup, LOCKUPS } from '/shared/text-defs.js';
+import { createLockupClips, LOCKUPS } from '/shared/text-defs.js';
 
 export { MONTAGE_STYLES };
 export const MONTAGE_DEFAULTS = { style: 'hype', intensity: 0.5, reframe: true, seed: 1, match: true, muteSource: true, title: false, titleKicker: '', titleText: '', lockup: LOCKUPS[0].name };
@@ -92,9 +92,10 @@ export function applyPlan({ project, plan, opts, prep }) {
   let title = null;
   if (o.title && (o.titleText || o.titleKicker) && total > 0) {
     const len = Math.min(3.5, Math.max(1.5, total / 3));
-    const [kicker, main] = createTitleLockup(0.3, len, { lockup: o.lockup, kicker: o.titleKicker, title: o.titleText });
-    // a blank field means "no line", not the lockup's sample words
-    for (const [c, text] of [[main, o.titleText], [kicker, o.titleKicker]]) if (text) { c.trackId = addTrack(project, 'video').id; addClipRaw(project, c); }
+    const { clips, kicker, title: main } = createLockupClips(0.3, len, { lockup: o.lockup, kicker: o.titleKicker, title: o.titleText });
+    // a blank field means "no line", not the lockup's sample words; a lockup's own sub line is sample text too, so it stays out of the cut
+    const drop = new Set([...(o.titleText ? [] : [main]), ...(o.titleKicker ? [] : [kicker]), ...clips.filter((c) => c.name.startsWith('Sub'))]);
+    for (const c of clips) if (!drop.has(c)) { c.trackId = addTrack(project, 'video').id; addClipRaw(project, c); }
     title = o.titleText ? main : kicker;
   }
   return { track, clips: made, adjust, title, mutedSource: muteSource };
