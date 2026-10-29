@@ -3,6 +3,7 @@ import { store } from '../store.js';
 import { addMediaClip, trackEnd, addTrack, overlaps } from '/shared/timeline.js';
 import { createTextClip, createTitleLockup, lockupFonts, LOCKUPS, TEXT_PRESETS } from '/shared/text-defs.js';
 import { placeAdlibs, adlibWordsDefault } from '../engine/rhythm-tools.js';
+import { SHAPES, SHAPE_KINDS, createShapeClip } from '/shared/shape-defs.js';
 import { createGeneratorClip, GEN_PRESETS } from '/shared/organic-defs.js';
 import { createAdjustClip, ADJUST_LOOKS, ORGANIC_LOOKS } from '/shared/adjust-defs.js';
 import { addClipRaw, projectDuration } from '/shared/timeline.js';
@@ -166,6 +167,8 @@ export function mountMediaBin({ onImport }) {
   const tp = document.getElementById('text-presets');
   for (const p of TEXT_PRESETS) tp.append(el('button', { onclick: () => addOverlayClip((s) => createTextClip(p, s, 4)) }, p.name, el('small', { text: `${p.text.font} · ${p.text.anim?.type || 'static'}` })));
   document.getElementById('add-text').onclick = () => addOverlayClip((s) => createTextClip(null, s, 4));
+  const sl = document.getElementById('shape-list');
+  for (const k of SHAPE_KINDS) sl.append(el('button', { 'data-shape': k, onclick: () => addOverlayClip((s) => createShapeClip(k, s, 4)) }, SHAPES[k].label, el('small', { text: 'shape' })));
   const aw = document.getElementById('adlib-words'); aw.value = adlibWordsDefault();
   document.getElementById('adlib-place').onclick = () => placeAdlibs({ words: aw.value, every: Number(document.getElementById('adlib-every').value) });
   const addLockup = (name) => {

@@ -8,6 +8,7 @@ import { EFFECTS } from '/shared/effects-defs.js';
 import { GEN_PARAMS } from '/shared/organic-defs.js';
 import { resolveParam, resolveClipProps, fadeFactor, transitionAt } from '/shared/params.js';
 import { drawTextClip } from './text-renderer.js';
+import { drawShapeClip } from './shape-renderer.js';
 import { rasterizeMask } from './mask-renderer.js';
 import { normalizeMask, normalizeMatte, canBeMatte, matteSourceIds, maskKey } from '/shared/mask.js';
 import { drawRoots } from './roots-renderer.js';
@@ -268,6 +269,12 @@ export class Compositor {
       ready = true;
     } else if (clip.type === 'text') {
       drawTextClip(this.textCtx, this.w, this.h, clip, tl, props);
+      const tex = this._upload(this.textCanvas);
+      this._clear(this.fbos.a, 0, 0, 0, 0);
+      this._drawLayer(tex, this.w / 2, this.h / 2, 0, 0, 0, 1);
+      ready = true;
+    } else if (clip.type === 'shape') {
+      drawShapeClip(this.textCtx, this.w, this.h, clip, tl, props);
       const tex = this._upload(this.textCanvas);
       this._clear(this.fbos.a, 0, 0, 0, 0);
       this._drawLayer(tex, this.w / 2, this.h / 2, 0, 0, 0, 1);

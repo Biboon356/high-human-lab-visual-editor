@@ -3,6 +3,7 @@
 import { el } from './dom.js';
 import { store } from '../store.js';
 import { drawTextClip } from '../engine/text-renderer.js';
+import { drawShapeClip } from '../engine/shape-renderer.js';
 import { resolveClipProps } from '/shared/params.js';
 import { activeVisualClips } from '/shared/timeline.js';
 import { mediaBox, inBox, boxCenter, alphaBox, snapToCentre } from '/shared/pick.js';
@@ -28,14 +29,14 @@ export function mountPreviewEdit({ preview }) {
   function boxFor(clip) {
     const W = preview.comp.w, H = preview.comp.h, tl = store.playhead - clip.start;
     const props = resolveClipProps(clip, tl, null);
-    if (clip.type === 'text') {
+    if (clip.type === 'text' || clip.type === 'shape') {
       if (scratch.width !== W || scratch.height !== H) { scratch.width = W; scratch.height = H; }
-      drawTextClip(sctx, W, H, clip, tl, { ...props, opacity: 1 });
+      (clip.type === 'text' ? drawTextClip : drawShapeClip)(sctx, W, H, clip, tl, { ...props, opacity: 1 });
       return alphaBox(sctx.getImageData(0, 0, W, H).data, W, H);
     }
     return mediaBox(store.project, clip, props, W, H);
   }
-  const pickable = (c) => c.type === 'text' || (c.type === 'media' && mediaBox(store.project, c, resolveClipProps(c, 0, null), 100, 100));
+  const pickable = (c) => c.type === 'text' || c.type === 'shape' || (c.type === 'media' && mediaBox(store.project, c, resolveClipProps(c, 0, null), 100, 100));
 
   /** Topmost text/picture under the point (text is matched by the box around its letters, so the gaps between words count). */
   function pick(x, y) {

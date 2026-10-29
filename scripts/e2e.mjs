@@ -1206,6 +1206,34 @@ await step('genre looks render: desi patterns, zine, vaporwave, brutalist and me
   await shot('33-ransom');
 });
 
+await step('shape clips: every kind draws, the Inspector edits them, they pick, move and fade like a title', async () => {
+  await resetProject();
+  await page.click('#panel-left [data-tab="type"]');
+  await ev(() => { const { store } = window.__app; store.mutate((p) => { p.settings.width = 640; p.settings.height = 360; }); });
+  const kinds = await ev(async () => (await import('/shared/shape-defs.js')).SHAPE_KINDS);
+  assert.ok(kinds.length >= 15);
+  for (const k of kinds) {
+    await ev(() => { const { store } = window.__app; store.mutate((p) => { p.clips = []; }); store.setPlayhead(0); });
+    await page.click(`[data-shape="${k}"]`);
+    await ev(() => window.__app.store.setPlayhead(1)); await settle(420);
+    const n = await ev(() => { const d = window.__grab(160, 90); let c = 0; for (let i = 0; i < d.length; i += 3) if (d[i] + d[i + 1] + d[i + 2] > 60) c++; return c; });
+    assert.ok(n >= 3, `shape "${k}" draws pixels (${n})`);
+  }
+  // edit through the Inspector, then move it by dragging in the preview
+  await page.click('[data-shape="ellipse"]'); await page.click('#panel-right [data-tab="inspector"]');
+  assert.equal(await ev(() => document.querySelectorAll('[data-shape-kind]').length), 1, 'the Inspector has a Shape card');
+  await ev(() => { const { store } = window.__app; store.setPlayhead(1); const c = store.selectedClip; c.shape.size = 0.3; c.shape.color = '#ffffff'; store.touch('project'); }); await settle(500);
+  const centre = await ev(() => { const d = window.__grab(64, 36); return d[(18 * 64 + 32) * 3]; });
+  assert.ok(centre > 200, `the disc sits in the middle (${centre})`);
+  const at = await ev(() => { const s = window.__app.previewEdit.toScreen(320, 180); return s; });
+  await page.mouse.move(at.x, at.y); await page.mouse.down(); await page.mouse.move(at.x + 120, at.y, { steps: 5 }); await page.mouse.up();
+  const x = await ev(() => window.__app.store.selectedClip.props.x); assert.ok(x > 0.1, `dragging the shape in the preview moves it (${x})`);
+  await ev(() => { const c = window.__app.store.selectedClip; c.fadeIn = 1; window.__app.store.setPlayhead(c.start + 0.05); }); await settle(400);
+  const faint = await ev(() => { const d = window.__grab(64, 36); let m = 0; for (let i = 0; i < d.length; i += 3) m = Math.max(m, d[i]); return m; });
+  assert.ok(faint < 90, `a fade-in dims it at the start (${faint})`);
+  await shot('34-shapes');
+});
+
 await step('montage v2: favourites and skip flags, hook + calm close, Y2K style grades the whole cut, optional title card, footage sound muted, exports', async () => {
   await resetProject();
   // regression: asking for an analysis while there is no song yet must not wedge the analysis for good

@@ -41,7 +41,7 @@ export function createClip(fields) {
   return {
     id: uid('clip'),
     trackId: null,
-    type: 'media', // 'media' | 'text' | 'generator' | 'adjust' (effects-only layer that grades everything below it)
+    type: 'media', // 'media' | 'text' | 'shape' | 'generator' | 'adjust' (effects-only layer that grades everything below it)
     mediaId: null,
     name: '',
     start: 0,

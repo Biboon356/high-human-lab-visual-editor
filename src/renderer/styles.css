@@ -200,7 +200,7 @@ textarea { width: 100%; }
 .clip { position: absolute; top: 4px; bottom: 4px; border-radius: 0; background: var(--clip-video); border: 0; border-top: 1px solid rgba(255,255,255,.16); box-shadow: inset 0 0 0 1px rgba(0,0,0,.35); overflow: hidden; cursor: grab; color: var(--text); font-size: 11px; font-weight: 500; display: flex; align-items: center; padding: 0 9px; white-space: nowrap; user-select: none; transition: filter .16s; }
 .clip:hover { filter: brightness(1.14); }
 [data-theme="light"] .clip { color: #0d1410; border-top-color: rgba(255,255,255,.5); box-shadow: inset 0 0 0 1px rgba(0,0,0,.18); }
-.clip.audio { background: var(--clip-audio); } .clip.text { background: var(--clip-text); } .clip.generator { background: var(--clip-gen); } .clip.adjust { background: repeating-linear-gradient(135deg, var(--clip-adjust) 0 6px, transparent 6px 12px), var(--clip-adjust2); } .clip.image { background: var(--clip-image); }
+.clip.audio { background: var(--clip-audio); } .clip.text { background: var(--clip-text); } .clip.shape { background: var(--clip-text); background-image: repeating-linear-gradient(45deg, rgba(255,255,255,.07) 0 4px, transparent 4px 8px); } .clip.generator { background: var(--clip-gen); } .clip.adjust { background: repeating-linear-gradient(135deg, var(--clip-adjust) 0 6px, transparent 6px 12px), var(--clip-adjust2); } .clip.image { background: var(--clip-image); }
 .clip.sel { box-shadow: 0 0 0 1px var(--text), inset 0 0 0 1px var(--text); z-index: 3; }
 .clip .nm { overflow: hidden; text-overflow: ellipsis; pointer-events: none; } .clip .badge { margin-left: 8px; font: 9px var(--mono); opacity: .75; pointer-events: none; }
 .clip .kfs { position: absolute; bottom: 1px; left: 0; right: 0; height: 5px; pointer-events: none; }
