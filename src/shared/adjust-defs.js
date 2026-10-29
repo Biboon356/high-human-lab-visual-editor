@@ -27,6 +27,9 @@ export const ADJUST_LOOKS = [
   { name: 'Synthwave Grid', note: 'sunset sky and a neon floor rushing at you', chain: [fx('grid3d', { horizon: 0.42, sky: 1, speed: 0.6 }), fx('bloom', { threshold: 0.7, intensity: 0.5, radius: 40 }), fx('crt', { scan: 0.15, bleed: 0.006, curve: 0.05 })] },
   { name: 'Grid Floor (over footage)', note: 'neon floor lines only, your picture stays as the sky', chain: [fx('grid3d', { horizon: 0.38, sky: 0, floor: 0.35, speed: 0.5, color: '#7dffb0', color2: '#38e1ff' }), fx('bloom', { threshold: 0.7, intensity: 0.45, radius: 36 })] },
   { name: 'Mall Tape', note: 'tired VHS, pink shadows', chain: [fx('vhs', { jitter: 0.25, bleed: 0.014, noise: 0.35, tracking: 0.3 }), fx('color', { saturation: 1.2, contrast: 1.1, hue: -12 }), fx('bloom', { threshold: 0.6, intensity: 0.5 })] },
+  { name: 'Fade out to black', note: 'the last 1.5 s of the cut dips to black', fade: 'out', chain: [fx('color', { brightness: -1, contrast: 1 })] },
+  { name: 'Fade in from black', note: 'the first 1.2 s rises from black', fade: 'in', chain: [fx('color', { brightness: -1, contrast: 1 })] },
+  { name: 'Fade out to white', note: 'the last 1.5 s flares to white', fade: 'out', chain: [fx('color', { brightness: 1, contrast: 1 })] },
 ];
 
 // Organic looks live INSIDE the picture: veins that grow in from an edge, take their light from the footage and bend it.

@@ -1,5 +1,6 @@
 // Parameter resolution: base value -> keyframes -> audio-reactive binding.
 import { evalTrack } from './keyframes.js';
+import { MASK_PROPS } from './mask.js';
 
 export const REACTIVE_SOURCES = ['rms', 'bass', 'mid', 'high', 'beat'];
 
@@ -41,7 +42,7 @@ export const BLEND_MODES = ['normal', 'add', 'screen', 'multiply', 'exclusion'];
 /** Resolves every clip-level numeric prop at clip-relative time t. */
 export function resolveClipProps(clip, t, feats) {
   const out = {};
-  for (const d of [...CLIP_PROPS, ...TEXT_PROPS]) {
+  for (const d of [...CLIP_PROPS, ...TEXT_PROPS, ...MASK_PROPS]) {
     out[d.key] = resolveParam(clip, d.key, clip.props[d.key] ?? d.def, t, feats, [d.min, d.max]);
   }
   out.blend = clip.props.blend || 'normal';

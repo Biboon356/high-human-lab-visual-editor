@@ -25,8 +25,17 @@ void main(){
 }`;
 
 export const FRAG_LAYER = `#version 300 es
-precision highp float; in vec2 v_uv; out vec4 o; uniform sampler2D u_tex; uniform float u_opacity;
-void main(){ o = texture(u_tex, v_uv)*u_opacity; }`;
+precision highp float; in vec2 v_uv; out vec4 o; uniform sampler2D u_tex, u_mask, u_matte; uniform float u_opacity, u_hasMask, u_maskInv, u_matteMode, u_matteInv; uniform vec2 u_res;
+void main(){
+  vec4 c = texture(u_tex, v_uv)*u_opacity;
+  if(u_hasMask > .5 || u_matteMode > .5){                // mask / matte live in frame space, whatever the layer's own transform
+    vec2 s = gl_FragCoord.xy/u_res; float m = 1.;
+    if(u_hasMask > .5){ float a = texture(u_mask, s).a; m *= mix(a, 1.-a, u_maskInv); }
+    if(u_matteMode > .5){ vec4 t = texture(u_matte, s); float a = clamp(u_matteMode < 1.5 ? t.a : dot(t.rgb, vec3(.2126,.7152,.0722)), 0., 1.); m *= mix(a, 1.-a, u_matteInv); }
+    c *= m;
+  }
+  o = c;
+}`;
 
 export const FRAG_BLIT = FRAG_LAYER;
 

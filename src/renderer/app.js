@@ -1,5 +1,4 @@
 import { reverseSelected, freezeAtPlayhead } from './engine/edit-tools.js';
-import { mountPresetLibrary } from './ui/preset-library-ui.js';
 import { mountPreviewEdit } from './ui/preview-edit.js';
 import { store } from './store.js';
 import { toast } from './ui/dom.js';
@@ -7,6 +6,7 @@ import { createProject } from '/shared/project.js';
 import { mountPreview } from './ui/preview.js';
 import { mountTimeline, setMark, clearRange, splitSelected, deleteSelected, duplicateSelected, copySelected, pasteClip, cutOnBeats, autoMontage } from './ui/timeline-ui.js';
 import { mountInspector } from './ui/inspector.js';
+import { mountMaskEditor, maskEdit } from './ui/mask-ui.js';
 import { mountMediaBin, importResults } from './ui/media-bin.js';
 import { mountReactive, runAnalysis } from './ui/reactive-ui.js';
 import { mountProjectSettings } from './ui/project-settings.js';
@@ -127,10 +127,10 @@ if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
 // ---- mount modules
 const preview = mountPreview();
 const previewEdit = mountPreviewEdit({ preview });
+const maskEditor = mountMaskEditor({ preview });
 const timeline = mountTimeline();
 mountInspector($('inspector'));
 mountMediaBin({ onImport: importResults });
-mountPresetLibrary();
 mountReactive($('reactive'));
 mountProjectSettings($('project-settings'));
 startRoots($('bg-roots'), () => store.playing || isExporting());
@@ -179,7 +179,7 @@ document.addEventListener('paste', (e) => { if (!inTextField() && store.clipboar
 
 // ---- automation hook (used by scripts/e2e.mjs; harmless in normal use)
 window.__app = {
-  reverseSelected, freezeAtPlayhead, previewEdit, store, preview, timeline, autoEdit: autoEditEngine, captionEdit: { applyCaptionEdits }, smartMontage, autosave: { writeNow, offerRecovery }, runAnalysis, cutOnBeats, autoMontage, importPaths: async (paths) => importResults(await hh.probePaths(paths)),
+  reverseSelected, freezeAtPlayhead, previewEdit, maskEditor, maskEdit, store, preview, timeline, autoEdit: autoEditEngine, captionEdit: { applyCaptionEdits }, smartMontage, autosave: { writeNow, offerRecovery }, runAnalysis, cutOnBeats, autoMontage, importPaths: async (paths) => importResults(await hh.probePaths(paths)),
   exportTo: async (outPath, overrides = {}) => {
     const s = store.project.settings;
     const { range: _r, ...ov } = overrides; const settings = { width: s.width, height: s.height, fps: s.fps, quality: "draft", format: outPath.endsWith(".webm") ? "webm" : "mp4", ...ov, outPath };

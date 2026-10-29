@@ -76,3 +76,9 @@ test('3D object effect: option lists match the shader branches', () => {
   assert.equal(p('background').options.length, 4);
   assert.equal(EFFECTS.grid3d.params.find((d) => d.key === 'sky').options.length, 2);
 });
+
+test('fade looks are single colour layers that place themselves (out = end, in = start)', () => {
+  const fades = ADJUST_LOOKS.filter((l) => l.fade);
+  assert.deepEqual(fades.map((l) => l.fade).sort(), ['in', 'out', 'out']);
+  for (const l of fades) assert.equal(l.chain.length, 1);
+});

@@ -8,6 +8,8 @@ import { EFFECTS } from '/shared/effects-defs.js';
 import { GEN_PARAMS } from '/shared/organic-defs.js';
 import { resolveParam, resolveClipProps, fadeFactor, transitionAt } from '/shared/params.js';
 import { drawTextClip } from './text-renderer.js';
+import { rasterizeMask } from './mask-renderer.js';
+import { normalizeMask, normalizeMatte, canBeMatte, matteSourceIds, maskKey } from '/shared/mask.js';
 import { drawRoots } from './roots-renderer.js';
 
 const STYLE_INDEX = { roots: 0, fluid: 1, cells: 2, dust: 3 };
@@ -24,6 +26,10 @@ export class Compositor {
     this.textCanvas = document.createElement('canvas');
     this.textCtx = this.textCanvas.getContext('2d');
     this.srcTex = this._texture();
+    this.maskCanvas = document.createElement('canvas');
+    this.maskScratch = document.createElement('canvas');
+    this.maskCtx = this.maskCanvas.getContext('2d');
+    this.maskTex = new Map(); // clip id -> {key, tex}: a mask is redrawn only when something about it changed
     this.imageTex = new WeakMap();
     this.pixels = null;
     this._initQuad();
@@ -100,7 +106,10 @@ export class Compositor {
     this.canvas.width = w; this.canvas.height = h;
     this.textCanvas.width = w; this.textCanvas.height = h;
     for (const f of Object.values(this.fbos)) { gl.deleteTexture(f.tex); gl.deleteFramebuffer(f.fbo); }
-    this.fbos = { a: this._fbo(w, h), b: this._fbo(w, h), acc: this._fbo(w, h) };
+    this.fbos = { a: this._fbo(w, h), b: this._fbo(w, h), acc: this._fbo(w, h), m: this._fbo(w, h) };
+    this.maskCanvas.width = this.maskScratch.width = w; this.maskCanvas.height = this.maskScratch.height = h;
+    for (const e of this.maskTex.values()) gl.deleteTexture(e.tex);
+    this.maskTex.clear();
     this.pixels = null;
   }
 
@@ -136,7 +145,7 @@ export class Compositor {
   }
 
   /** t3: optional {flipX, flipY, rotX, rotY, depth} from the clip's props (degrees; depth 0..1 = how strong the perspective is). */
-  _drawLayer(tex, halfW, halfH, offX, offY, rot, opacity, t3 = null) {
+  _drawLayer(tex, halfW, halfH, offX, offY, rot, opacity, t3 = null, ex = null) {
     const p = this._program('layer', VERT_LAYER, FRAG_LAYER);
     this._use(p);
     this._set2('u_flip', t3?.flipX ? -1 : 1, t3?.flipY ? -1 : 1);
@@ -150,7 +159,36 @@ export class Compositor {
     this._set2('u_offset', offX, offY);
     this._set1('u_rot', rot);
     this._set1('u_opacity', opacity);
+    // Sampler uniforms persist per program: an unused mask/matte sampler must point at unit 0, and a matte texture must never stay
+    // bound while it is the render target (that is a feedback loop and the draw is silently dropped).
+    this._set1('u_hasMask', ex?.mask ? 1 : 0);
+    this._set1('u_matteMode', ex?.matte ? ex.matteMode : 0);
+    this._set1i('u_mask', ex?.mask ? 1 : 0);
+    this._set1i('u_matte', ex?.matte ? 2 : 0);
+    if (ex?.mask) { this._set1('u_maskInv', ex.maskInv ? 1 : 0); this._bindUnit(1, ex.mask); }
+    if (ex?.matte) { this._set1('u_matteInv', ex.matteInv ? 1 : 0); this._bindUnit(2, ex.matte); }
     this._draw();
+    if (ex) { this._bindUnit(1, null); this._bindUnit(2, null); this._bindTex(tex); } // leave unit 0 active for the next caller
+  }
+  _bindUnit(n, tex) { const gl = this.gl; gl.activeTexture(gl.TEXTURE0 + n); gl.bindTexture(gl.TEXTURE_2D, tex); gl.activeTexture(gl.TEXTURE0); }
+
+  /** Texture of the clip's rasterised mask, or null when it has none. */
+  _maskFor(clip, props) {
+    const mask = normalizeMask(clip.mask);
+    if (!mask) return null;
+    const key = maskKey(mask, props, this.w, this.h);
+    let e = this.maskTex.get(clip.id);
+    if (!e) { e = { key: '', tex: this._texture() }; this.maskTex.set(clip.id, e); }
+    if (e.key !== key) {
+      rasterizeMask(this.maskCtx, this.maskScratch, mask, props, this.w, this.h);
+      const gl = this.gl;
+      this._bindTex(e.tex);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+      gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.maskCanvas);
+      e.key = key;
+    }
+    return { tex: e.tex, inv: mask.invert };
   }
 
   _blend(mode) {
@@ -206,6 +244,66 @@ export class Compositor {
   }
 
   /**
+   * Draws one clip (source -> effect chain) into the A/B buffers and returns where the result ended up, or null when
+   * the clip has nothing to show this frame. The layer is not yet laid onto the frame.
+   */
+  _renderLayer(project, clip, t, sources, features, missing, resolved) {
+    const gl = this.gl;
+    const tl = t - clip.start;
+    const props = resolved || resolveClipProps(clip, tl, features);
+    props.opacity *= fadeFactor(clip, tl);
+    const trans = transitionAt(clip, tl);
+    if (trans) props.scale *= trans.scaleMul;
+    let ready = false;
+    const t3 = { flipX: clip.props.flipX, flipY: clip.props.flipY, rotX: props.rotX, rotY: props.rotY, depth: props.depth };
+    const flat = clip.type === 'media' || clip.type === 'adjust'; // pictures tilt about their own centre when drawn; the rest tilt as a full-frame card at the end
+
+    if (clip.type === 'media') {
+      const fr = sources.frameFor(project, clip);
+      if (!fr) { const m = findMedia(project, clip.mediaId); if (m) missing.push(m.name); return null; }
+      const tex = fr.data ? this._uploadRaw(fr.data, fr.w, fr.h) : this._upload(fr.el);
+      this._clear(this.fbos.a, 0, 0, 0, 0);
+      const fit = Math.min(this.w / fr.w, this.h / fr.h) * props.scale;
+      this._drawLayer(tex, (fr.w * fit) / 2, (fr.h * fit) / 2, props.x * this.w, props.y * this.h, (-props.rotation * Math.PI) / 180, 1, t3);
+      ready = true;
+    } else if (clip.type === 'text') {
+      drawTextClip(this.textCtx, this.w, this.h, clip, tl, props);
+      const tex = this._upload(this.textCanvas);
+      this._clear(this.fbos.a, 0, 0, 0, 0);
+      this._drawLayer(tex, this.w / 2, this.h / 2, 0, 0, 0, 1);
+      ready = true;
+    } else if (clip.type === 'generator' && clip.gen.style === 'tree') {
+      const gp = {};
+      for (const d of GEN_PARAMS) gp[d.key] = d.options ? Number(clip.gen.params[d.key] ?? d.def) : resolveParam(clip.gen, d.key, clip.gen.params[d.key] ?? d.def, tl, features, [d.min, d.max]);
+      drawRoots(this.textCtx, this.w, this.h, !!clip.gen.transparent, gp, t);
+      const tex = this._upload(this.textCanvas);
+      this._clear(this.fbos.a, 0, 0, 0, 0);
+      this._drawLayer(tex, this.w / 2, this.h / 2, 0, 0, 0, 1);
+      ready = true;
+    } else if (clip.type === 'adjust') {
+      // adjustment layer: everything composited so far becomes this clip's input; its effects grade the whole stack below
+      this._target(this.fbos.a);
+      gl.disable(gl.BLEND);
+      this._drawLayer(this.fbos.acc.tex, this.w / 2, this.h / 2, 0, 0, 0, 1);
+      ready = true;
+    } else if (clip.type === 'generator') {
+      this._runGenerator(clip, tl, features, t);
+      // generator fills the frame; scale/position don't apply, opacity does
+      ready = true;
+    }
+    if (!ready) return null;
+
+    let cur = this.fbos.a, other = this.fbos.b;
+    const chain = trans ? [...clip.effects, ...trans.effects] : clip.effects;
+    for (const fx of chain) {
+      if (!fx.enabled || !EFFECTS[fx.type]) continue;
+      this._runEffect(fx, cur, other, clip, tl, features, t);
+      [cur, other] = [other, cur];
+    }
+    return { cur, props, t3, flat };
+  }
+
+  /**
    * @param {object} ctx {project, t, sources, features}
    * @returns {{missing:string[]}} names of media that had no frame available this tick
    */
@@ -213,63 +311,39 @@ export class Compositor {
     const gl = this.gl;
     const missing = [];
     this._clear(this.fbos.acc, 0, 0, 0, 1);
+    const active = activeVisualClips(project, t);
+    const matteIds = matteSourceIds(project); // clips that only serve as someone's matte are not drawn themselves
 
-    for (const clip of activeVisualClips(project, t)) {
+    for (const clip of active) {
+      if (matteIds.has(clip.id)) continue;
       const tl = t - clip.start;
       const props = resolveClipProps(clip, tl, features);
-      props.opacity *= fadeFactor(clip, tl);
-      const trans = transitionAt(clip, tl);
-      if (trans) props.scale *= trans.scaleMul;
-      let ready = false;
-      const t3 = { flipX: clip.props.flipX, flipY: clip.props.flipY, rotX: props.rotX, rotY: props.rotY, depth: props.depth };
-      const flat = clip.type === 'media' || clip.type === 'adjust'; // pictures tilt about their own centre when drawn; the rest tilt as a full-frame card at the end
 
-      if (clip.type === 'media') {
-        const fr = sources.frameFor(project, clip);
-        if (!fr) { const m = findMedia(project, clip.mediaId); if (m) missing.push(m.name); continue; }
-        const tex = fr.data ? this._uploadRaw(fr.data, fr.w, fr.h) : this._upload(fr.el);
-        this._clear(this.fbos.a, 0, 0, 0, 0);
-        const fit = Math.min(this.w / fr.w, this.h / fr.h) * props.scale;
-        this._drawLayer(tex, (fr.w * fit) / 2, (fr.h * fit) / 2, props.x * this.w, props.y * this.h, (-props.rotation * Math.PI) / 180, 1, t3);
-        ready = true;
-      } else if (clip.type === 'text') {
-        drawTextClip(this.textCtx, this.w, this.h, clip, tl, props);
-        const tex = this._upload(this.textCanvas);
-        this._clear(this.fbos.a, 0, 0, 0, 0);
-        this._drawLayer(tex, this.w / 2, this.h / 2, 0, 0, 0, 1);
-        ready = true;
-      } else if (clip.type === 'generator' && clip.gen.style === 'tree') {
-        const gp = {};
-        for (const d of GEN_PARAMS) gp[d.key] = d.options ? Number(clip.gen.params[d.key] ?? d.def) : resolveParam(clip.gen, d.key, clip.gen.params[d.key] ?? d.def, tl, features, [d.min, d.max]);
-        drawRoots(this.textCtx, this.w, this.h, !!clip.gen.transparent, gp, t);
-        const tex = this._upload(this.textCanvas);
-        this._clear(this.fbos.a, 0, 0, 0, 0);
-        this._drawLayer(tex, this.w / 2, this.h / 2, 0, 0, 0, 1);
-        ready = true;
-      } else if (clip.type === 'adjust') {
-        // adjustment layer: everything composited so far becomes this clip's input; its effects grade the whole stack below
-        this._target(this.fbos.a);
-        gl.disable(gl.BLEND);
-        this._drawLayer(this.fbos.acc.tex, this.w / 2, this.h / 2, 0, 0, 0, 1);
-        ready = true;
-      } else if (clip.type === 'generator') {
-        this._runGenerator(clip, tl, features, t);
-        // generator fills the frame; scale/position don't apply, opacity does
-        ready = true;
+      // A matte is another clip's finished picture. It is drawn first (it needs the same scratch buffers), parked in buffer m,
+      // and then multiplied into this clip when it is laid onto the frame.
+      const mt = normalizeMatte(clip.matte);
+      let matteTex = null;
+      if (mt && canBeMatte(project, clip, mt.source)) {
+        const src = active.find((c) => c.id === mt.source);
+        this._clear(this.fbos.m, 0, 0, 0, 0);
+        if (src) {
+          const L = this._renderLayer(project, src, t, sources, features, missing, null);
+          if (L) { this._target(this.fbos.m); gl.disable(gl.BLEND); this._drawLayer(L.cur.tex, this.w / 2, this.h / 2, 0, 0, 0, L.props.opacity, L.flat ? null : L.t3); }
+        }
+        matteTex = this.fbos.m.tex;
       }
-      if (!ready) continue;
 
-      let cur = this.fbos.a, other = this.fbos.b;
-      const chain = trans ? [...clip.effects, ...trans.effects] : clip.effects;
-      for (const fx of chain) {
-        if (!fx.enabled || !EFFECTS[fx.type]) continue;
-        this._runEffect(fx, cur, other, clip, tl, features, t);
-        [cur, other] = [other, cur];
-      }
+      const L = this._renderLayer(project, clip, t, sources, features, missing, props);
+      if (!L) continue;
+      const mask = this._maskFor(clip, props);
+      const ex = mask || matteTex ? {
+        mask: mask?.tex || null, maskInv: !!mask?.inv,
+        matte: matteTex, matteMode: mt?.use === 'luma' ? 2 : 1, matteInv: !!mt?.invert,
+      } : null;
 
       this._target(this.fbos.acc);
-      this._blend(props.blend);
-      this._drawLayer(cur.tex, this.w / 2, this.h / 2, 0, 0, 0, props.opacity, flat ? null : t3);
+      this._blend(L.props.blend);
+      this._drawLayer(L.cur.tex, this.w / 2, this.h / 2, 0, 0, 0, L.props.opacity, L.flat ? null : L.t3, ex);
       gl.disable(gl.BLEND);
     }
 

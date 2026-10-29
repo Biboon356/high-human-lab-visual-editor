@@ -9,6 +9,7 @@ import { CLIP_PROPS, TEXT_PROPS, BLEND_MODES, TRANSITIONS } from '/shared/params
 import { TEXT_ANIMATIONS } from '/shared/text-defs.js';
 import { ensureFontList } from './fonts.js';
 import { GEN_PARAMS, GEN_STYLES } from '/shared/organic-defs.js';
+import { maskCard, matteCard } from './mask-ui.js';
 
 const USER_PRESET_KEY = 'hhlab.userEffectPresets';
 const loadUserPresets = () => { try { return JSON.parse(localStorage.getItem(USER_PRESET_KEY) || '[]'); } catch { return []; } };
@@ -93,7 +94,7 @@ export function mountInspector(root) {
 
     if (clip.type === 'text') root.append(textCard(clip, lt));
     if (clip.type === 'generator') root.append(genCard(clip, lt));
-    if (clip.type !== 'media' || media?.kind !== 'audio') root.append(effectsCard(clip, lt));
+    if (clip.type !== 'media' || media?.kind !== 'audio') root.append(effectsCard(clip, lt), maskCard(clip, lt, card), matteCard(clip, card));
   };
 
   function textCard(clip, lt) {
@@ -188,6 +189,7 @@ export function mountInspector(root) {
 
   // Re-render only when the selection or clip structure changes; slider drags use 'render' and never rebuild.
   store.on('selection', render);
+  store.on('maskedit', render);
   store.on('project', () => { if (!document.activeElement || !root.contains(document.activeElement) || document.activeElement.tagName === 'BUTTON') render(); else if (lastId !== store.selection) render(); });
   store.on('playhead', () => { for (const u of rowUpdaters) u(); });
   store.on('keyframes', () => { for (const u of rowUpdaters) u(); });

@@ -897,40 +897,91 @@ await step('basic edits: reverse plays backwards (picture + sound) and undoes, f
   await shot('27-basic-edits');
 });
 
-await step('presets: a large searchable library; click adds a multi-effect chain to the selected clip, Layer adds an adjustment layer, every preset renders without shader errors', async () => {
+await step('masks and mattes: ellipse/rectangle/drawn shapes cut the picture, invert, cut-out, grow, move over time, drag handles; a title or a luma picture works as a matte', async () => {
+  const wh = path.join(dir, 'mask-white.png'), halfL = path.join(dir, 'mask-half.png');
+  sh(FFMPEG, ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'color=c=white:s=320x180', '-frames:v', '1', wh]);
+  sh(FFMPEG, ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'color=c=white:s=320x180,drawbox=x=160:y=0:w=160:h=180:c=black:t=fill', '-frames:v', '1', halfL]);
   await resetProject();
-  await ev(async (c) => { await window.__app.importPaths([c]); const { store } = window.__app; store.mutate((p) => { p.settings.width = 320; p.settings.height = 180; }); store.select(store.project.clips[0].id); store.setPlayhead(1.5); }, clip);
-  await page.click('#panel-left [data-tab="presets"]');
-  const total = await ev(() => document.querySelectorAll('#preset-list .preset-row').length);
-  assert.ok(total >= 120, `the list shows the whole library (${total})`);
-  await page.fill('#preset-search', 'vhs'); const vhs = await ev(() => document.querySelectorAll('#preset-list .preset-row').length);
-  assert.ok(vhs >= 5 && vhs < total, `search narrows the list (${vhs})`);
-  await page.fill('#preset-search', ''); await page.click('#preset-cats [data-cat="Glitch"]');
-  assert.ok((await ev(() => [...document.querySelectorAll('#preset-list .preset-row')].length)) >= 10, 'a category filters');
-  await page.click('#preset-cats [data-cat="All"]');
-  await page.fill('#preset-search', 'datamosh');
-  const before = await ev(() => window.__app.store.selectedClip.effects.length);
-  await page.click('#preset-list [data-preset="glitch/datamosh-smear"]');
-  const after = await ev(() => window.__app.store.selectedClip.effects.map((e) => e.type));
-  assert.equal(after.length - before, 3, `a three-effect chain was added (${after})`); assert.ok(after.includes('mosh'));
-  await ev(() => window.__app.store.undo());
-  assert.equal(await ev(() => window.__app.store.selectedClip.effects.length), before, 'one Undo removes the whole chain');
-  await page.fill('#preset-search', 'chrome hour'); await page.click('#preset-list [data-layer="y2k/chrome-hour"]');
-  assert.equal(await ev(() => window.__app.store.project.clips.filter((c) => c.type === 'adjust').length), 1, 'Layer adds an adjustment layer');
-  // every preset renders: apply each as a layer, grab a frame, no GL/shader errors logged
-  const errs = logs.length;
-  const ids = await ev(async () => (await import('/shared/preset-library.js')).PRESET_LIBRARY.map((p) => p.id));
-  let changed = 0;
-  const base = await ev(() => { window.__app.store.project.clips = window.__app.store.project.clips.filter((c) => c.type !== 'adjust'); window.__app.store.touch('project'); return window.__grab(32, 18); });
-  for (const id of ids) {
-    await ev(async (id) => { const { store } = window.__app; const L = await import('/shared/preset-library.js'); const A = await import('/shared/adjust-defs.js'); const T = await import('/shared/timeline.js');
-      store.mutate((p) => { p.clips = p.clips.filter((c) => c.type !== 'adjust'); const c = A.createAdjustClip(L.PRESET_LIBRARY.find((x) => x.id === id), 0, 6); c.trackId = T.addTrack(p, 'video').id; T.addClipRaw(p, c); }); store.setPlayhead(4.5); }, id);
-    await settle(180);
-    const d = await ev(() => window.__grab(32, 18)); let s = 0; for (let i = 0; i < d.length; i++) s += Math.abs(d[i] - base[i]); if (s / d.length > 0.5) changed++;
-  }
-  assert.ok(changed >= ids.length * 0.9, `${changed} of ${ids.length} presets visibly change the picture`);
-  assert.equal(logs.slice(errs).filter((l) => /shader|compile|GLSL|WebGL|error/i.test(l)).length, 0, 'no shader or GL errors in the console');
-  await page.fill('#preset-search', ''); await shot('28-presets');
+  await ev(async ([w]) => { await window.__app.importPaths([w]); const { store } = window.__app; const { addMediaClip } = await import('/shared/timeline.js');
+    store.mutate((p) => { p.settings.width = 320; p.settings.height = 180; addMediaClip(p, p.media[0].id, p.tracks.find((t) => t.kind === 'video').id, 0).duration = 6; }); store.select(store.project.clips[0].id); store.setPlayhead(1); }, [wh]);
+  await page.click('#panel-right [data-tab="inspector"]');
+  const lit = () => ev(() => { const W = 64, H = 36, d = window.__grab(W, H); let n = 0, sx = 0; for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (d[(y * W + x) * 3] > 128) { n++; sx += x; } return { n: n / (W * H), cx: n ? sx / n / W : 0.5, c: d[(18 * W + 32) * 3], k: d[(2 * W + 2) * 3] }; });
+  await settle(700);
+  const base = await lit(); assert.ok(base.n > 0.97, `unmasked white card fills the frame (${base.n})`);
+
+  // ellipse from the Inspector button
+  await page.click('[data-mask-add="ellipse"]');
+  const hasMask = await ev(() => window.__app.store.selectedClip.mask?.shapes?.length);
+  assert.equal(hasMask, 1, 'the button adds an ellipse mask');
+  await ev(() => { const c = window.__app.store.selectedClip; c.props.maskFeather = 0; c.mask.shapes[0].w = 0.5; c.mask.shapes[0].h = 0.6; window.__app.store.touch('project'); }); await settle(500);
+  const ell = await lit(); assert.ok(ell.c > 200 && ell.k < 20, `inside the ellipse is lit, the corner is not (${ell.c}/${ell.k})`);
+  assert.ok(ell.n > 0.2 && ell.n < 0.4, `an ellipse 0.5 x 0.6 covers about ${Math.round(Math.PI / 4 * 0.5 * 0.6 * 100)}% (${ell.n.toFixed(2)})`);
+  await ev(() => { const c = window.__app.store.selectedClip; c.mask.invert = true; window.__app.store.touch('project'); }); await settle(400);
+  const inv = await lit(); assert.ok(inv.c < 20 && inv.k > 200 && Math.abs(inv.n + ell.n - 1) < 0.05, `invert swaps inside and outside (${inv.c}/${inv.k}, ${(inv.n + ell.n).toFixed(2)})`);
+  await ev(() => { const c = window.__app.store.selectedClip; c.mask.invert = false; window.__app.store.touch('project'); }); await settle(300);
+
+  // grow / feather / move over time
+  await ev(() => { const c = window.__app.store.selectedClip; c.props.maskGrow = 1; window.__app.store.touch('project'); }); await settle(400);
+  const grown = await lit(); assert.ok(grown.n > ell.n + 0.05, `grow widens the mask (${ell.n.toFixed(2)} → ${grown.n.toFixed(2)})`);
+  await ev(() => { const c = window.__app.store.selectedClip; c.props.maskGrow = -1; window.__app.store.touch('project'); }); await settle(400);
+  const shrunk = await lit(); assert.ok(shrunk.n < ell.n - 0.05, `shrink narrows it (${shrunk.n.toFixed(2)})`);
+  await ev(() => { const c = window.__app.store.selectedClip; c.props.maskGrow = 0; c.props.maskFeather = 1; window.__app.store.touch('project'); }); await settle(400);
+  const soft = await ev(() => { const d = window.__grab(64, 36); let mid = 0; for (let i = 0; i < d.length; i += 3) if (d[i] > 30 && d[i] < 225) mid++; return mid / (d.length / 3); });
+  assert.ok(soft > 0.05, `feather makes a soft edge (${soft.toFixed(2)} of pixels are partial)`);
+  await ev(() => { const c = window.__app.store.selectedClip; c.props.maskFeather = 0; c.keyframes.maskX = [{ t: 0, v: -0.3 }, { t: 4, v: 0.3 }]; window.__app.store.touch('project'); window.__app.store.setPlayhead(0.2); }); await settle(500);
+  const m0 = await lit(); await ev(() => window.__app.store.setPlayhead(3.8)); await settle(500); const m1 = await lit();
+  assert.ok(m1.cx > m0.cx + 0.3, `the mask slides across the frame over time (${m0.cx.toFixed(2)} → ${m1.cx.toFixed(2)})`);
+  await ev(() => { const c = window.__app.store.selectedClip; c.keyframes = {}; c.props.maskX = 0; window.__app.store.setPlayhead(1); window.__app.store.touch('project'); }); await settle(400);
+
+  // a rectangle that is cut out of the ellipse
+  await page.click('[data-mask-add="rect"]');
+  await ev(() => { const c = window.__app.store.selectedClip; const s = c.mask.shapes[1]; s.w = 0.1; s.h = 0.1; s.sub = true; window.__app.store.touch('project'); }); await settle(500);
+  const hole = await lit(); assert.ok(hole.c < 20 && hole.n < ell.n - 0.003, `a cut-out rectangle leaves a hole in the middle (${hole.c})`);
+  await shot('29-mask-editor');
+
+  // drag the east handle of the ellipse to enlarge it, with the real mouse
+  await ev(() => { const c = window.__app.store.selectedClip; c.mask.shapes.splice(1, 1); window.__app.maskEdit.sel = 0; window.__app.maskEdit.on = true; window.__app.store.touch('project'); window.__app.store.emit('maskedit'); }); await settle(500);
+  const before = await ev(() => window.__app.store.selectedClip.mask.shapes[0].w);
+  const from = await ev(() => window.__app.maskEditor.toScreen(0.5 + 0.25, 0.5)), to = await ev(() => window.__app.maskEditor.toScreen(0.5 + 0.4, 0.5));
+  await page.mouse.move(from.x, from.y); await page.mouse.down(); await page.mouse.move((from.x + to.x) / 2, from.y, { steps: 4 }); await page.mouse.move(to.x, to.y, { steps: 4 }); await page.mouse.up();
+  const after = await ev(() => window.__app.store.selectedClip.mask.shapes[0].w);
+  assert.ok(after > before + 0.1, `dragging a handle resizes the shape (${before} → ${after.toFixed(2)})`);
+  await ev(() => window.__app.store.undo()); await settle(300);
+  assert.ok(Math.abs((await ev(() => window.__app.store.selectedClip.mask.shapes[0].w)) - before) < 1e-6, 'one Undo reverts the drag');
+
+  // draw a polygon with clicks: a triangle that covers about a quarter of the frame
+  await ev(() => { const c = window.__app.store.selectedClip; delete c.mask; window.__app.store.touch('project'); window.__app.store.emit('maskedit'); }); await settle(300);
+  await page.click('[data-mask-add="poly"]'); await settle(300);
+  for (const [u, v] of [[0.25, 0.9], [0.5, 0.1], [0.75, 0.9]]) { const s = await ev(([u, v]) => window.__app.maskEditor.toScreen(u, v), [u, v]); await page.mouse.click(s.x, s.y); }
+  await page.keyboard.press('Enter'); await settle(500);
+  const poly = await ev(() => window.__app.store.selectedClip.mask?.shapes?.[0]);
+  assert.equal(poly?.k, 'poly'); assert.equal(poly.pts.length, 3, 'three clicks make a triangle');
+  await ev(() => { window.__app.store.selectedClip.props.maskFeather = 0; window.__app.store.touch('project'); }); await settle(500);
+  const tri = await lit(); assert.ok(tri.n > 0.15 && tri.n < 0.25 && tri.k < 20, `the drawn triangle (base 0.5, height 0.8) shows about a fifth of the frame (${tri.n.toFixed(2)})`);
+
+  // matte: a title decides what shows
+  await ev(async () => { const { store } = window.__app; const T = await import('/shared/text-defs.js'); const TL = await import('/shared/timeline.js');
+    store.mutate((p) => { const c = store.selectedClip; delete c.mask; const pr = T.TEXT_PRESETS.find((x) => x.name.startsWith('Y2K Chrome Bubble')) || T.TEXT_PRESETS[0];
+      const tc = T.createTextClip(pr, 0, 6); tc.text.content = 'MATTE'; tc.text.size = 0.4; tc.text.fit = 0.9; tc.text.color = '#ffffff'; tc.text.fx.gradient = false; tc.name = 'matte title';
+      tc.trackId = TL.addTrack(p, 'video').id; TL.addClipRaw(p, tc); }); });
+  await settle(600);
+  const withTitle = await lit(); assert.ok(withTitle.n > 0.97, `before matting, the white card is still all there (${withTitle.n})`);
+  await ev(() => { const { store } = window.__app; const tc = store.project.clips.find((c) => c.name === 'matte title'); const c = store.project.clips.find((x) => x.type === 'media'); store.select(c.id); store.mutate(() => { c.matte = { source: tc.id, use: 'alpha', invert: false }; }); }); await settle(700);
+  await shot('30-title-matte');
+  assert.equal(await ev(() => { window.__app.preview.forceDraw(); return window.__app.preview.comp.gl.getError(); }), 0, 'matte drawing raises no GL error');
+  const matted = await lit(); assert.ok(matted.n > 0.03 && matted.n < 0.5 && matted.k < 20, `through the title only the letters show (${matted.n.toFixed(2)})`);
+  await ev(() => { const { store } = window.__app; store.project.clips.find((x) => x.type === 'media').matte.invert = true; store.touch('project'); }); await settle(500);
+  const mInv = await lit(); assert.ok(mInv.n > 0.5 && Math.abs(mInv.n + matted.n - 1) < 0.08, `inverting the matte shows everything but the letters (${mInv.n.toFixed(2)})`);
+  await ev(() => { const { store } = window.__app; delete store.project.clips.find((x) => x.type === 'media').matte; store.touch('project'); }); await settle(500);
+  assert.ok((await lit()).n > 0.97, 'removing the matte brings the whole picture back');
+
+  // luma matte: a half-white / half-black picture
+  await ev(async ([h]) => { await window.__app.importPaths([h]); const { store } = window.__app; const TL = await import('/shared/timeline.js');
+    store.mutate((p) => { p.clips = p.clips.filter((c) => c.name !== 'matte title'); const m = p.media[p.media.length - 1]; const c = TL.addMediaClip(p, m.id, TL.addTrack(p, 'video').id, 0); c.duration = 6; c.name = 'half'; }); }, [halfL]);
+  await ev(() => { const { store } = window.__app; const half = store.project.clips.find((c) => c.name === 'half'); const c = store.project.clips.find((x) => x.type === 'media' && x.id !== half.id); store.select(c.id); store.mutate(() => { c.matte = { source: half.id, use: 'luma', invert: false }; }); }); await settle(700);
+  const luma = await lit(); assert.ok(luma.n > 0.4 && luma.n < 0.6 && luma.cx < 0.4, `a luma matte shows only where the matte is bright (${luma.n.toFixed(2)}, centre ${luma.cx.toFixed(2)})`);
+  await ev(() => { const { store } = window.__app; store.project.clips.find((x) => x.type === 'media' && x.name !== 'half').matte.use = 'alpha'; store.touch('project'); }); await settle(500);
+  assert.ok((await lit()).n > 0.97, 'an alpha matte of an opaque picture shows everything');
 });
 
 await step('timeline tracks reorder: drag the grip or use the arrows, audio can sit above video, rename, remove an empty row, video order changes what draws on top', async () => {

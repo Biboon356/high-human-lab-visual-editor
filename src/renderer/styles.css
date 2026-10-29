@@ -280,18 +280,8 @@ kbd { font: 500 9.5px var(--mono); letter-spacing: .04em; padding: 1px 6px; bord
 .chips { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 14px 8px; }
 .chip { font: 500 10px var(--mono); letter-spacing: .04em; padding: 3px 7px; height: auto; border: 1px solid var(--line2); background: transparent; color: var(--dim); }
 .chip.on, .chip:hover { color: var(--text); border-color: var(--text); }
-#preset-search { width: 100%; }
-.preset-list.presets { display: flex; flex-direction: column; }
-.preset-row { display: flex; align-items: stretch; }
-.preset-row .p-clip { flex: 1; min-width: 0; text-align: left; }
-.preset-row .p-clip .pn { display: block; }
-.preset-row .p-layer { flex: none; font: 500 9px var(--mono); letter-spacing: .06em; text-transform: uppercase; padding: 0 8px; }
-.preset-list.presets .preset-row .p-layer { flex-direction: row; align-items: center; justify-content: center; gap: 0; border-top: 1px solid var(--line); border-left: 1px solid var(--line); padding: 0 10px; color: var(--dim); }
-.preset-list.presets .preset-row .p-layer:hover:not(:disabled) { padding-left: 10px; color: var(--text); }
 /* five left-panel tabs: tighter, and never clipped */
 .tabs[data-tabs="left"] button { font-size: 8.5px; letter-spacing: .08em; gap: 3px; min-width: 0; padding: 0 2px; }
-.preset-list.presets .preset-row .p-clip small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-.preset-list.presets .preset-row .p-layer { writing-mode: horizontal-tb; align-self: stretch; }
 /* preview selection box */
 .pick-box { position: absolute; border: 1px dashed var(--accent2, #7dffb0); pointer-events: none; z-index: 4; box-shadow: 0 0 0 1px rgba(0,0,0,.35); }
 .pick-box .pick-h { position: absolute; right: -6px; bottom: -6px; width: 11px; height: 11px; background: var(--accent2, #7dffb0); border: 1px solid #0b0f0c; pointer-events: auto; cursor: nwse-resize; }
@@ -304,3 +294,14 @@ kbd { font: 500 9.5px var(--mono); letter-spacing: .04em; padding: 1px 6px; bord
 .range-flag { position: absolute; top: 0; bottom: 0; width: 28px; padding: 0 3px; font: 600 8px var(--mono); letter-spacing: .08em; color: #0b0f0c; background: var(--accent2, #7dffb0); cursor: ew-resize; display: flex; align-items: center; z-index: 6; user-select: none; }
 .range-flag.in { transform: translateX(0); border-radius: 0 0 0 0; } .range-flag.out { transform: translateX(-100%); justify-content: flex-end; }
 #tl-range { margin-left: 6px; } #tl-range.on { color: var(--accent2, #7dffb0); }
+
+/* mask editor drawn over the preview */
+.mask-ov { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 5; pointer-events: none; display: none; }
+.mask-ov .mask-shape-path { fill: rgba(125,255,176,.07); stroke: #fff; stroke-width: 1.2; stroke-dasharray: 5 4; pointer-events: all; cursor: move; filter: drop-shadow(0 0 1px #000); }
+.mask-ov .mask-shape-path.on { stroke: var(--accent2, #7dffb0); stroke-dasharray: none; stroke-width: 1.6; }
+.mask-ov .mask-shape-path.sub { fill: rgba(255,90,90,.1); stroke: #ff7a7a; }
+.mask-ov .mh { fill: var(--accent2, #7dffb0); stroke: #0b0f0c; stroke-width: 1.2; pointer-events: all; cursor: pointer; }
+.mask-ov .mh.first { fill: #fff; }
+.mask-ov .mask-draw { fill: transparent; pointer-events: all; cursor: crosshair; }
+.mask-ov .mask-line { stroke: var(--accent2, #7dffb0); stroke-width: 1.5; stroke-dasharray: 4 3; pointer-events: none; }
+.mask-shape.on label { color: var(--accent2, #7dffb0); }
