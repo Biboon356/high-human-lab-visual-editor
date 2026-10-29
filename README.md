@@ -163,6 +163,14 @@ None of this has been measured against real Thai recordings yet (see status belo
 - **Lockups: 20 in all** (Type tab), eight of them with **three typefaces** — each part is its own text clip, so wording, font, colour and position stay editable. New: *Ransom zine, Cut-up, Vapor sign, Neon line, Swiss grid, Brutal wide, Black metal logo, Crypt poster*.
 - **Limits:** the pattern designs are tuned by eye on Linux; at very large *Size / repeat* values the paisley and lattice cells get coarse. Not verified on real Mac/Windows installs.
 
+## v0.6.0 — designed lockups, shapes, spiritual Hindi type
+
+- **Lockups rebuilt as designed compositions** (Type tab). The first versions were words in a row; each lockup is now a *stack of clips* — words, ornaments (frames, rules, arches, flames, suns, tape, paper plates, hazard stripes) and, where it helps, a faint pattern layer — with grain and finish on the type. 22 lockups, most with three typefaces: *Dhyaan · gold leaf, Jyoti · flame, Moksha · arch, Satya · stone, Future sutra, Filmi poster, Truck-art desi, Mixtape cover, Xerox flyer, Ransom zine, Spray crew, Blackletter street, Vapor sign, Neon line, Swiss grid, Brutal wide, Black metal logo, Crypt poster* and the four Y2K/script originals. Every part is its own clip (own track, bottom to top), so you can delete an ornament, retype a line, swap a font, or keep only the layout. The montage title card uses a lockup's ornaments too (its sample sub-line is left out).
+- **Shape clips** (Type tab → Shapes): plate/rule, ornament rule, double frame, pointed arch, disc/ring, diamond, star/sparkle, sun with rays, retro slatted sun, flame, lotus, rosette, dot row, hazard stripes, tape. They are ordinary clips — move/scale/turn/fade/keyframe them, stack effects, drag them in the preview — with an Inspector card for size, colours, outline, glow, shadow and a slow spin.
+- **Hindi, spiritual and niche:** new faces *Inknut Antiqua* (carved), *Tillana* (brush), *Dekko* (hand-drawn), *Jaini* (cut stone), *Sarpanch* (angular, techno), *Gotu* (soft), *Kurale* (calligraphic); presets with a gold-leaf, stone or flame finish for **ध्यान, शांति, ज्योति, सत्य, मोक्ष, साधना, मौन, भविष्य**. The stiffest earlier presets were removed. These are ordinary words (meditation, peace, flame, truth, liberation, practice, silence, future); no deity images and no sacred symbols are drawn. Have a native speaker check anything you publish.
+- **Pattern v2:** five more designs — *Lotus mandala, Henna vines, Diya row, Zari border, Torana garland* — and **Gold-leaf shading** (a *Foil* control that makes the line catch light unevenly). New looks *Foil Mandala, Lotus Bloom, Henna Vines, Diya Garden, Zari Border, Torana Garland* and **Mandala Pulse (beat)** (glow and size follow the music).
+- **Limits:** lockups are composed for 16:9; on a vertical frame the text fits by width and ornaments keep their frame proportions, so check and adjust. Not verified on real Mac/Windows installs.
+
 ## Updating without reinstalling
 
 From version 0.2.0 the app updates itself **in place**: on start (and every few hours) it asks GitHub for the latest release, downloads a small checksummed bundle of the app's own code (`src/**`, a few hundred KB), and shows **Update x.y.z · Restart** in the top bar. Nothing is applied until you press it; the next start then runs the new code from the app's data folder. *Project → Updates* shows the version and has a manual *Check for updates* (also *Tools → Check for Updates…*).
@@ -230,7 +238,7 @@ Legend: ✅ works and is covered by the automated tests · 🧪 prototype (works
 
 ## Testing
 
-`npm test` runs 140 unit tests. `scripts/e2e.mjs` (65 checks) is a real end-to-end run of the Electron app (see table above): it
+`npm test` runs 143 unit tests. `scripts/e2e.mjs` (66 checks) is a real end-to-end run of the Electron app (see table above): it
 generates test media with ffmpeg, drives the app, reads pixels out of the compositor, and probes exported files.
 Native file dialogs are stubbed at the Electron main-process level; every other path is the production code.
 

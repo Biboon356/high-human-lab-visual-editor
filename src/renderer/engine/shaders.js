@@ -572,7 +572,7 @@ vec4 effect(vec2 uv){
   return vec4(outc*(inside*c.a) , a);
 }`),
   pattern: wrap(`
-uniform float u_style, u_scale, u_detail, u_rotate, u_speed, u_line, u_glow, u_fill, u_mix; uniform vec3 u_color, u_color2;
+uniform float u_style, u_scale, u_detail, u_rotate, u_speed, u_line, u_glow, u_fill, u_foil, u_mix; uniform vec3 u_color, u_color2;
 const float PI = 3.14159265;
 vec2 rot2(vec2 p, float a){ float c = cos(a), s = sin(a); return vec2(c*p.x - s*p.y, s*p.x + c*p.y); }
 // each pattern returns: x = distance to the nearest line (pattern units), y = fill (0..1), z = a second accent (dots)
@@ -639,6 +639,65 @@ vec3 border(vec2 uv, float asp, float w){                   // truck-art frame: 
   float dots = (y < bw*.88 && flower < 0.) ? 1. : 0.;
   return vec3(d, fill, dots);
 }
+vec3 lotusMandala(vec2 p){                                  // three rows of overlapping petals, folded into mirrored wedges
+  float N = max(4., floor(u_detail/2.)*2.);
+  float r = length(p), a = atan(p.y, p.x), sec = PI/N;
+  float af = abs(mod(a + sec*.5, 2.*sec) - sec);
+  vec2 q = r*vec2(cos(af), sin(af));
+  float d = 1e3, fill = 0., dots = 0.;
+  for(int i = 0; i < 3; i++){
+    float fi = float(i), cx = .27 + .24*fi, rr = .27 + .05*fi, off = .15 + .03*fi;
+    float leaf = max(length(q - vec2(cx, off)) - rr, length(q - vec2(cx, -off)) - rr);
+    d = min(d, abs(leaf)); if(leaf < 0.) fill = max(fill, .85 - .25*fi);
+  }
+  d = min(d, abs(r - .985));
+  dots = max(dots, 1. - smoothstep(.014, .024, length(q - vec2(.93, 0.))));
+  if(r > 1.) d = 1e3;
+  return vec3(d, fill, dots);
+}
+vec3 mehndi(vec2 g){                                        // henna vines: a waving stem with leaves growing from alternate sides
+  vec2 id = floor(g), f = fract(g) - .5;
+  float yc = .2*sin(f.x*6.2831 + id.y*1.7);
+  float d = abs(f.y - yc);
+  vec2 lp = vec2(fract(f.x*2. + .5) - .5, f.y - yc);
+  float side = sin(floor(f.x*2. + .5)*2.4 + id.y*1.3) > 0. ? 1. : -1.;
+  float leaf = roundCone(vec2(lp.x + .05*side*lp.y, lp.y*side), vec2(0., .01), vec2(0., .27), .062, .006);
+  d = min(d, abs(leaf));
+  float bud = length(vec2(f.x - .25, f.y - (.2*sin(.25*6.2831 + id.y*1.7)))) - .028;
+  return vec3(min(d, abs(bud)), leaf < 0. ? .9 : 0., bud < 0. ? 1. : 0.);
+}
+vec3 diyaRow(vec2 g, float t){                              // a row of oil lamps, each flame breathing at its own pace
+  vec2 id = floor(g), f = fract(g) - .5;
+  float flick = 1. + .09*sin(t*7. + id.x*2.3 + id.y*1.1);
+  float bowl = max(length(f*vec2(1., 1.45) + vec2(0., .05)) - .27, f.y + .08);
+  vec2 fp = (f - vec2(0., -.02)) * vec2(1./flick, 1./flick);
+  float flame = roundCone(fp, vec2(0., .02), vec2(.0, .34), .075, .004);
+  float d = min(abs(bowl), abs(flame));
+  float fill = bowl < 0. ? .65 : 0.;
+  return vec3(d, fill, flame < 0. ? 1. : 0.);
+}
+vec3 zari(vec2 uv, float asp, float w){                     // woven sari border: a chain of diamonds between fine rules
+  vec2 e = vec2(min(uv.x, 1. - uv.x)*asp, min(uv.y, 1. - uv.y));
+  float y = min(e.x, e.y), along = e.x < e.y ? uv.y : uv.x*asp;
+  float L = w*.95, cell = floor(along/L), t = (fract(along/L) - .5)*L, bw = w;
+  float d = min(abs(y - bw), min(abs(y - bw*.84), abs(y - bw*.16)));
+  float dia = abs(t)*.85 + abs(y - bw*.5)*1.15 - bw*.34;
+  d = min(d, abs(dia)); float fill = dia < 0. ? (mod(cell, 2.) < 1. ? .9 : .5) : 0.;
+  float dots = (length(vec2(abs(t) - L*.5, y - bw*.5)) < bw*.06) ? 1. : 0.;
+  if(y > bw*1.02) d = 1e3;
+  return vec3(d, fill, dots);
+}
+vec3 torana(vec2 uv, float asp, float w){                   // festival garland hung along the top: scallops with a tassel at every dip
+  float y = 1. - uv.y, along = uv.x*asp;
+  float L = w*1.3, cell = floor(along/L), t = (fract(along/L) - .5)*L;
+  float arc = abs(length(vec2(t, y - w*.12)) - L*.5);
+  float rope = abs(y - w*.12);
+  float tas = roundCone(vec2(t, y - w*.12 - L*.5), vec2(0., 0.), vec2(0., L*.62), L*.1, L*.012);
+  float d = min(arc, min(rope*(y < w*.14 ? 1. : 1e3), abs(tas)));
+  float fill = tas < 0. ? (mod(cell, 2.) < 1. ? .95 : .6) : 0.;
+  if(y > w*1.9) d = 1e3;
+  return vec3(d, fill, length(vec2(t, y - w*.12 - L*.5)) < L*.06 ? 1. : 0.);
+}
 vec4 effect(vec2 uv){
   vec4 c = src(uv);
   float asp = u_res.x/u_res.y;
@@ -652,14 +711,21 @@ vec4 effect(vec2 uv){
   else if(st == 1){ k = u_scale*3.; s = jali(rot2(p, rad)*k + vec2(tt, tt*.5)); }
   else if(st == 2){ k = u_scale*3.; s = rangoli(rot2(p, rad)*k + vec2(tt, 0.)); }
   else if(st == 3){ k = u_scale*2.5; s = paisley(rot2(p, rad)*k + vec2(0., tt)); }
-  else { k = 1.; s = border(uv, asp, .09*u_scale); }
+  else if(st == 4){ k = 1.; s = border(uv, asp, .09*u_scale); }
+  else if(st == 5){ k = 2./max(u_scale, .05); s = lotusMandala(rot2(p, rad + tt)*k); }
+  else if(st == 6){ k = u_scale*2.2; s = mehndi(rot2(p, rad)*k + vec2(tt, 0.)); }
+  else if(st == 7){ k = u_scale*3.; s = diyaRow(rot2(p, rad)*k + vec2(tt*.3, 0.), u_time); }
+  else if(st == 8){ k = 1.; s = zari(uv, asp, .07*u_scale); }
+  else { k = 1.; s = torana(uv, asp, .1*u_scale); }
   float wp = w*k;                                           // line width in pattern units
   float line = 1. - smoothstep(wp*.5, wp*.5 + 1.4*hpx*k, s.x);
-  float glow = exp(-s.x/max(wp*7., 1e-4))*u_glow*(st == 3 ? .12 : .5); // paisley cells are drawn one at a time, so a wide glow would show the cell edges
+  float glow = exp(-s.x/max(wp*7., 1e-4))*u_glow*((st == 3 || st == 6) ? .12 : .5); // paisley cells are drawn one at a time, so a wide glow would show the cell edges
   float fillm = s.y*u_fill;
   vec3 col = mix(c.rgb, u_color2, fillm*(.35 + .65*step(.01, fillm)));
-  col = mix(col, u_color, clamp(max(line, s.z), 0., 1.));
-  col += u_color*glow*(1. - line);
+  float fo = fbm(uv*vec2(asp, 1.)*5. + vec2(u_time*.04, 0.)), sheen = pow(clamp(fo*1.6 - .3, 0., 1.), 2.);
+  vec3 lc = mix(u_color, u_color*(.5 + .95*fo) + vec3(.18)*sheen, u_foil);     // gold-leaf: the line catches light unevenly
+  col = mix(col, lc, clamp(max(line, s.z), 0., 1.));
+  col += lc*glow*(1. - line);
   float a = max(c.a, max(max(line, s.z), max(fillm, glow*.6)));
   return emit(mix(c.rgb, col, u_mix), mix(c.a, a, u_mix));
 }`),

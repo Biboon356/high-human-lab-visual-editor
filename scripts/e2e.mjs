@@ -1176,7 +1176,7 @@ await step('genre looks render: desi patterns, zine, vaporwave, brutalist and me
   const grab = () => ev(() => window.__grab(96, 54));
   const diff = (a, b) => { let s = 0; for (let i = 0; i < a.length; i++) s += Math.abs(a[i] - b[i]); return s / a.length; };
   const base = await grab();
-  const names = ['Mandala Bloom', 'Jali Window', 'Rangoli Floor', 'Paisley Night', 'Truck-art Frame', 'Marigold Haze', 'Zine Cut-up', 'Riso Pink', 'Riso Blue', 'Vapor Sunset', 'Vapor Tape', 'City Pop Dusk', 'Concrete', 'Swiss Red', 'Black Metal', 'Blood Moon', 'Candlelit Crypt'];
+  const names = ['Mandala Bloom', 'Jali Window', 'Rangoli Floor', 'Paisley Night', 'Truck-art Frame', 'Marigold Haze', 'Foil Mandala', 'Lotus Bloom', 'Henna Vines', 'Diya Garden', 'Zari Border', 'Torana Garland', 'Mandala Pulse (beat)', 'Zine Cut-up', 'Riso Pink', 'Riso Blue', 'Vapor Sunset', 'Vapor Tape', 'City Pop Dusk', 'Concrete', 'Swiss Red', 'Black Metal', 'Blood Moon', 'Candlelit Crypt'];
   assert.equal(await ev(async (n) => { const L = (await import('/shared/adjust-defs.js')).ADJUST_LOOKS; return n.filter((x) => L.some((l) => l.name === x)).length; }, names), names.length, 'all genre looks exist');
   const errorsBefore = logs.length;
   for (const n of names) {
@@ -1190,7 +1190,7 @@ await step('genre looks render: desi patterns, zine, vaporwave, brutalist and me
   // every pattern style draws something of its own on an empty frame
   await ev(async () => { const { store } = window.__app; const E = await import('/shared/effects-defs.js'); const A = await import('/shared/adjust-defs.js'); const T = await import('/shared/timeline.js');
     store.mutate((p) => { p.clips = []; const c = A.createAdjustClip({ name: 'p', chain: [{ type: 'pattern', params: {} }] }, 0, 6); c.trackId = p.tracks.find((t) => t.kind === 'video').id; T.addClipRaw(p, c); window.__pc = c; }); store.setPlayhead(1); });
-  for (let style = 0; style < 5; style++) {
+  for (let style = 0; style < 10; style++) {
     await ev((s) => { window.__pc.effects[0].params.style = s; window.__app.store.touch('project'); }, style); await settle(450);
     const lit = await ev(() => { const d = window.__grab(96, 54); let n = 0; for (let i = 0; i < d.length; i += 3) if (d[i] + d[i + 1] + d[i + 2] > 120) n++; return n / (d.length / 3); });
     assert.ok(lit > 0.015, `pattern style ${style} draws lines on an empty frame (${lit.toFixed(3)} lit)`);

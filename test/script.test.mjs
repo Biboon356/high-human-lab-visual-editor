@@ -63,3 +63,29 @@ test('genre packs: 20+ lockups, at least eight use three fonts, every genre is r
   assert.equal(ransom.text.ransom, true);
   assert.equal(TEXT_PRESETS.find((p) => p.name === 'Metal Logo (Metal Mania)').text.ransom, undefined, 'only the ransom preset opts in');
 });
+
+test('lockups are stacks of clips: ornaments and pattern veils sit under the words, every reference resolves, and timing options hold', async () => {
+  const { createLockupClips } = await import('../src/shared/text-defs.js');
+  const { SHAPE_KINDS } = await import('../src/shared/shape-defs.js');
+  const { VEIL_LOOKS } = await import('../src/shared/adjust-defs.js');
+  let withDeco = 0;
+  for (const L of LOCKUPS) {
+    const { clips, title, kicker } = createLockupClips(1, 4, { lockup: L.name });
+    assert.ok(clips.includes(title) && clips.includes(kicker), L.name);
+    const iTitle = clips.indexOf(title);
+    for (const d of L.deco || []) assert.ok(d.shape ? SHAPE_KINDS.includes(d.shape) : VEIL_LOOKS.some((v) => v.name === d.veil), `${L.name}: unknown ornament ${d.shape || d.veil}`);
+    for (const d of L.over || []) assert.ok(SHAPE_KINDS.includes(d.shape), L.name);
+    clips.slice(0, (L.deco || []).length).forEach((c) => assert.notEqual(c.type, 'text', `${L.name}: ornaments come first (bottom of the stack)`));
+    assert.equal(clips.length, (L.deco || []).length + (L.over || []).length + 2 + (L.sub ? 1 : 0), L.name);
+    assert.ok(clips.indexOf(title) === iTitle && iTitle >= (L.deco || []).length);
+    for (const c of clips) { assert.ok(c.duration > 0.1 && c.start >= 1 - 1e-9, `${L.name}: ${c.name}`); }
+    if (L.deco || L.over) withDeco++;
+  }
+  assert.ok(withDeco >= 14, `${withDeco} lockups carry ornaments`);
+  const dhy = createLockupClips(0, 4, { lockup: LOCKUPS.find((L) => L.name.startsWith('Dhyaan')).name });
+  const rule = dhy.clips.find((c) => c.type === 'shape' && c.shape.kind === 'divider');
+  assert.ok(rule.start > 0.4 && rule.fadeIn > 0, 'an ornament can arrive after the words (delay + fade)');
+  assert.ok(Math.abs(rule.start + rule.duration - 4) < 1e-9, 'a delayed part still ends with the lockup');
+  assert.equal(dhy.clips.filter((c) => c.type === 'adjust').length, 1, 'the mandala veil is an adjustment layer');
+  assert.ok(createTitleLockup(0, 3, { lockup: LOCKUPS[5].name }).every((c) => c.type === 'text'), 'the words-only helper (montage) never returns ornaments');
+});

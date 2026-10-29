@@ -129,3 +129,9 @@ Preset: **Xerox Photocopy** (คอนทราสต์สูง + toner noise 
 5. **Dark / metal**: ฟอนต์ Metal Mania, New Rocker, Cinzel Decorative, Grenze Gotisch, IM Fell English SC + ลุค Black Metal / Blood Moon / Candlelit Crypt
 6. **Lockup รวม 20 แบบ** (แท็บ Type) มี 3 ฟอนต์ 8 แบบ ทุกส่วนเป็นคลิปข้อความแยก แก้ได้อิสระ ใหม่: Ransom zine, Cut-up, Vapor sign, Neon line, Swiss grid, Brutal wide, Black metal logo, Crypt poster
 
+## v0.6.0 — Lockup ที่ออกแบบจริง, Shape, ฟอนต์ฮินดีแนวจิตวิญญาณ
+1. **Lockup ทำใหม่ 22 แบบ** (แท็บ Type): ไม่ใช่แค่ตัวหนังสือเรียงกัน แต่เป็นชุดคลิปซ้อนกัน — ตัวอักษร + ลายประดับ (กรอบ เส้นประดับ ซุ้มโค้ง เปลวไฟ ดวงอาทิตย์ เทป กระดาษ แถบลายทางเตือน) + เลเยอร์ลายจาง ๆ ถ้าเหมาะ แต่ละส่วนเป็นคลิปแยกบน track ของตัวเอง ลบลายประดับ แก้ข้อความ เปลี่ยนฟอนต์ หรือเก็บแค่เลย์เอาต์ก็ได้
+2. **Shape clip** (แท็บ Type → Shapes): 15 แบบ เช่น กรอบคู่ ซุ้มโค้ง เปลวไฟ ดอกบัว ดวงอาทิตย์ เทปกาว ลากย้ายในพรีวิว ใส่ fade/keyframe/เอฟเฟกต์ได้เหมือนข้อความ ปรับสี เส้นขอบ เรืองแสง และหมุนช้า ๆ ได้ในการ์ด Shape
+3. **ฟอนต์ฮินดีแนวจิตวิญญาณ/นิช**: Inknut Antiqua (แกะหิน), Tillana (พู่กัน), Dekko (ลายมือ), Jaini, Sarpanch (เหลี่ยม ไซเบอร์), Gotu, Kurale + พรีเซ็ตคำ ध्यान शांति ज्योति सत्य मोक्ष साधना मौन भविष्य พร้อมผิวแบบแผ่นทอง/หิน/เปลวไฟ (ใช้คำธรรมดา ไม่มีรูปเทพหรือสัญลักษณ์ศักดิ์สิทธิ์ ถ้าจะเผยแพร่ ควรให้เจ้าของภาษาช่วยตรวจ)
+4. **Pattern v2**: ลายเพิ่ม 5 แบบ (Lotus mandala, Henna vines, Diya row, Zari border, Torana garland) + ตัวปรับ **Gold-leaf shading** ให้เส้นสะท้อนแสงเหมือนทองคำเปลว + ลุคใหม่ Foil Mandala, Lotus Bloom, Henna Vines, Diya Garden, Zari Border, Torana Garland, **Mandala Pulse (beat)** ที่ขยายและเรืองตามจังหวะเพลง
+
