@@ -1,6 +1,7 @@
 // Pure timeline operations. All functions mutate the project in place and return
 // a boolean/ref describing the result; callers snapshot for undo before calling.
 import { createClip, findClip, findMedia, findTrack, uid } from './project.js';
+import { RAMP_KEY, hasRamp, rampKeys, rampAt, rampIntegral, ensureKeyAt, trimRampHead, sourceAdvance, timelineFor } from './ramp.js';
 
 export const MIN_CLIP = 0.1;
 export const clipEnd = (c) => c.start + c.duration;
@@ -74,22 +75,24 @@ function sourceLimit(project, clip) {
   return m && m.kind !== 'image' ? m.duration : Infinity;
 }
 
-/** Trim the left edge to a new timeline time. Adjusts in-point so content stays put. */
+/** Trim the left edge to a new timeline time. Adjusts in-point so content stays put (a speed ramp slides with the picture). */
 export function trimStart(project, clipId, newStart) {
   const clip = findClip(project, clipId);
   if (!clip) return false;
   const end = clipEnd(clip);
   let s = Math.min(newStart, end - MIN_CLIP);
   s = Math.max(s, 0);
-  let delta = s - clip.start;
-  const sp = clip.type === 'media' ? clip.speed || 1 : 1;
-  if (clip.type === 'media') {
-    if (clip.in + delta * sp < 0) { delta = -clip.in / sp; s = clip.start + delta; }
-    clip.in += delta * sp;
+  const media = clip.type === 'media';
+  const sp = media ? clip.speed || 1 : 1;
+  if (media) { // cannot reveal footage from before the start of the file
+    const back = hasRamp(clip) ? sp * rampKeys(clip)[0].v : sp; // the curve is flat before its first key
+    if (clip.in + (s - clip.start) * back < 0 && s < clip.start) s = clip.start - clip.in / back;
   }
   const prev = project.clips.filter((c) => c.trackId === clip.trackId && c.id !== clip.id && clipEnd(c) <= clip.start + 1e-6);
   const floor = prev.reduce((m, c) => Math.max(m, clipEnd(c)), 0);
-  if (s < floor) { clip.in += clip.type === 'media' ? (floor - s) * sp : 0; s = floor; }
+  if (s < floor) s = floor;
+  const delta = s - clip.start;
+  if (media) clip.in += trimRampHead(clip, delta);
   clip.start = s;
   clip.duration = end - s;
   return true;
@@ -99,7 +102,7 @@ export function trimEnd(project, clipId, newEnd) {
   const clip = findClip(project, clipId);
   if (!clip) return false;
   let e = Math.max(newEnd, clip.start + MIN_CLIP);
-  const maxDur = (sourceLimit(project, clip) - (clip.type === 'media' ? clip.in : 0)) / (clip.type === 'media' ? clip.speed || 1 : 1);
+  const maxDur = clip.type === 'media' ? timelineFor(clip, sourceLimit(project, clip) - clip.in) : Infinity;
   e = Math.min(e, clip.start + maxDur);
   const next = project.clips.filter((c) => c.trackId === clip.trackId && c.id !== clip.id && c.start >= clipEnd(clip) - 1e-6);
   const ceil = next.reduce((m, c) => Math.min(m, c.start), Infinity);
@@ -115,11 +118,13 @@ export function splitClip(project, clipId, t) {
   if (!clip) return null;
   if (t <= clip.start + MIN_CLIP || t >= clipEnd(clip) - MIN_CLIP) return null;
   const local = t - clip.start;
+  if (clip.type === 'media' && hasRamp(clip)) clip.keyframes[RAMP_KEY] = ensureKeyAt(rampKeys(clip), local); // both halves keep the curve's shape at the cut
+  const rightIn = clip.type === 'media' ? sourceTimeAt(clip, t) : 0;
   const right = structuredClone(clip);
   right.id = createClip({}).id;
   right.start = t;
   right.duration = clip.duration - local;
-  if (clip.type === 'media') right.in = clip.in + local * (clip.speed || 1);
+  if (clip.type === 'media') right.in = rightIn;
   clip.duration = local;
   // keyframes are clip-relative: partition them at the cut
   const cut = (owner, ownerRight) => {
@@ -265,12 +270,12 @@ export function markRange(project, which, t) {
 
 /** Source-file window a clip plays: [in, in + duration × speed). */
 export function sourceSpan(clip) {
-  return { start: clip.in || 0, duration: clip.duration * (clip.speed || 1) };
+  return { start: clip.in || 0, duration: sourceAdvance(clip, clip.duration) };
 }
 
 /** Source time (seconds into the media file) shown by `clip` at timeline time t. */
 export function sourceTimeAt(clip, t) {
-  return (clip.in || 0) + (t - clip.start) * (clip.speed || 1);
+  return (clip.in || 0) + sourceAdvance(clip, t - clip.start);
 }
 
 /**

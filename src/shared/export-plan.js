@@ -1,6 +1,7 @@
 // Builds ffmpeg argument lists. Pure functions so they can be unit-tested without ffmpeg.
 import { clipEnd, projectDuration } from './timeline.js';
 import { findMedia, findTrack } from './project.js';
+import { hasRamp } from './ramp.js';
 
 export const QUALITY = {
   draft: { crf: 28, preset: 'veryfast', vp9crf: 40 },
@@ -16,7 +17,7 @@ export const FORMATS = {
 export function audioSources(project) {
   return project.clips
     .map((clip) => ({ clip, media: clip.type === 'media' ? findMedia(project, clip.mediaId) : null, track: findTrack(project, clip.trackId) }))
-    .filter(({ media, track }) => media && media.hasAudio && track && !track.muted);
+    .filter(({ clip, media, track }) => media && media.hasAudio && track && !track.muted && !hasRamp(clip)); // a ramped clip's own sound is left out: the music carries the edit
 }
 
 /** TikTok / Reels / Shorts all normalise to roughly -14 LUFS; matching it avoids the platform turning your video down. */

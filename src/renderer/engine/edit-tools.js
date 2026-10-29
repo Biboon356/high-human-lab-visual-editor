@@ -4,6 +4,7 @@ import { store } from '../store.js';
 import { toast } from '../ui/dom.js';
 import { findMedia, uid } from '/shared/project.js';
 import { clipEnd, freezeFrameAt, sourceSpan, sourceTimeAt } from '/shared/timeline.js';
+import { mirrorRamp } from '/shared/ramp.js';
 
 async function importDerived(path, name) {
   const [r] = await window.hh.probePaths([path]);
@@ -24,7 +25,7 @@ export async function reverseSelected() {
     const rev = await importDerived(dest, `${media.name.replace(/\.[^.]+$/, '')} (reversed)`);
     store.snapshot();
     store.project.media.push(rev);
-    clip.mediaId = rev.id; clip.in = 0; clip.name = `${clip.name || media.name} ◄`;
+    clip.mediaId = rev.id; clip.in = 0; mirrorRamp(clip); clip.name = `${clip.name || media.name} ◄`;
     store.touch('project');
     toast('Reversed. Undo brings the original back.');
     return true;

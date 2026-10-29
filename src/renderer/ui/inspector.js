@@ -10,6 +10,7 @@ import { TEXT_ANIMATIONS } from '/shared/text-defs.js';
 import { ensureFontList } from './fonts.js';
 import { GEN_PARAMS, GEN_STYLES } from '/shared/organic-defs.js';
 import { maskCard, matteCard } from './mask-ui.js';
+import { rampCard } from './ramp-ui.js';
 
 const USER_PRESET_KEY = 'hhlab.userEffectPresets';
 const loadUserPresets = () => { try { return JSON.parse(localStorage.getItem(USER_PRESET_KEY) || '[]'); } catch { return []; } };
@@ -92,6 +93,7 @@ export function mountInspector(root) {
     }
     root.append(card(clip.type === 'text' ? 'Text clip' : clip.type === 'generator' ? 'Organic clip' : clip.type === 'adjust' ? 'Adjustment layer' : 'Clip', body));
 
+    if (clip.type === 'media' && media?.kind === 'video') root.append(rampCard(clip, lt, card));
     if (clip.type === 'text') root.append(textCard(clip, lt));
     if (clip.type === 'generator') root.append(genCard(clip, lt));
     if (clip.type !== 'media' || media?.kind !== 'audio') root.append(effectsCard(clip, lt), maskCard(clip, lt, card), matteCard(clip, card));

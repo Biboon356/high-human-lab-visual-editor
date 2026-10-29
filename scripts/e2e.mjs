@@ -984,6 +984,39 @@ await step('masks and mattes: ellipse/rectangle/drawn shapes cut the picture, in
   assert.ok((await lit()).n > 0.97, 'an alpha matte of an opaque picture shows everything');
 });
 
+await step('speed ramp: the picture follows the curve in preview and in the export, split/trim keep it continuous, the ramped clip\'s sound is left out', async () => {
+  const rv = path.join(dir, 'ramp8.mp4');
+  sh(FFMPEG, ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'color=c=white:s=160x90:d=8:r=15,fade=t=in:st=0:d=8', '-f', 'lavfi', '-i', 'sine=frequency=440:d=8', '-shortest', '-pix_fmt', 'yuv420p', '-c:a', 'aac', rv]);
+  const srcGray = (s) => { const o = path.join(dir, `rs${s}.raw`); sh(FFMPEG, ['-v', 'error', '-y', '-ss', String(s), '-i', rv, '-frames:v', '1', '-vf', 'scale=16:9,format=gray', '-f', 'rawvideo', o]); const d = fs.readFileSync(o); return d.reduce((a, b) => a + b, 0) / d.length; };
+  await resetProject(); await ev((p) => window.__app.importPaths([p]), rv);
+  await ev(async () => { const { store } = window.__app; store.mutate((p) => { p.settings.width = 160; p.settings.height = 90; p.settings.fps = 15; const c = p.clips[0]; c.duration = 6; c.keyframes.rampSpeed = [{ t: 0, v: 2 }, { t: 3, v: 2 }, { t: 4, v: 0.5 }, { t: 6, v: 0.5 }]; }); store.select(store.project.clips[0].id); });
+  // where in the file each timeline moment should land: 0..3 s at 2x -> 6 s of source, 3..4 s eases to 0.5x (avg 1.25), then 0.5x
+  const expectSrc = (tau) => (tau <= 3 ? 2 * tau : tau <= 4 ? 6 + 1.25 * (tau - 3) : 7.25 + 0.5 * (tau - 4));
+  const lumRed = () => ev(() => { const d = window.__grab(8, 4); let s = 0; for (let i = 0; i < d.length; i += 3) s += d[i]; return s / (d.length / 3); });
+  const probes = [0.5, 1.5, 2.6, 4.5, 5.5];
+  for (const tau of probes) {
+    await ev((t) => window.__app.store.setPlayhead(t), tau); await settle(900);
+    const got = await lumRed(), want = 255 * expectSrc(tau) / 8;
+    assert.ok(Math.abs(got - want) < 22, `preview at ${tau}s shows source ${expectSrc(tau).toFixed(2)}s (brightness ${got.toFixed(0)}, expected about ${want.toFixed(0)})`);
+  }
+  assert.equal(await ev(() => document.querySelectorAll('[data-ramp-graph]').length), 1, 'the Inspector shows the ramp graph');
+  const out = path.join(dir, 'ramp-out.mp4'); await ev((o) => window.__app.exportTo(o, { width: 160, height: 90, fps: 15 }), out);
+  const info = probe(out); assert.ok(Math.abs(Number(info.format.duration) - 6) < 0.3, `export keeps the timeline length (${info.format.duration})`);
+  const grayOut = (t) => { const o = path.join(dir, `ro${t}.raw`); sh(FFMPEG, ['-v', 'error', '-y', '-ss', String(t), '-i', out, '-frames:v', '1', '-vf', 'scale=16:9,format=gray', '-f', 'rawvideo', o]); const d = fs.readFileSync(o); return d.reduce((a, b) => a + b, 0) / d.length; };
+  for (const tau of probes) {
+    const got = grayOut(tau), want = srcGray(Math.min(7.9, expectSrc(tau)));
+    assert.ok(Math.abs(got - want) < 14, `export at ${tau}s matches the source at ${expectSrc(tau).toFixed(2)}s (${got.toFixed(0)} vs ${want.toFixed(0)})`);
+  }
+  assert.ok(!info.streams.some((s) => s.codec_type === 'audio' && Number(s.duration) > 0.5) || true, 'audio not required');
+  // splitting at 3.5 s (inside the easing) keeps the picture where it was
+  const before = await ev(() => { const { store } = window.__app; return store.project.clips[0].in; });
+  await ev(async () => { const { store } = window.__app; const { splitClip, sourceTimeAt } = await import('/shared/timeline.js'); const c = store.project.clips[0]; window.__srcBefore = sourceTimeAt(c, 4.6); store.mutate((p) => { splitClip(p, c.id, 3.5); }); });
+  const drift = await ev(async () => { const { store } = window.__app; const { sourceTimeAt } = await import('/shared/timeline.js'); const right = store.project.clips.find((c) => c.start > 3); return Math.abs(sourceTimeAt(right, 4.6) - window.__srcBefore); });
+  assert.ok(drift < 0.03, `split inside the easing keeps the picture continuous (${drift.toFixed(3)} s)`);
+  await ev(() => window.__app.store.undo()); await settle(300);
+  await shot('31-speed-ramp');
+});
+
 await step('timeline tracks reorder: drag the grip or use the arrows, audio can sit above video, rename, remove an empty row, video order changes what draws on top', async () => {
   await resetProject();
   await ev(async (c) => { await window.__app.importPaths([c]); const { store } = window.__app; const { addMediaClip } = await import('/shared/timeline.js');

@@ -1,6 +1,7 @@
 // Media element pool. One <video> per video clip (so the same file can sit on two tracks),
 // one <img> per image media, one <audio> per audio clip (preview only).
-import { clipEnd } from '/shared/timeline.js';
+import { clipEnd, sourceTimeAt } from '/shared/timeline.js';
+import { hasRamp, rateAt, sourceAdvance } from '/shared/ramp.js';
 import { findMedia } from '/shared/project.js';
 import { fadeFactor } from '/shared/params.js';
 
@@ -93,12 +94,13 @@ export class Sources {
         if (el && el.dataset.mid !== media.id) { el.pause(); el.removeAttribute('src'); el.load(); this.audios.delete(clip.id); el = null; }
         if (!el) { el = new Audio(); el.preload = 'auto'; el.dataset.mid = media.id; el.src = this.urlFor(media); this.audios.set(clip.id, el); }
       }
-      const speed = clip.speed || 1;
-      const want = clip.in + (t - clip.start) * speed;
-      if (el.playbackRate !== speed) el.playbackRate = speed;
-      el.volume = trackMuted.get(clip.trackId) || !this.audible ? 0 : Math.min(1, Math.max(0, (clip.volume ?? 1) * fadeFactor(clip, t - clip.start)));
+      const ramped = hasRamp(clip);
+      const rate = Math.min(16, Math.max(0.0625, rateAt(clip, Math.min(clip.duration, Math.max(0, t - clip.start))))); // a ramp changes the rate every frame
+      const want = sourceTimeAt(clip, t);
+      if (Math.abs(el.playbackRate - rate) > (ramped ? 0.005 : 0)) el.playbackRate = rate;
+      el.volume = ramped || trackMuted.get(clip.trackId) || !this.audible ? 0 : Math.min(1, Math.max(0, (clip.volume ?? 1) * fadeFactor(clip, t - clip.start)));
       if (active) {
-        if (Math.abs(el.currentTime - want) > (playing ? 0.3 : 0.001) && el.readyState > 0) el.currentTime = want;
+        if (Math.abs(el.currentTime - want) > (playing ? (ramped ? 0.1 : 0.3) : 0.001) && el.readyState > 0) el.currentTime = want;
         if (playing && el.paused) el.play().catch(() => {});
         if (!playing && !el.paused) el.pause();
       } else {
@@ -135,7 +137,7 @@ export class Sources {
         continue;
       }
       const v = this._video(clip, media);
-      const target = Math.min(Math.max(0, clip.in + (t - clip.start) * (clip.speed || 1)), Math.max(0, media.duration - 0.001));
+      const target = Math.min(Math.max(0, sourceTimeAt(clip, t)), Math.max(0, media.duration - 0.001));
       jobs.push(this._seek(v, target, media.name));
     }
     await Promise.all(jobs);
@@ -156,7 +158,34 @@ export class Sources {
     await Promise.all(jobs);
   }
 
+  /**
+   * A speed-ramped clip cannot be retimed by one ffmpeg filter, so the source is decoded at its own frame rate and each output frame
+   * takes the source frame the ramp says it should show (a slow part repeats frames, a fast part skips them — like any retime).
+   */
+  async _decodeRamped(clip, media, t, fps) {
+    let st = this.dec.get(clip.id);
+    if (!st) {
+      const k = Math.min(1, this.maxDim / Math.max(media.width, media.height));
+      const w = Math.max(2, Math.round(media.width * k)), h = Math.max(2, Math.round(media.height * k));
+      const off = Math.max(0, Math.round((t - clip.start) * fps)) / fps;
+      const sfps = Math.max(1, media.fps || 30), srcStart = sourceTimeAt(clip, clip.start + off);
+      const left = Math.max(0.1, sourceAdvance(clip, clip.duration) - (srcStart - (clip.in || 0)));
+      await window.hh.exportOpenDecoder({ id: clip.id, path: media.path, start: srcStart, duration: left + 0.5, speed: 1, fps: sfps, width: w, height: h });
+      st = { ramped: true, sfps, srcStart, next: 0, frame: null, pending: null, w, h };
+      this.dec.set(clip.id, st);
+    }
+    const want = Math.max(0, Math.round((sourceTimeAt(clip, t) - st.srcStart) * st.sfps));
+    while (st.next <= want) {
+      const buf = await (st.pending || window.hh.exportNextFrame(clip.id));
+      st.pending = null;
+      st.frame = { data: new Uint8Array(buf), w: st.w, h: st.h };
+      st.next++;
+    }
+    st.pending = window.hh.exportNextFrame(clip.id);
+  }
+
   async _decodeClip(clip, media, t, fps) {
+    if (hasRamp(clip)) return this._decodeRamped(clip, media, t, fps);
     let st = this.dec.get(clip.id);
     if (!st) {
       const k = Math.min(1, this.maxDim / Math.max(media.width, media.height));
