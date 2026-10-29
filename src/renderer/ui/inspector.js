@@ -128,10 +128,11 @@ export function mountInspector(root) {
     const gradOn = field(el('input', { type: 'checkbox', checked: T.fx.gradient }), 'change', (i) => { T.fx.gradient = i.checked; });
     const g1 = field(el('input', { type: 'color', value: T.fx.grad1 }), 'input', (i) => { T.fx.grad1 = i.value; T.fx.gradStops = null; });
     const g2 = field(el('input', { type: 'color', value: T.fx.grad2 }), 'input', (i) => { T.fx.grad2 = i.value; T.fx.gradStops = null; });
+    const ransom = field(el('input', { type: 'checkbox', checked: !!T.ransom }), 'change', (i) => { T.ransom = i.checked; });
     const vert = field(el('input', { type: 'checkbox', checked: !!T.vertical }), 'change', (i) => { T.vertical = i.checked; });
     const colGap = field(el('input', { type: 'range', min: 0.8, max: 3, step: 0.05, value: T.colSpacing || 1.35 }), 'input', (i) => { T.colSpacing = Number(i.value); });
     return card('Typography', [ta, flatRow('Font', font), flatRow('Weight', weight, el('label', { class: 'chk' }, italic, 'italic')),
-      flatRow('Size', size), flatRow('Fit width', fit), flatRow('Align', align, el('label', { class: 'chk' }, upper, 'CAPS')), flatRow('Vertical', vert, colGap), flatRow('Fill', color),
+      flatRow('Size', size), flatRow('Fit width', fit), flatRow('Align', align, el('label', { class: 'chk' }, upper, 'CAPS')), flatRow('Vertical', vert, colGap), flatRow('Ransom note', el('label', { class: 'chk', title: 'Every letter on its own scrap of paper, in its own typeface' }, ransom, 'cut-out letters')), flatRow('Fill', color),
       flatRow('Outline', stroke, strokeC), flatRow('Hollow', hollow, fillA), flatRow('Plate', bgOn, bgC, bgPad),
       flatRow('Chrome fill', gradOn, g1, g2), flatRow('RGB split', sl('split')), flatRow('Shadow', sl('shadow')), flatRow('Glow', sl('glow')), flatRow('Halo (readability)', sl('halo')),
       flatRow('Animation', anim), flatRow('Anim. time', aDur), flatRow('Anim. speed', aSpd)]);

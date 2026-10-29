@@ -570,3 +570,44 @@ Copyright 2023 The Bungee Project Authors (https://github.com/djrrb/Bungee)
 --- Bebas Neue ---
 Copyright 2019 The Bebas Neue Project Authors (https://github.com/dharmatype/Bebas-Neue)
 (Each is licensed under the SIL Open Font License 1.1, reproduced above.)
+
+=== Genre packs (v0.5.0): Rubik Distressed, Londrina Solid, Reenie Beanie, Covered By Your Grace, Courier Prime, Monoton, Shrikhand, Righteous, Audiowide, Space Grotesk, Space Mono, Syne, Unbounded, Big Shoulders Display, Metal Mania, New Rocker, Cinzel Decorative, Grenze Gotisch, IM Fell English SC ===
+--- Rubik Distressed ---
+Copyright 2020 The Rubik Filtered Project Authors (https://github.com/NaN-xyz/Rubik-Filtered)
+--- Londrina Solid ---
+Copyright 2011 The Londrina Solid Authors (https://github.com/marcelommp/Londrina-Typeface), with Reserved Font Name "Londrina Solid" LondrinaSolid-Light.ttf: Copyright 2011 The Londrina Solid Authors (https://github.com/marcelommp/Londrina-Typeface), with Reserved Font Name "Londrina Solid" Londrin
+--- Reenie Beanie ---
+Copyright (c) 2010 Typeco (james@typeco.com). All rights reserved.
+--- Covered By Your Grace ---
+Copyright (c) 2010, Kimberly Geswein (kimberlygeswein.com)
+--- Courier Prime ---
+Copyright 2015 The Courier Prime Project Authors (https://github.com/quoteunquoteapps/CourierPrime). CourierPrime-Italic.ttf: Copyright 2015 The Courier Prime Project Authors (https://github.com/quoteunquoteapps/CourierPrime). CourierPrime-Bold.ttf: Copyright 2015 The Courier Prime Project Authors (
+--- Monoton ---
+Copyright (c) 2011, Vernon Adams (vern@newtypography.co.uk) with Reserved Font Name 'Monoton'. All rights reserved.
+--- Shrikhand ---
+Copyright (c) 2015 Jonny Pinhorn (jonpinhorn.typedesign@gmail.com)
+--- Righteous ---
+Copyright (c) 2011 by Brian J. Bonislawsky DBA Astigmatic (AOETI) (astigma@astigmatic.com), with Reserved Font Name "Righteous"
+--- Audiowide ---
+Copyright (c) 2012 by Brian J. Bonislawsky DBA Astigmatic (AOETI) (astigma@astigmatic.com), with Reserved Font Name "Audiowide"
+--- Space Grotesk ---
+Copyright 2020 The Space Grotesk Project Authors (https://github.com/floriankarsten/space-grotesk)
+--- Space Mono ---
+Copyright 2016 The Space Mono Project Authors (https://github.com/googlefonts/spacemono) SpaceMono-Italic.ttf: Copyright 2016 The Space Mono Project Authors (https://github.com/googlefonts/spacemono) SpaceMono-Bold.ttf: Copyright 2016 The Space Mono Project Authors (https://github.com/googlefonts/sp
+--- Syne ---
+Copyright 2019 The Syne Project Authors (https://gitlab.com/bonjour-monde/fonderie/syne-typeface)
+--- Unbounded ---
+Copyright 2022 The Unbounded Project Authors (https://github.com/googlefonts/unbounded)
+--- Big Shoulders Display ---
+Google Inc.
+--- Metal Mania ---
+Copyright (c) 2012 by Open Window (dathanboardman@gmail.com) with Reseved Font Name "Metal Mania"
+--- New Rocker ---
+Copyright (c) 2012, Pablo Impallari (www.impallari.com|impallari@gmail.com), Copyright (c) 2012, Brenda Gallo (gbrenda1987@gmail.com), Copyright (c) 2012, Rodrigo Fuenzalida (www.rfuenzalida.com|hello@rfuenzalida.com), with Reserved Font Name 'New Rocker'
+--- Cinzel Decorative ---
+Copyright  2012 Natanael Gama (info@ndiscovered.com), with Reserved Font Name 'Cinzel' CinzelDecorative-Bold.ttf: Copyright  2012 Natanael Gama (info@ndiscovered.com), with Reserved Font Name 'Cinzel' CinzelDecorative-Black.ttf: Copyright  2012 Natanael Gama (info@ndiscovered.com), with Reserved Fon
+--- Grenze Gotisch ---
+Copyright 2020 The Grenze Gotisch Project Authors (https://github.com/Omnibus-Type/Grenze-Gotisch)
+--- IM Fell English SC ---
+Google Inc.
+(Each is licensed under the SIL Open Font License 1.1, reproduced above.)

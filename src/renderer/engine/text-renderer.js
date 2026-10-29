@@ -16,6 +16,40 @@ export function fontString(text, px) {
   return `${text.italic ? 'italic ' : ''}${text.weight} ${px}px ${fam}`;
 }
 
+
+// Ransom note: every letter on its own scrap of paper, in its own typeface, a little crooked. Deterministic per position, so it holds still.
+const RANSOM_FONTS = [['Anton', 400], ['Special Elite', 400], ['Rubik Distressed', 400], ['Permanent Marker', 400], ['Bebas Neue', 400], ['Archivo Black', 400], ['Courier Prime', 700], ['Londrina Solid', 900]];
+const RANSOM_PAPER = [['#f4efe3', '#111111'], ['#111111', '#f4efe3'], ['#d1002f', '#ffffff'], ['#ffe066', '#111111'], ['#e4e4e0', '#222222'], ['#1d4ed8', '#ffffff']];
+function drawRansom(ctx, lines, px, lh, maxW) {
+  let idx = 0;
+  const rows = lines.map((l) => graphemes(l).map((ch) => {
+    const i = idx++, h = (n) => hash(i * 7.13 + n * 3.1);
+    if (ch === ' ') return { gap: true, w: px * 0.4 };
+    const [fam, wt] = RANSOM_FONTS[Math.floor(h(1) * RANSOM_FONTS.length)], sz = px * (0.8 + h(2) * 0.42);
+    ctx.font = `${wt} ${sz}px "${fam}"`;
+    return { ch, fam, wt, sz, w: ctx.measureText(ch).width + sz * 0.26, rot: (h(4) - 0.5) * 0.22, dy: (h(5) - 0.5) * px * 0.14, paper: RANSOM_PAPER[Math.floor(h(3) * RANSOM_PAPER.length)] };
+  }));
+  const rowW = (row) => row.reduce((a, c) => a + c.w + px * 0.04, 0);
+  const k = Math.min(1, maxW / Math.max(1, ...rows.map(rowW))); // letters are wider on their paper than plain text: shrink to the requested width
+  ctx.scale(k, k);
+  rows.forEach((row, ri) => {
+    let x = -rowW(row) / 2;
+    const y = (ri - (rows.length - 1) / 2) * lh * 1.2;
+    for (const c of row) {
+      if (c.gap) { x += c.w; continue; }
+      ctx.save();
+      ctx.translate(x + c.w / 2, y + c.dy); ctx.rotate(c.rot);
+      ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = px * 0.06; ctx.shadowOffsetY = px * 0.03;
+      ctx.fillStyle = c.paper[0]; ctx.fillRect(-c.w / 2, -c.sz * 0.56, c.w, c.sz * 1.12);
+      ctx.shadowColor = 'transparent';
+      ctx.fillStyle = c.paper[1]; ctx.font = `${c.wt} ${c.sz}px "${c.fam}"`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(c.ch, 0, c.sz * 0.04);
+      ctx.restore();
+      x += c.w + px * 0.04;
+    }
+  });
+}
+
 export function drawTextClip(ctx, W, H, clip, t, p) {
   const T = clip.text;
   ctx.clearRect(0, 0, W, H);
@@ -135,6 +169,13 @@ export function drawTextClip(ctx, W, H, clip, t, p) {
     vcols = cols.length; vrows = Math.max(1, ...cols.map((c) => c.length));
     vpos = []; lines = [];
     cols.forEach((chars, c) => chars.forEach((ch, r) => { lines.push(ch); vpos.push({ x: ((cols.length - 1) / 2 - c) * colGap, y: (r - (chars.length - 1) / 2) * lh }); }));
+  }
+  if (T.ransom) { // cut-out letters replace the normal fill/outline/fx pipeline
+    ctx.translate(W / 2 + p.x * W + dx, H / 2 - p.y * H + dy);
+    ctx.rotate((p.rotation * Math.PI) / 180);
+    drawRansom(ctx, lines, px, lh, (T.fit > 0 ? T.fit : 0.95) * W);
+    ctx.restore();
+    return;
   }
   const widths = lines.map((l) => ctx.measureText(l).width);
   const blockW = vpos ? vcols * colGap : Math.max(...widths, 1);

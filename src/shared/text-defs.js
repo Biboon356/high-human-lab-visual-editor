@@ -3,7 +3,7 @@ import { createClip, defaultProps } from './project.js';
 import { createEffect } from './effects-defs.js';
 
 export const FONTS = [
-  'DotGothic16', 'Zen Antique', 'Dela Gothic One', 'Rozha One', 'Yatra One', 'Modak', 'Tiro Devanagari Hindi', 'Eczar', 'Teko', 'Khand', 'Kalam', 'Amita', 'Martel', 'Anton', 'Permanent Marker', 'Special Elite', 'Rubik Spray Paint', 'Black Ops One', 'Rubik Glitch', 'Archivo Black', 'Rock Salt', 'Bungee', 'Bebas Neue', 'Michroma', 'Orbitron', 'Press Start 2P', 'UnifrakturCook', 'Pirata One', 'Pinyon Script', 'Instrument Serif', 'Inter Tight', 'DM Mono', 'Helvetica Neue', 'Arial Black', 'Impact', 'Futura', 'Courier New', 'Menlo', 'Consolas',
+  'DotGothic16', 'Zen Antique', 'Dela Gothic One', 'Rozha One', 'Yatra One', 'Modak', 'Tiro Devanagari Hindi', 'Eczar', 'Teko', 'Khand', 'Kalam', 'Amita', 'Martel', 'Anton', 'Permanent Marker', 'Special Elite', 'Rubik Spray Paint', 'Black Ops One', 'Rubik Glitch', 'Archivo Black', 'Rock Salt', 'Bungee', 'Bebas Neue', 'Rubik Distressed', 'Londrina Solid', 'Reenie Beanie', 'Covered By Your Grace', 'Courier Prime', 'Monoton', 'Shrikhand', 'Righteous', 'Audiowide', 'Space Grotesk', 'Space Mono', 'Syne', 'Unbounded', 'Big Shoulders Display', 'Metal Mania', 'New Rocker', 'Cinzel Decorative', 'Grenze Gotisch', 'IM Fell English SC', 'Michroma', 'Orbitron', 'Press Start 2P', 'UnifrakturCook', 'Pirata One', 'Pinyon Script', 'Instrument Serif', 'Inter Tight', 'DM Mono', 'Helvetica Neue', 'Arial Black', 'Impact', 'Futura', 'Courier New', 'Menlo', 'Consolas',
   'Georgia', 'Times New Roman', 'Didot', 'Bodoni 72', 'Baskerville', 'Playfair Display', 'Hiragino Sans', 'Yu Gothic', 'Noto Sans JP', 'sans-serif', 'serif', 'monospace',
 ];
 
@@ -47,6 +47,7 @@ export function defaultText() {
     fx: { split: 0, shadow: 0, glow: 0, halo: 0, gradient: false, grad1: '#ffffff', grad2: '#7d8f85', gradStops: null },
     vertical: false, colSpacing: 1.35, // tategaki (upright columns, right to left) for Japanese
     outline2: null, // { width, color }: a second, wider rim outside the outline (sticker / bubble chrome)
+    ransom: false, // cut-out letters: every letter on its own scrap of paper, in its own typeface, slightly crooked
   };
 }
 
@@ -237,6 +238,71 @@ export const TEXT_PRESETS = [
   mk('Ad-lib Pop (marker)',
     { content: 'yeah!', font: 'Permanent Marker', weight: 400, size: 0.09, color: '#ffffff', anim: { type: 'slam', duration: 0.3, speed: 1 }, fx: { shadow: 0.7, split: 0.2 } },
     { rotation: 8, x: 0.22, y: 0.18 }),
+  // ---- zine / punk ----
+  mk('Ransom Note (cut-out)',
+    { content: 'NO FUTURE', font: 'Anton', weight: 400, size: 0.16, fit: 0.8, ransom: true, anim: { type: 'fade', duration: 0.4, speed: 1 } },
+    {}),
+  mk('Zine Title (distressed)',
+    { content: 'ZINE NIGHT', font: 'Rubik Distressed', weight: 400, size: 0.15, fit: 0.85, uppercase: true, color: '#f4efe3', anim: { type: 'stutter', duration: 0.7, speed: 1 }, fx: { shadow: 0.4 } },
+    {}),
+  mk('Scrawl Marker (zine)',
+    { content: 'diy', font: 'Covered By Your Grace', weight: 400, size: 0.1, color: '#ff2e88', anim: { type: 'fade', duration: 0.5, speed: 1 }, fx: { shadow: 0.4 } },
+    { rotation: -5, x: -0.2, y: 0.2 }),
+  mk('Beanie Scribble',
+    { content: 'handmade', font: 'Reenie Beanie', weight: 400, size: 0.09, color: '#ffffff', anim: { type: 'typewriter', duration: 1, speed: 1 }, fx: { shadow: 0.3 } },
+    { rotation: 3, y: -0.2 }),
+  mk('Courier Caption',
+    { content: 'xerox + staples + noise', font: 'Courier Prime', weight: 700, size: 0.04, uppercase: true, color: '#e9e4d4', anim: { type: 'typewriter', duration: 1.4, speed: 1 } },
+    { y: -0.2, tracking: 0.1 }),
+  mk('Hand Cut (Londrina)',
+    { content: 'HAND CUT', font: 'Londrina Solid', weight: 900, size: 0.16, fit: 0.7, uppercase: true, color: '#f2ff3a', anim: { type: 'slam', duration: 0.5, speed: 1 }, fx: { shadow: 0.6 } },
+    { rotation: -2 }),
+  // ---- vaporwave / city pop ----
+  mk('Neon Line (Monoton)',
+    { content: 'NIGHT DRIVE', font: 'Monoton', weight: 400, size: 0.1, fit: 0.85, uppercase: true, color: '#ff4fd8', anim: { type: 'flicker', duration: 1, speed: 1 }, fx: { glow: 0.95, shadow: 0.2 } },
+    {}),
+  mk('Vapor Script (Shrikhand)',
+    { content: 'City Lights', font: 'Shrikhand', weight: 400, size: 0.16, fit: 0.75, color: '#ff4fa8', anim: { type: 'fade', duration: 1, speed: 1 },
+      fx: { gradient: true, gradStops: [[0, '#ffe3f6'], [0.5, '#ff4fa8'], [1, '#7a2cff']], shadow: 0.6, glow: 0.5 } },
+    {}),
+  mk('Righteous Label',
+    { content: 'MIDNIGHT FM', font: 'Righteous', weight: 400, size: 0.06, uppercase: true, color: '#7df9ff', anim: { type: 'fade', duration: 0.6, speed: 1 }, fx: { glow: 0.5 } },
+    { tracking: 0.25 }),
+  mk('Audiowide Tag',
+    { content: 'LIVE FROM TOKYO 1987', font: 'Audiowide', weight: 400, size: 0.045, uppercase: true, color: '#ffe9a8', anim: { type: 'fade', duration: 0.6, speed: 1 }, fx: { glow: 0.4 } },
+    { tracking: 0.2 }),
+  // ---- brutalist / Swiss ----
+  mk('Swiss Mono Label',
+    { content: '(01) — NEW ORDER', font: 'Space Mono', weight: 700, size: 0.035, fit: 0.26, uppercase: true, color: '#f2f2ee', align: 'left', anim: { type: 'typewriter', duration: 1, speed: 1 } },
+    { x: -0.33, y: 0.3 }),
+  mk('Big Shoulders Stack',
+    { content: 'CONCRETE', font: 'Big Shoulders Display', weight: 900, size: 0.28, fit: 0.88, uppercase: true, color: '#f2f2ee', lineHeight: 0.9, anim: { type: 'slam', duration: 0.5, speed: 1 } },
+    { y: 0.02 }),
+  mk('Grotesk Caption (red)',
+    { content: 'Lagos / Berlin / Seoul', font: 'Space Grotesk', weight: 700, size: 0.04, fit: 0.34, color: '#ff3b1f', align: 'left', anim: { type: 'fade', duration: 0.6, speed: 1 } },
+    { x: -0.31, y: -0.28 }),
+  mk('Unbounded Hard (wide)',
+    { content: 'HARD EDGE', font: 'Unbounded', weight: 900, size: 0.09, fit: 0.9, uppercase: true, color: '#ffffff', anim: { type: 'slam', duration: 0.5, speed: 1 } },
+    {}),
+  mk('Syne Whisper',
+    { content: 'volume nine', font: 'Syne', weight: 800, size: 0.05, color: '#ff3b1f', anim: { type: 'fade', duration: 0.6, speed: 1 } },
+    { y: 0.17 }),
+  // ---- dark / metal ----
+  mk('Metal Logo (Metal Mania)',
+    { content: 'NECROPOLIS', font: 'Metal Mania', weight: 400, size: 0.15, fit: 0.85, uppercase: true, color: '#e8e2d4', strokeWidth: 0.012, strokeColor: '#000000', anim: { type: 'fade', duration: 1.2, speed: 1 }, fx: { glow: 0.3, shadow: 0.8 } },
+    {}),
+  mk('Gotisch Heavy',
+    { content: 'Iron Wolves', font: 'Grenze Gotisch', weight: 900, size: 0.15, fit: 0.8, color: '#d9d2c0', anim: { type: 'fade', duration: 1.2, speed: 1 }, fx: { shadow: 0.7, glow: 0.15 } },
+    {}),
+  mk('New Rocker Title',
+    { content: 'IRON WOLVES', font: 'New Rocker', weight: 400, size: 0.13, fit: 0.8, uppercase: true, color: '#c1121f', strokeWidth: 0.012, strokeColor: '#1a0000', anim: { type: 'slam', duration: 0.6, speed: 1 }, fx: { shadow: 0.8, glow: 0.4 } },
+    {}),
+  mk('Cinzel Kicker',
+    { content: 'LIVE', font: 'Cinzel Decorative', weight: 900, size: 0.06, uppercase: true, color: '#d9c27a', anim: { type: 'fade', duration: 0.8, speed: 1 }, fx: { glow: 0.3 } },
+    { tracking: 0.3 }),
+  mk('Fell Whisper',
+    { content: 'in the year of the long night', font: 'IM Fell English SC', weight: 400, size: 0.045, color: '#cfc6b2', anim: { type: 'fade', duration: 1.2, speed: 1 }, fx: { shadow: 0.4 } },
+    { tracking: 0.1 }),
 ];
 
 export function createTextClip(preset, start, duration = 4) {
@@ -270,6 +336,18 @@ export const LOCKUPS = [
   { name: 'Blackletter street (3 fonts)', kicker: { preset: 'Typewriter Cover', text: 'EST. IN THE BASEMENT', y: 0.25 }, title: { preset: 'Gothic Drop (blackletter)', text: 'Dead End', fit: 0.6, y: 0 }, sub: { preset: 'Marker Tag', text: 'no features', rotation: 4, x: -0.1, y: -0.21 } },
   { name: 'Flyer night (2 fonts)', kicker: { preset: 'Bebas Credit', text: 'LIVE · ONE NIGHT ONLY', y: 0.2 }, title: { preset: 'Block Heavy (Archivo)', text: 'LOUD', y: -0.01 } },
   { name: 'Static broadcast (2 fonts)', kicker: { preset: 'Techno Spec Sheet', text: 'SIGNAL LOST // 404', align: 'center', x: 0, y: 0.17, size: 0.03 }, title: { preset: 'Glitch Rap Title', text: 'STATIC', y: -0.01 } },
+  // ---- zine / punk ----
+  { name: 'Ransom zine (2 fonts)', kicker: { preset: 'Typewriter Cover', text: 'ISSUE #04 — PHOTOCOPIED', y: 0.27 }, title: { preset: 'Ransom Note (cut-out)', text: 'NO FUTURE', y: -0.02 } },
+  { name: 'Cut-up (3 fonts)', kicker: { preset: 'Scrawl Marker (zine)', text: 'diy', x: -0.2, y: 0.26 }, title: { preset: 'Zine Title (distressed)', text: 'ZINE NIGHT', fit: 0.7, y: 0 }, sub: { preset: 'Courier Caption', text: 'xerox + staples + noise', y: -0.22 } },
+  // ---- vaporwave / city pop ----
+  { name: 'Vapor sign (3 fonts)', kicker: { preset: 'Cyber Katakana (pixel)', text: 'ネオンの夜', size: 0.06, fit: 0.3, y: 0.27 }, title: { preset: 'Vapor Script (Shrikhand)', text: 'City Lights', fit: 0.6, y: 0 }, sub: { preset: 'Audiowide Tag', text: 'LIVE FROM TOKYO 1987', y: -0.23 } },
+  { name: 'Neon line (2 fonts)', kicker: { preset: 'Righteous Label', text: 'MIDNIGHT FM', y: 0.2 }, title: { preset: 'Neon Line (Monoton)', text: 'NIGHT DRIVE', fit: 0.7, y: -0.02 } },
+  // ---- brutalist / Swiss ----
+  { name: 'Swiss grid (3 fonts)', kicker: { preset: 'Swiss Mono Label', text: '(01) — NEW ORDER' }, title: { preset: 'Big Shoulders Stack', text: 'CONCRETE', fit: 0.7, y: 0 }, sub: { preset: 'Grotesk Caption (red)', text: 'Lagos / Berlin / Seoul' } },
+  { name: 'Brutal wide (2 fonts)', kicker: { preset: 'Syne Whisper', text: 'volume nine', y: 0.2 }, title: { preset: 'Unbounded Hard (wide)', text: 'HARD EDGE', fit: 0.78, y: -0.02 } },
+  // ---- dark / metal ----
+  { name: 'Black metal logo (2 fonts)', kicker: { preset: 'Fell Whisper', text: 'in the year of the long night', y: 0.22 }, title: { preset: 'Metal Logo (Metal Mania)', text: 'NECROPOLIS', fit: 0.7, y: -0.02 } },
+  { name: 'Crypt poster (3 fonts)', kicker: { preset: 'Cinzel Kicker', text: 'LIVE', y: 0.25 }, title: { preset: 'New Rocker Title', text: 'IRON WOLVES', fit: 0.66, y: 0 }, sub: { preset: 'Fell Whisper', text: 'one night in hell', y: -0.22 } },
 ];
 
 /** The two-line title card from the editorial reference: kicker above, script title below. Returns [kicker, title] (not yet on a track). */

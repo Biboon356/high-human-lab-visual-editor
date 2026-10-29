@@ -153,6 +153,16 @@ None of this has been measured against real Thai recordings yet (see status belo
 - **Removed:** the *05 Presets* tab (the 142-look library). Fade in/out moved to the Looks tab; effect presets in the Inspector menu are unchanged.
 - **Not verified on real Mac/Windows installs** (tested end-to-end with Electron on Linux). Known limits: the mask editor edits shapes on screen only while the clip is selected and paused; ad-libs need the music analysed first.
 
+## v0.5.0 — desi patterns and four more genres
+
+- **Pattern effect** (Inspector → Add effect → *Pattern*): five procedural designs drawn by the shader, no pictures involved — **Mandala** (petals, rings, beads, a rose at the centre; *Detail* sets the number of petals), **Jali lattice** (the pointed arches of a carved stone window), **Rangoli dots** (dots wrapped in loops), **Paisley field**, **Truck-art frame** (a painted border of scallops and flowers). Line colour/width, fill colour, glow, rotation and a slow drift/spin are all adjustable and keyframable; *Mix* fades it over the picture. Looks: *Mandala Bloom, Jali Window, Rangoli Floor, Paisley Night, Truck-art Frame, Marigold Haze*. The designs are generic ornament; no religious symbols are used.
+- **Zine / punk:** **Ransom note** text (Typography → *Ransom note* tick): every letter on its own scrap of paper in its own typeface, slightly crooked, still while it is on screen. Fonts *Rubik Distressed, Londrina Solid, Reenie Beanie, Covered By Your Grace, Courier Prime*. Looks *Zine Cut-up, Riso Pink, Riso Blue*.
+- **Vaporwave / city pop:** fonts *Monoton, Shrikhand, Righteous, Audiowide* (the Japanese kicker uses the bundled pixel face); looks *Vapor Sunset, Vapor Tape, City Pop Dusk*.
+- **Brutalist / Swiss:** *Space Grotesk, Space Mono, Syne, Unbounded, Big Shoulders Display*; looks *Concrete, Swiss Red*.
+- **Dark / metal:** *Metal Mania, New Rocker, Cinzel Decorative, Grenze Gotisch, IM Fell English SC*; looks *Black Metal, Blood Moon, Candlelit Crypt*.
+- **Lockups: 20 in all** (Type tab), nine of them with **three typefaces** — each part is its own text clip, so wording, font, colour and position stay editable. New: *Ransom zine, Cut-up, Vapor sign, Neon line, Swiss grid, Brutal wide, Black metal logo, Crypt poster*.
+- **Limits:** the pattern designs are tuned by eye on Linux; at very large *Size / repeat* values the paisley and lattice cells get coarse. Not verified on real Mac/Windows installs.
+
 ## Updating without reinstalling
 
 From version 0.2.0 the app updates itself **in place**: on start (and every few hours) it asks GitHub for the latest release, downloads a small checksummed bundle of the app's own code (`src/**`, a few hundred KB), and shows **Update x.y.z · Restart** in the top bar. Nothing is applied until you press it; the next start then runs the new code from the app's data folder. *Project → Updates* shows the version and has a manual *Check for updates* (also *Tools → Check for Updates…*).
@@ -220,7 +230,7 @@ Legend: ✅ works and is covered by the automated tests · 🧪 prototype (works
 
 ## Testing
 
-`npm test` runs 139 unit tests. `scripts/e2e.mjs` (64 checks) is a real end-to-end run of the Electron app (see table above): it
+`npm test` runs 140 unit tests. `scripts/e2e.mjs` (65 checks) is a real end-to-end run of the Electron app (see table above): it
 generates test media with ffmpeg, drives the app, reads pixels out of the compositor, and probes exported files.
 Native file dialogs are stubbed at the Electron main-process level; every other path is the production code.
 

@@ -1022,7 +1022,7 @@ await step('type packs: every lockup (2 and 3 fonts, Hindi and street) lays out 
   await page.click('#panel-left [data-tab="type"]');
   await ev(() => { const { store } = window.__app; store.mutate((p) => { p.settings.width = 960; p.settings.height = 540; }); });
   const names = await ev(async () => (await import('/shared/text-defs.js')).LOCKUPS.map((l) => ({ name: l.name, n: l.sub ? 3 : 2 })));
-  assert.ok(names.length >= 12, `${names.length} lockups`);
+  assert.ok(names.length >= 20, `${names.length} lockups`);
   const logsBefore = logs.length;
   let i = 0;
   for (const L of names) {
@@ -1166,6 +1166,44 @@ await step('rhythm tools: ad-libs land on the beats of the analysed song; stutte
   assert.ok(Math.abs(s.total - 4.75) < 0.01, `the cut grew by the 3 extra plays (${s.total})`);
   await ev(() => window.__app.store.undo()); await settle(200);
   assert.equal(await ev(() => window.__app.store.project.clips.filter((c) => c.type === 'media').length), 1, 'one Undo restores the clip');
+});
+
+await step('genre looks render: desi patterns, zine, vaporwave, brutalist and metal looks each change the picture and compile cleanly; ransom-note text holds still', async () => {
+  await resetProject();
+  await ev(async (c) => { await window.__app.importPaths([c]); const { store } = window.__app; const { addMediaClip } = await import('/shared/timeline.js');
+    store.mutate((p) => { p.settings.width = 480; p.settings.height = 270; addMediaClip(p, p.media[0].id, p.tracks.find((t) => t.kind === 'video').id, 0); }); store.setPlayhead(1.2); }, clip);
+  await settle(700);
+  const grab = () => ev(() => window.__grab(96, 54));
+  const diff = (a, b) => { let s = 0; for (let i = 0; i < a.length; i++) s += Math.abs(a[i] - b[i]); return s / a.length; };
+  const base = await grab();
+  const names = ['Mandala Bloom', 'Jali Window', 'Rangoli Floor', 'Paisley Night', 'Truck-art Frame', 'Marigold Haze', 'Zine Cut-up', 'Riso Pink', 'Riso Blue', 'Vapor Sunset', 'Vapor Tape', 'City Pop Dusk', 'Concrete', 'Swiss Red', 'Black Metal', 'Blood Moon', 'Candlelit Crypt'];
+  assert.equal(await ev(async (n) => { const L = (await import('/shared/adjust-defs.js')).ADJUST_LOOKS; return n.filter((x) => L.some((l) => l.name === x)).length; }, names), names.length, 'all genre looks exist');
+  const errorsBefore = logs.length;
+  for (const n of names) {
+    await ev(async (n) => { const { store } = window.__app; const A = await import('/shared/adjust-defs.js'); const T = await import('/shared/timeline.js');
+      store.mutate((p) => { p.clips = p.clips.filter((c) => c.type !== 'adjust'); const c = A.createAdjustClip(A.ADJUST_LOOKS.find((l) => l.name === n), 0, 6); c.trackId = T.addTrack(p, 'video').id; T.addClipRaw(p, c); }); store.setPlayhead(5); }, n);
+    await settle(650);
+    const d = diff(base, await grab());
+    assert.ok(d > 1.2, `${n} changes the picture (Δ${d.toFixed(1)})`);
+  }
+  assert.equal(logs.slice(errorsBefore).filter((l) => /shader|compile|GLSL|WebGL/i.test(l)).length, 0, 'no shader errors in the console');
+  // every pattern style draws something of its own on an empty frame
+  await ev(async () => { const { store } = window.__app; const E = await import('/shared/effects-defs.js'); const A = await import('/shared/adjust-defs.js'); const T = await import('/shared/timeline.js');
+    store.mutate((p) => { p.clips = []; const c = A.createAdjustClip({ name: 'p', chain: [{ type: 'pattern', params: {} }] }, 0, 6); c.trackId = p.tracks.find((t) => t.kind === 'video').id; T.addClipRaw(p, c); window.__pc = c; }); store.setPlayhead(1); });
+  for (let style = 0; style < 5; style++) {
+    await ev((s) => { window.__pc.effects[0].params.style = s; window.__app.store.touch('project'); }, style); await settle(450);
+    const lit = await ev(() => { const d = window.__grab(96, 54); let n = 0; for (let i = 0; i < d.length; i += 3) if (d[i] + d[i + 1] + d[i + 2] > 120) n++; return n / (d.length / 3); });
+    assert.ok(lit > 0.015, `pattern style ${style} draws lines on an empty frame (${lit.toFixed(3)} lit)`);
+  }
+  // ransom note: scraps of paper, and the same picture every time the frame is drawn
+  await ev(async () => { const { store } = window.__app; const T = await import('/shared/text-defs.js'); const TL = await import('/shared/timeline.js');
+    store.mutate((p) => { p.clips = []; const c = T.createTextClip(T.TEXT_PRESETS.find((x) => x.name === 'Ransom Note (cut-out)'), 0, 4); c.trackId = p.tracks.find((t) => t.kind === 'video').id; TL.addClipRaw(p, c); }); store.setPlayhead(2); });
+  await settle(600);
+  const r1 = await ev(() => window.__grab(96, 54)); await ev(() => window.__app.store.setPlayhead(2.5)); await settle(400); const r2 = await ev(() => window.__grab(96, 54));
+  let lit = 0; for (let i = 0; i < r1.length; i += 3) if (r1[i] + r1[i + 1] + r1[i + 2] > 200) lit++;
+  assert.ok(lit / (r1.length / 3) > 0.08, `ransom letters sit on paper scraps (${(lit / (r1.length / 3)).toFixed(2)} bright)`);
+  assert.ok(diff(r1, r2) < 0.5, `the ransom note holds still (Δ${diff(r1, r2).toFixed(2)})`);
+  await shot('33-ransom');
 });
 
 await step('montage v2: favourites and skip flags, hook + calm close, Y2K style grades the whole cut, optional title card, footage sound muted, exports', async () => {

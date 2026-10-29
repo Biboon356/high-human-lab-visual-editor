@@ -120,3 +120,12 @@ Preset: **Xerox Photocopy** (คอนทราสต์สูง + toner noise 
 7. **Stutter** (แถบไทม์ไลน์): วาง playhead ในคลิป เลือกความยาวชิ้น (⅛/¼/½ วินาที) และจำนวนรอบ แล้วกด Stutter — ชิ้นนั้นวนซ้ำ (ภาพและเสียง) ที่เหลือของคลิปเลื่อนตามไป
 8. **Lockup 12 แบบ** (แท็บ Type) มีทั้ง 2 ฟอนต์และ 3 ฟอนต์ เช่น *Filmi poster, Mixtape cover, Spray crew, Blackletter street* — แต่ละส่วนเป็นคลิปข้อความแยก แก้คำ/ฟอนต์/สี/ตำแหน่งได้อิสระ
 9. **เลิกใช้**: แท็บ *05 Presets* ถูกเอาออก (เฟดย้ายไปแท็บ Looks)
+
+## v0.5.0 — ลายแบบ desi และอีก 4 แนวเพลง
+1. **เอฟเฟกต์ Pattern** (Inspector → Add effect → Pattern): ลาย 5 แบบที่วาดด้วยโค้ด ไม่ใช้รูป — **Mandala**, **Jali** (ตาข่ายหินฉลุ), **Rangoli** (จุดกับเส้นวน), **Paisley**, **Truck-art frame** (กรอบลายรถบรรทุกอินเดีย) ปรับสีเส้น สีพื้น ความหนา เรืองแสง หมุน/เลื่อนช้า ๆ ได้ และใส่ keyframe ได้ มีลุคสำเร็จรูป: Mandala Bloom, Jali Window, Rangoli Floor, Paisley Night, Truck-art Frame, Marigold Haze (ลายเป็นลวดลายทั่วไป ไม่ใช้สัญลักษณ์ทางศาสนา)
+2. **Zine/พังก์**: ข้อความ **Ransom note** (ติ๊ก "Ransom note" ในแผง Typography) ตัวอักษรแต่ละตัวอยู่บนเศษกระดาษคนละแบบ คนละฟอนต์ เอียงนิดๆ + ฟอนต์ 5 แบบ + ลุค Zine Cut-up / Riso Pink / Riso Blue
+3. **Vaporwave / city pop**: ฟอนต์ Monoton, Shrikhand, Righteous, Audiowide + ลุค Vapor Sunset / Vapor Tape / City Pop Dusk
+4. **Brutalist / Swiss**: ฟอนต์ Space Grotesk, Space Mono, Syne, Unbounded, Big Shoulders Display + ลุค Concrete / Swiss Red
+5. **Dark / metal**: ฟอนต์ Metal Mania, New Rocker, Cinzel Decorative, Grenze Gotisch, IM Fell English SC + ลุค Black Metal / Blood Moon / Candlelit Crypt
+6. **Lockup รวม 20 แบบ** (แท็บ Type) มี 3 ฟอนต์ 9 แบบ ทุกส่วนเป็นคลิปข้อความแยก แก้ได้อิสระ ใหม่: Ransom zine, Cut-up, Vapor sign, Neon line, Swiss grid, Brutal wide, Black metal logo, Crypt poster
+
