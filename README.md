@@ -123,7 +123,7 @@ None of this has been measured against real Thai recordings yet (see status belo
 
 ## v0.3.0 — editing basics, 3D, and a big preset library
 
-- **Preset library** (left panel → *05 Presets*): 142 ready-made looks grouped Y2K / Street / Cinematic / Glitch / Retro / Dream / Organic / 3D / Beat / Clean / Effects, searchable ("vhs", "chrome", "beat"…). Most are chains of 3–5 effects (a grade + bloom + grain + a signature effect). Click a preset to append its whole chain to the selected clip (one Undo removes it), or press **Layer** to apply it as an adjustment layer over everything below. The *Beat* group is audio-reactive (needs music analysed in the Audio-Reactive tab).
+- **Preset library** *(removed again in v0.4.0 — the Looks tab, the effect presets menu in the Inspector and the typography presets cover it)*: 142 ready-made looks grouped Y2K / Street / Cinematic / Glitch / Retro / Dream / Organic / 3D / Beat / Clean / Effects, searchable ("vhs", "chrome", "beat"…). Most are chains of 3–5 effects (a grade + bloom + grain + a signature effect). Click a preset to append its whole chain to the selected clip (one Undo removes it), or press **Layer** to apply it as an adjustment layer over everything below. The *Beat* group is audio-reactive (needs music analysed in the Audio-Reactive tab).
 - **Reverse** (timeline toolbar): plays the selected clip backwards, picture and sound. It renders a reversed copy of just the part of the file the clip uses (in short chunks so long clips don't exhaust memory), adds it to the Library as "… (reversed)" and points the clip at it; Undo restores the original. Needs a little time and disk for long clips.
 - **Freeze** (timeline toolbar, 1/2/3/5 s): cuts the clip at the playhead, slides the rest of that track later, and holds the exact source frame (full resolution, no effects baked in) as a still clip that keeps the clip's look.
 - **Flip** horizontal/vertical, and **Crop** (an effect: per-side insets, rounded corners, feather) for letterboxing or reveals.
@@ -139,8 +139,19 @@ None of this has been measured against real Thai recordings yet (see status belo
 ## v0.3.2 — readable titles, fades, calmer kaleido
 
 - **Halo (readability)** in the text inspector: a soft dark glow behind the letters (not a hard outline) that keeps a title legible over busy footage such as full-frame Organic veins. Presets *Brand Title (halo)* and *Brand Sub (halo)*.
-- **Fade presets** (Presets → Clean): *Fade out to black*, *Fade in from black*, *Fade out to white* place themselves — out covers the last 1.5 s, in covers the first 1.2 s — as an adjustment layer you can drag or trim.
+- **Fade looks** (Looks tab): *Fade out to black*, *Fade in from black*, *Fade out to white* place themselves — out covers the last 1.5 s, in covers the first 1.2 s — as an adjustment layer you can drag or trim.
 - *Lucid Kaleido* and *Kaleido Trip* bloom thresholds raised so the opener no longer clips to white.
+
+## v0.4.0 — masks, speed ramps, Hindi type, an underground toolkit
+
+- **Masks** (Inspector → *Mask*): add a rectangle, an ellipse or **draw your own polygon** by clicking points on the picture (Enter or a click on the first point closes it; Backspace removes the last point, Esc cancels). Drag a shape to move it, drag its handles to resize, drag polygon points, double-click an edge to add a point and a point to remove it. *Cut* turns a shape into a hole. **Feather**, **Grow/shrink**, **Invert**, and the mask's **X / Y / scale / rotation** are keyframable, so one mask can follow a subject across the clip. Works on any clip — and on an *adjustment layer* it limits where a look applies. Limits: individual polygon points are not animated (move/scale/turn the mask instead), and the mask is in frame space, not tied to the clip's own position.
+- **Track matte** (Inspector → *Matte*): let another clip decide what shows — its **shape (alpha)** or its **brightness (luma)**, optionally inverted. A title as a window onto footage, a picture as a luma wipe. The matte clip is not drawn itself.
+- **Speed ramp** (Inspector → *Speed ramp*, video clips): a graph of playback speed over the clip. Pick a shape (*slow-mo dip, hit and slide, whip up, freeze-ish end, ease in*), **Pulse on beats**, or click/drag your own points (double-click removes). The retime is exact in preview and export; splitting and trimming a ramped clip keep the picture continuous (a cut inside an easing is re-drawn through sampled points, a hair of error). **The ramped clip's own sound is left out** — continuous time-stretching of audio is not built; let the music carry the edit. Slow parts repeat source frames (like any retime); there is no frame blending.
+- **Hindi (Devanagari) type:** ten bundled OFL faces — *Rozha One, Yatra One, Modak, Tiro Devanagari Hindi, Eczar, Teko, Khand, Kalam, Amita, Martel* — each with a Latin face so mixed Hinglish lines stay in one family; 12 text presets. Text is split into **conjunct-aware clusters** (क्ष, त्रि stay whole) for per-letter animations, and **no letter-spacing is ever added to Devanagari** (it would break the headline bar). The sample words in presets are common Hindi words; have a native speaker check anything you publish. Fonts without Devanagari fall back to the system's Devanagari font.
+- **Underground / street toolkit:** fonts *Anton, Permanent Marker, Special Elite, Rubik Spray Paint, Black Ops One, Rubik Glitch, Archivo Black, Rock Salt, Bungee, Bebas Neue*; effects **Xerox** (toner streaks, halftone, ink/paper colours), **Fisheye** and **Torn paper edge**; looks *Xerox Flyer, Xerox Red, Newsprint, Fisheye Cam, Basement Flash, Night CCTV, Basement Tape, Torn Frame, Bass Drop (beat), Beat Zoom*; the **Underground** montage style. **Ad-libs on the beat** (Type tab): type your words, pick every 1/2/4/8 beats and press *Place on beats* — short pop-ups land exactly on the analysed beats (inside the render range if you set one). **Stutter** (timeline): loops the ¼ s (⅛ / ½) after the playhead ×3–×8, picture and sound, and slides the rest of the cut later.
+- **Lockups:** twelve multi-font title cards (Type tab), including **3-font** ones — *Filmi poster, Mixtape cover, Spray crew, Blackletter street* — and 2-font ones (*Desi street, Modak × credit, Flyer night, Static broadcast* …). Each part is its own text clip, so every word, font, colour and position stays editable.
+- **Removed:** the *05 Presets* tab (the 142-look library). Fade in/out moved to the Looks tab; effect presets in the Inspector menu are unchanged.
+- **Not verified on real Mac/Windows installs** (tested end-to-end with Electron on Linux). Known limits: the mask editor edits shapes on screen only while the clip is selected and paused; ad-libs need the music analysed first.
 
 ## Updating without reinstalling
 
@@ -209,7 +220,7 @@ Legend: ✅ works and is covered by the automated tests · 🧪 prototype (works
 
 ## Testing
 
-`npm test` runs 91 unit tests. `scripts/e2e.mjs` (50 checks) is a real end-to-end run of the Electron app (see table above): it
+`npm test` runs 139 unit tests. `scripts/e2e.mjs` (64 checks) is a real end-to-end run of the Electron app (see table above): it
 generates test media with ffmpeg, drives the app, reads pixels out of the compositor, and probes exported files.
 Native file dialogs are stubbed at the Electron main-process level; every other path is the production code.
 
