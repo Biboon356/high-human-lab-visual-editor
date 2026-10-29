@@ -111,7 +111,9 @@ mountUpdateButton();
 // bundled faces must be loaded before the canvas draws with them; redraw once they are ready
 Promise.all([['400 40px "Pinyon Script"'], ['400 40px "Instrument Serif"'], ['italic 400 40px "Instrument Serif"'], ['500 40px "Inter Tight"'], ['400 40px "DM Mono"'],
   ['400 40px "Michroma"'], ['500 40px "Orbitron"'], ['900 40px "Orbitron"'], ['400 40px "Press Start 2P"'], ['700 40px "UnifrakturCook"'], ['400 40px "Pirata One"'],
-  ['400 40px "DotGothic16"', 'サイバー東京'], ['400 40px "Dela Gothic One"', 'FUTURE'], ['400 40px "Zen Antique"', '東京夜行の庭']].map(([f, t]) => document.fonts.load(f, t)))
+  ['400 40px "DotGothic16"', 'サイバー東京'], ['400 40px "Dela Gothic One"', 'FUTURE'], ['400 40px "Zen Antique"', '東京夜行の庭'],
+  ...[['Rozha One', 400], ['Yatra One', 400], ['Modak', 400], ['Tiro Devanagari Hindi', 400], ['Eczar', 800], ['Teko', 700], ['Khand', 700], ['Kalam', 700], ['Amita', 700], ['Martel', 900]].map(([f, w]) => [`${w} 40px "${f}"`, 'हिन्दी Hindi']),
+  ...['Anton', 'Permanent Marker', 'Special Elite', 'Rubik Spray Paint', 'Black Ops One', 'Rubik Glitch', 'Archivo Black', 'Rock Salt', 'Bungee', 'Bebas Neue'].map((f) => [`400 40px "${f}"`, 'HIGH HUMAN'])].map(([f, t]) => document.fonts.load(f, t)))
   .then(() => store.emit('render')).catch(() => {});
 $('tl-montage').onclick = openMontageDialog;
 

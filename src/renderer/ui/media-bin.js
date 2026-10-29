@@ -1,7 +1,7 @@
 import { el, toast, fmtTime } from './dom.js';
 import { store } from '../store.js';
 import { addMediaClip, trackEnd, addTrack, overlaps } from '/shared/timeline.js';
-import { createTextClip, createTitleLockup, LOCKUPS, TEXT_PRESETS } from '/shared/text-defs.js';
+import { createTextClip, createTitleLockup, lockupFonts, LOCKUPS, TEXT_PRESETS } from '/shared/text-defs.js';
 import { createGeneratorClip, GEN_PRESETS } from '/shared/organic-defs.js';
 import { createAdjustClip, ADJUST_LOOKS, ORGANIC_LOOKS } from '/shared/adjust-defs.js';
 import { addClipRaw, projectDuration } from '/shared/timeline.js';
@@ -167,19 +167,19 @@ export function mountMediaBin({ onImport }) {
   document.getElementById('add-text').onclick = () => addOverlayClip((s) => createTextClip(null, s, 4));
   const addLockup = (name) => {
     const start = Math.max(0, store.playhead), len = 4;
-    const [kicker, title] = createTitleLockup(start, len, { lockup: name });
+    const [kicker, title, sub] = createTitleLockup(start, len, { lockup: name });
     const t = store.mutate((p) => {
-      // two clips that share the same time need two tracks: reuse free video tracks from the top, add one if needed
-      const free = (avoid) => p.tracks.filter((x) => x.kind === 'video').find((x) => x.id !== avoid && !overlaps(p, x.id, start, len)) || addTrack(p, 'video');
-      const tt = free(null); title.trackId = tt.id; addClipRaw(p, title);
-      const kt = free(tt.id); kicker.trackId = kt.id; addClipRaw(p, kicker);
+      // clips that share the same time need their own tracks: reuse free video tracks from the top, add one if needed
+      const used = new Set();
+      const free = () => { const x = p.tracks.filter((tr) => tr.kind === 'video').find((tr) => !used.has(tr.id) && !overlaps(p, tr.id, start, len)) || addTrack(p, 'video'); used.add(x.id); return x; };
+      for (const c of [title, kicker, sub].filter(Boolean)) { c.trackId = free().id; addClipRaw(p, c); }
       return title;
     });
     store.select(t.id);
   };
   document.getElementById('add-lockup').onclick = () => addLockup(LOCKUPS[0].name);
   const ll = document.getElementById('lockup-list');
-  for (const L of LOCKUPS.slice(1)) ll.append(el('button', { 'data-lockup': L.name, title: `Adds two text clips: ${L.kicker.preset} + ${L.title.preset}`, onclick: () => addLockup(L.name) }, L.name, el('small', { text: 'kicker + title' })));
+  for (const L of LOCKUPS.slice(1)) ll.append(el('button', { 'data-lockup': L.name, title: `Adds ${L.sub ? 'three' : 'two'} text clips: ${[L.kicker, L.title, L.sub].filter(Boolean).map((s) => s.preset).join(' + ')}`, onclick: () => addLockup(L.name) }, L.name, el('small', { text: lockupFonts(L).join(' + ') })));
   const lk = document.getElementById('look-list');
   for (const L of ADJUST_LOOKS) lk.append(el('button', { 'data-look': L.name, title: L.note, onclick: () => addAdjustLayer(L) }, L.name, el('small', { text: L.note })));
   const ol = document.getElementById('organic-looks');

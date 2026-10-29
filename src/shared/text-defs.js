@@ -3,7 +3,7 @@ import { createClip, defaultProps } from './project.js';
 import { createEffect } from './effects-defs.js';
 
 export const FONTS = [
-  'DotGothic16', 'Zen Antique', 'Dela Gothic One', 'Michroma', 'Orbitron', 'Press Start 2P', 'UnifrakturCook', 'Pirata One', 'Pinyon Script', 'Instrument Serif', 'Inter Tight', 'DM Mono', 'Helvetica Neue', 'Arial Black', 'Impact', 'Futura', 'Courier New', 'Menlo', 'Consolas',
+  'DotGothic16', 'Zen Antique', 'Dela Gothic One', 'Rozha One', 'Yatra One', 'Modak', 'Tiro Devanagari Hindi', 'Eczar', 'Teko', 'Khand', 'Kalam', 'Amita', 'Martel', 'Anton', 'Permanent Marker', 'Special Elite', 'Rubik Spray Paint', 'Black Ops One', 'Rubik Glitch', 'Archivo Black', 'Rock Salt', 'Bungee', 'Bebas Neue', 'Michroma', 'Orbitron', 'Press Start 2P', 'UnifrakturCook', 'Pirata One', 'Pinyon Script', 'Instrument Serif', 'Inter Tight', 'DM Mono', 'Helvetica Neue', 'Arial Black', 'Impact', 'Futura', 'Courier New', 'Menlo', 'Consolas',
   'Georgia', 'Times New Roman', 'Didot', 'Bodoni 72', 'Baskerville', 'Playfair Display', 'Hiragino Sans', 'Yu Gothic', 'Noto Sans JP', 'sans-serif', 'serif', 'monospace',
 ];
 
@@ -164,6 +164,79 @@ export const TEXT_PRESETS = [
   mk('Pulse Mono',
     { content: 'BPM', font: 'Courier New', weight: 700, size: 0.18, color: '#ffffff', anim: { type: 'pulse', duration: 1, speed: 1 } },
     {}),
+  // ---- Devanagari (Hindi) ----  no letter-spacing is ever added to Devanagari: it would break the headline bar
+  mk('Bollywood Gold (Rozha)',
+    { content: 'रात की रानी', font: 'Rozha One', weight: 400, size: 0.15, fit: 0.82, color: '#ffe9a8', strokeWidth: 0.012, strokeColor: '#4a1500', anim: { type: 'slam', duration: 0.7, speed: 1 },
+      fx: { gradient: true, gradStops: [[0, '#fff6c9'], [0.45, '#f6b73c'], [0.55, '#b8631a'], [1, '#ffd980']], shadow: 0.8, glow: 0.35 } },
+    {}),
+  mk('Desi Street (Teko)',
+    { content: 'सड़क का राजा', font: 'Teko', weight: 700, size: 0.17, fit: 0.8, color: '#ffffff', anim: { type: 'stutter', duration: 0.7, speed: 1 }, fx: { split: 0.5, shadow: 0.6 } },
+    {}),
+  mk('Yatra Brush (red)',
+    { content: 'यात्रा', font: 'Yatra One', weight: 400, size: 0.2, fit: 0.55, color: '#ff2d2d', strokeWidth: 0.01, strokeColor: '#2a0000', anim: { type: 'fade', duration: 0.8, speed: 1 }, fx: { shadow: 0.7, glow: 0.4 } },
+    {}),
+  mk('Modak Pop (bubble)',
+    { content: 'मस्ती', font: 'Modak', weight: 400, size: 0.26, fit: 0.6, color: '#ffd23f', strokeWidth: 0.035, strokeColor: '#c1121f', outline2: { width: 0.06, color: '#ffffff' }, anim: { type: 'slam', duration: 0.6, speed: 1 }, fx: { shadow: 0.8 } },
+    {}),
+  mk('Hindi Serif (Tiro)',
+    { content: 'अंधेरा', font: 'Tiro Devanagari Hindi', weight: 400, size: 0.14, fit: 0.55, color: '#f4efe3', anim: { type: 'fade', duration: 1.2, speed: 1 }, fx: { shadow: 0.5, glow: 0.15 } },
+    {}),
+  mk('Hindi Kicker (Tiro)',
+    { content: 'एक कहानी', font: 'Tiro Devanagari Hindi', weight: 400, size: 0.05, color: '#f4efe3', anim: { type: 'fade', duration: 0.8, speed: 1 }, fx: { shadow: 0.4 } },
+    { y: 0.16 }),
+  mk('Khand Slab (Devanagari)',
+    { content: 'दिल्ली', font: 'Khand', weight: 700, size: 0.22, fit: 0.5, color: '#ffffff', anim: { type: 'letters', duration: 1.2, speed: 1 }, fx: { shadow: 0.5 } },
+    {}),
+  mk('Kalam Scrawl (Hindi)',
+    { content: 'दिल की बात', font: 'Kalam', weight: 700, size: 0.1, fit: 0.7, color: '#fff6d6', anim: { type: 'typewriter', duration: 1.6, speed: 1 }, fx: { shadow: 0.4 } },
+    { rotation: -3 }),
+  mk('Eczar Ember (Hindi)',
+    { content: 'तूफ़ान', font: 'Eczar', weight: 800, size: 0.2, fit: 0.6, color: '#ff7a1a', anim: { type: 'fade', duration: 1, speed: 1 },
+      fx: { gradient: true, gradStops: [[0, '#fff1b0'], [0.5, '#ff7a1a'], [1, '#9d1b00']], shadow: 0.6, glow: 0.5 } },
+    {}),
+  mk('Amita Calligraphy',
+    { content: 'शुभ रात्रि', font: 'Amita', weight: 700, size: 0.12, fit: 0.6, color: '#f6e7b4', anim: { type: 'fade', duration: 1.2, speed: 1 }, fx: { glow: 0.4, shadow: 0.4 } },
+    {}),
+  mk('Martel Headline (news)',
+    { content: 'ख़बर', font: 'Martel', weight: 900, size: 0.16, fit: 0.45, color: '#ffffff', bg: { enabled: true, color: '#b3001b', pad: 0.45 }, anim: { type: 'slide', duration: 0.5, speed: 1 } },
+    {}),
+  mk('Teko Label (Latin)',
+    { content: 'LIMITED RELEASE', font: 'Teko', weight: 700, size: 0.05, uppercase: true, color: '#ffffff', anim: { type: 'fade', duration: 0.6, speed: 1 }, fx: { shadow: 0.4 } },
+    { y: -0.14, tracking: 0.3 }),
+  // ---- underground / street ----
+  mk('Flyer Condensed (Anton)',
+    { content: 'NO SLEEP', font: 'Anton', weight: 400, size: 0.22, fit: 0.9, uppercase: true, color: '#f5f5f0', anim: { type: 'stutter', duration: 0.7, speed: 1 }, fx: { split: 0.3, shadow: 0.5 } },
+    { tracking: 0.02 }),
+  mk('Marker Tag',
+    { content: 'real ones only', font: 'Permanent Marker', weight: 400, size: 0.1, fit: 0.6, color: '#f2ff3a', anim: { type: 'fade', duration: 0.5, speed: 1 }, fx: { shadow: 0.6 } },
+    { rotation: -6, y: -0.18, x: 0.12 }),
+  mk('Typewriter Cover',
+    { content: 'VOL. 2 — SIDE A', font: 'Special Elite', weight: 400, size: 0.04, color: '#e9e4d4', uppercase: true, bg: { enabled: true, color: '#111111', pad: 0.5 }, anim: { type: 'typewriter', duration: 1.4, speed: 1 } },
+    { y: 0.2, tracking: 0.08 }),
+  mk('Spray Paint Title',
+    { content: 'UNDERGROUND', font: 'Rubik Spray Paint', weight: 400, size: 0.11, fit: 0.9, uppercase: true, color: '#ff3b3b', anim: { type: 'fade', duration: 0.8, speed: 1 }, fx: { glow: 0.3, shadow: 0.4 } },
+    {}),
+  mk('Stencil Label',
+    { content: 'UNFILTERED', font: 'Black Ops One', weight: 400, size: 0.06, uppercase: true, color: '#000000', bg: { enabled: true, color: '#ffffff', pad: 0.35 }, anim: { type: 'strobe', duration: 1, speed: 0.4 } },
+    { y: -0.26, tracking: 0.1 }),
+  mk('Glitch Rap Title',
+    { content: 'STATIC', font: 'Rubik Glitch', weight: 400, size: 0.22, fit: 0.8, uppercase: true, color: '#ffffff', anim: { type: 'jitter', duration: 1, speed: 1 }, fx: { split: 0.6 } },
+    {}),
+  mk('Block Heavy (Archivo)',
+    { content: 'LOUD', font: 'Archivo Black', weight: 400, size: 0.25, fit: 0.7, uppercase: true, color: '#ffffff', anim: { type: 'slam', duration: 0.5, speed: 1 }, fx: { shadow: 0.6 } },
+    { tracking: -0.02 }),
+  mk('Scrawl (Rock Salt)',
+    { content: '3am', font: 'Rock Salt', weight: 400, size: 0.1, color: '#ffffff', anim: { type: 'fade', duration: 0.6, speed: 1 }, fx: { shadow: 0.5 } },
+    { rotation: -4, y: 0.2, x: -0.18 }),
+  mk('Bungee Sign',
+    { content: 'LIVE TONIGHT', font: 'Bungee', weight: 400, size: 0.09, fit: 0.8, uppercase: true, color: '#ffec00', anim: { type: 'flicker', duration: 1, speed: 1 }, fx: { glow: 0.8, shadow: 0.3 } },
+    {}),
+  mk('Bebas Credit',
+    { content: 'PRODUCED BY HHL', font: 'Bebas Neue', weight: 400, size: 0.045, uppercase: true, color: '#ffffff', anim: { type: 'fade', duration: 0.6, speed: 1 }, fx: { shadow: 0.3 } },
+    { y: 0.16, tracking: 0.3 }),
+  mk('Ad-lib Pop (marker)',
+    { content: 'yeah!', font: 'Permanent Marker', weight: 400, size: 0.09, color: '#ffffff', anim: { type: 'slam', duration: 0.3, speed: 1 }, fx: { shadow: 0.7, split: 0.2 } },
+    { rotation: 8, x: 0.22, y: 0.18 }),
 ];
 
 export function createTextClip(preset, start, duration = 4) {
@@ -187,6 +260,16 @@ export const LOCKUPS = [
   { name: 'Y2K × 日本語', kicker: { preset: 'Cyber Katakana (pixel)', text: 'サイバー・ガーデン', size: 0.04, fit: 0.5, y: 0.17 }, title: { preset: 'Y2K Chrome Bubble', text: 'CYBER\nGARDEN', y: -0.02 } },
   { name: 'Gothic × 明朝', kicker: { preset: 'Tokyo Vertical (mincho)', text: '夜の庭', vertical: false, size: 0.045, x: 0, y: 0.17, tracking: 0.35 }, title: { preset: 'Gothic Drop (blackletter)', text: 'Night Garden', y: -0.02 } },
   { name: 'Techno spec', kicker: { preset: 'Techno Spec Sheet', text: 'SYSTEM // 01', align: 'center', x: 0, y: 0.15, size: 0.03 }, title: { preset: 'Orbitron Loading (Y2K)', text: 'ORGANIC OS', size: 0.12, fit: 0.82, y: 0, tracking: 0.12, color: '#e9f4ff', anim: 'fade' } },
+  // ---- Hindi / desi ----
+  { name: 'Filmi poster (3 fonts)', kicker: { preset: 'Script Kicker (small caps)', text: 'a HHL film', size: 0.045, x: 0, y: 0.27, tracking: 0.3 }, title: { preset: 'Bollywood Gold (Rozha)', text: 'रात की रानी', fit: 0.6, y: 0 }, sub: { preset: 'Teko Label (Latin)', text: 'NIGHT QUEEN · 2026', y: -0.22 } },
+  { name: 'Desi street (2 fonts)', kicker: { preset: 'Hindi Kicker (Tiro)', text: 'दिल्ली से', y: 0.2 }, title: { preset: 'Desi Street (Teko)', text: 'सड़क का राजा', y: -0.01 } },
+  { name: 'Modak × credit (2 fonts)', kicker: { preset: 'Bebas Credit', text: 'PRESENTS', y: 0.3 }, title: { preset: 'Modak Pop (bubble)', text: 'मस्ती', fit: 0.4, y: -0.03 } },
+  // ---- underground ----
+  { name: 'Mixtape cover (3 fonts)', kicker: { preset: 'Typewriter Cover', text: 'VOL. 2 — SIDE A', y: 0.28 }, title: { preset: 'Flyer Condensed (Anton)', text: 'NO SLEEP', fit: 0.55, y: 0 }, sub: { preset: 'Marker Tag', text: 'real ones only', rotation: -6, x: 0.12, y: -0.21 } },
+  { name: 'Spray crew (3 fonts)', kicker: { preset: 'Scrawl (Rock Salt)', text: '3am', x: -0.2, y: 0.21 }, title: { preset: 'Spray Paint Title', text: 'UNDERGROUND', y: 0 }, sub: { preset: 'Stencil Label', text: 'UNFILTERED', y: -0.18 } },
+  { name: 'Blackletter street (3 fonts)', kicker: { preset: 'Typewriter Cover', text: 'EST. IN THE BASEMENT', y: 0.25 }, title: { preset: 'Gothic Drop (blackletter)', text: 'Dead End', fit: 0.6, y: 0 }, sub: { preset: 'Marker Tag', text: 'no features', rotation: 4, x: -0.1, y: -0.21 } },
+  { name: 'Flyer night (2 fonts)', kicker: { preset: 'Bebas Credit', text: 'LIVE · ONE NIGHT ONLY', y: 0.2 }, title: { preset: 'Block Heavy (Archivo)', text: 'LOUD', y: -0.01 } },
+  { name: 'Static broadcast (2 fonts)', kicker: { preset: 'Techno Spec Sheet', text: 'SIGNAL LOST // 404', align: 'center', x: 0, y: 0.17, size: 0.03 }, title: { preset: 'Glitch Rap Title', text: 'STATIC', y: -0.01 } },
 ];
 
 /** The two-line title card from the editorial reference: kicker above, script title below. Returns [kicker, title] (not yet on a track). */
@@ -198,8 +281,14 @@ export function createTitleLockup(start, duration = 4, { lockup = 'Rose script',
     c.text.content = text; c.name = `${label} · ${text.replace(/\n/g, ' ')}`;
     for (const k of ['size', 'fit', 'vertical', 'align', 'color']) if (side[k] !== undefined) c.text[k] = side[k];
     if (side.anim) c.text.anim = { ...c.text.anim, type: side.anim };
-    for (const k of ['x', 'y', 'tracking']) if (side[k] !== undefined) c.props[k] = side[k];
+    for (const k of ['x', 'y', 'tracking', 'rotation']) if (side[k] !== undefined) c.props[k] = side[k];
     return c;
   };
-  return [build(L.kicker, kicker, 'Kicker'), build(L.title, title, 'Title')];
+  return [build(L.kicker, kicker, 'Kicker'), build(L.title, title, 'Title'), ...(L.sub ? [build(L.sub, undefined, 'Sub')] : [])];
+}
+
+/** Distinct fonts a lockup combines (shown in the Type panel). */
+export function lockupFonts(L) {
+  const fonts = [L.kicker, L.title, L.sub].filter(Boolean).map((s) => TEXT_PRESETS.find((p) => p.name === s.preset)?.text.font);
+  return [...new Set(fonts)];
 }

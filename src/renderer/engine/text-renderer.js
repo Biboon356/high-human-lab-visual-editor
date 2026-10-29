@@ -1,14 +1,18 @@
 // Draws a text clip into a 2D canvas the size of the frame. Position/rotation/scale are applied here
 // so rotation pivots on the text itself. Animations are pure functions of clip-local time.
+import { graphemes, safeTracking } from '/shared/script.js';
+
 const GENERIC = new Set(['sans-serif', 'serif', 'monospace', 'cursive', 'fantasy']);
 const hash = (n) => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
 const ease = (u) => 1 - Math.pow(1 - Math.min(1, Math.max(0, u)), 3);
 
 // Fallbacks that carry Thai glyphs on macOS, Windows and Linux, so Thai text never renders as tofu boxes.
 const THAI_FALLBACK = '"Sukhumvit Set", "Thonburi", "Leelawadee UI", "Tahoma", "Noto Sans Thai", "Loma", "Garuda"';
+// ... and Hindi/Devanagari, for fonts that have no Devanagari glyphs of their own
+const DEVANAGARI_FALLBACK = '"Kohinoor Devanagari", "Devanagari Sangam MN", "Nirmala UI", "Mangal", "Noto Sans Devanagari", "Lohit Devanagari"';
 
 export function fontString(text, px) {
-  const fam = GENERIC.has(text.font) ? `${text.font}` : `"${text.font}", ${THAI_FALLBACK}, sans-serif`;
+  const fam = GENERIC.has(text.font) ? `${text.font}` : `"${text.font}", ${THAI_FALLBACK}, ${DEVANAGARI_FALLBACK}, sans-serif`;
   return `${text.italic ? 'italic ' : ''}${text.weight} ${px}px ${fam}`;
 }
 
@@ -21,6 +25,7 @@ export function drawTextClip(ctx, W, H, clip, t, p) {
   let alpha = p.opacity, dx = 0, dy = 0, scale = p.scale;
   let perChar = null; // (charIndex) -> {dy, alpha, sc} for animations that move letters individually
   let content = T.uppercase ? T.content.toUpperCase() : T.content;
+  const trk = safeTracking(T.content, p.tracking); // Hindi keeps its headline bar unbroken: no added letter-spacing
 
   switch (a.type) {
     case 'typewriter': {
@@ -90,7 +95,7 @@ export function drawTextClip(ctx, W, H, clip, t, p) {
       const total = Math.max(1, content.replace(/\n/g, '').length);
       let idx = 0;
       const lock = Math.min(1.15, u * 1.15);
-      content = [...content].map((ch) => {
+      content = graphemes(content).map((ch) => {
         if (ch === '\n' || ch === ' ') return ch;
         const i = idx++;
         return i / total < lock - hash(i * 5.3) * 0.12 ? ch : GLYPHS[Math.floor(hash(i * 13.1 + Math.floor(t * 24)) * GLYPHS.length)];
@@ -105,7 +110,7 @@ export function drawTextClip(ctx, W, H, clip, t, p) {
   let px0 = T.size * H * scale;
   if (T.fit > 0 && !T.vertical) { // size the text so its widest line spans `fit` of the frame width, whatever the aspect ratio
     ctx.save();
-    ctx.font = fontString(T, 100); ctx.letterSpacing = `${p.tracking * 100}px`;
+    ctx.font = fontString(T, 100); ctx.letterSpacing = `${trk * 100}px`;
     const full = (T.uppercase ? T.content.toUpperCase() : T.content).split('\n');
     const wmax = Math.max(...full.map((l) => ctx.measureText(l).width), 1);
     ctx.restore();
@@ -115,7 +120,7 @@ export function drawTextClip(ctx, W, H, clip, t, p) {
   const FX = { split: 0, shadow: 0, glow: 0, halo: 0, gradient: false, grad1: '#fff', grad2: '#888', ...(T.fx || {}) };
   ctx.save();
   ctx.font = fontString(T, px);
-  ctx.letterSpacing = `${p.tracking * px}px`;
+  ctx.letterSpacing = `${trk * px}px`;
   ctx.textBaseline = 'middle';
   ctx.textAlign = 'left';
   ctx.lineJoin = 'round';
@@ -126,7 +131,7 @@ export function drawTextClip(ctx, W, H, clip, t, p) {
   let vpos = null, vcols = 0, vrows = 0;
   const colGap = (T.colSpacing || 1.35) * px;
   if (T.vertical) { // tategaki: every character is its own row, columns run right to left
-    const cols = lines.map((l) => [...l]);
+    const cols = lines.map((l) => graphemes(l));
     vcols = cols.length; vrows = Math.max(1, ...cols.map((c) => c.length));
     vpos = []; lines = [];
     cols.forEach((chars, c) => chars.forEach((ch, r) => { lines.push(ch); vpos.push({ x: ((cols.length - 1) / 2 - c) * colGap, y: (r - (chars.length - 1) / 2) * lh }); }));
@@ -152,12 +157,12 @@ export function drawTextClip(ctx, W, H, clip, t, p) {
   }
   const lineX = (i) => (vpos ? vpos[i].x - widths[i] / 2 : T.align === 'left' ? -blockW / 2 : T.align === 'right' ? blockW / 2 - widths[i] : -widths[i] / 2);
   const lineY = (i) => (vpos ? vpos[i].y : (i - (lines.length - 1) / 2) * lh);
-  const baseIndex = lines.map((_, i) => lines.slice(0, i).reduce((n, l) => n + [...l].length, 0));
+  const baseIndex = lines.map((_, i) => lines.slice(0, i).reduce((n, l) => n + graphemes(l).length, 0));
   const absStart = lines.map((_, i) => lines.slice(0, i).reduce((n, l) => n + l.length + 1, 0)); // offsets into the text incl. newlines
   let fillOverride = null;
   const pass = (paint, ox = 0) => lines.forEach((l, i) => {
     if (!perChar) { paint(l, lineX(i) + ox, lineY(i)); return; }
-    const chars = [...l];
+    const chars = graphemes(l);
     let abs = absStart[i];
     chars.forEach((ch, k) => {
       const here = abs; abs += ch.length;

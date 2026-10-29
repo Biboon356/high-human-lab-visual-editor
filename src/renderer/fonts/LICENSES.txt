@@ -504,3 +504,69 @@ PREAMBLE
 The goals of the Open Font License (OFL) are to stimulate worldwide
 development of collaborative font projects, to support the font creation
 efforts of ac
+
+=== Devanagari pack (v0.4.0): Rozha One, Yatra One, Modak, Tiro Devanagari Hindi, Eczar, Teko, Khand, Kalam, Amita, Martel ===
+--- Rozha One ---
+Copyright (c) 2014 Indian Type Foundry (info@indiantypefoundry.com)
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+--- Yatra One ---
+Copyright 2014 The Yatra Project Authors.
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+--- Modak ---
+Copyright (c) 2015 Ek Type (www.ektype.in)
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+--- Tiro Devanagari Hindi ---
+Copyright 2020 The Indigo Project Authors (https://github.com/TiroTypeworks/Indigo) TiroDevanagariHindi-Italic.ttf: Copyright 2020 The Indigo Project Authors (https://github.com/TiroTypeworks/Indigo)
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+--- Eczar ---
+Copyright 2014 The Eczar Project Authors (https://github.com/rosettatype/eczar)
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+--- Teko ---
+Copyright 2023 The Teko Project Authors (https://www.github.com/googlefonts/teko)
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+--- Khand ---
+Copyright (c) 2014 Indian Type Foundry (info@indiantypefoundry.com) Khand-Regular.ttf: Copyright (c) 2014 Indian Type Foundry (info@indiantypefoundry.com) Khand-Medium.ttf: Copyright (c) 2014 Indian Type Foundry (info@indiantypefoundry.com) Khand-SemiBold.ttf: Copyright (c) 2014 Indian Type Foundry (info@indiantypefoundry.com) Khand-Bold.ttf: Copyright (c) 2014 Indian Type Foundry (info@indiantypefoundry.com)
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+--- Kalam ---
+Copyright (c) 2014 Indian Type Foundry (info@indiantypefoundry.com) Kalam-Regular.ttf: Copyright (c) 2014 Indian Type Foundry (info@indiantypefoundry.com) Kalam-Bold.ttf: Copyright (c) 2014 Indian Type Foundry (info@indiantypefoundry.com)
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+--- Amita ---
+Copyright (c) 2014, Eduardo Rodriguez Tunni. Copyright (c) 2000, Modular Infotech, Pune, INDIA. All rights reserved. Copyright (c) 2011 by Brian J. Bonislawsky DBA Astigmatic (AOETI) (astigma@astigmatic.com). All rights reserved. Amita-Bold.ttf: Copyright (c) 2014, Eduardo Rodriguez Tunni. Copyright (c) 2000, Modular Infotech, Pune, INDIA. All rights reserved. Copyright (c) 2011 by Brian J. Bonislawsky DBA Astigmatic (AOETI) (astigma@astigmatic.com). All rights reserved.
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+--- Martel ---
+Copyright (c) 2015 Dan Reynolds. Copyright (c) 2010-2015, Sorkin Type Co (www.sorkintype.com) with Reserved Font Name 'Merriweather' Martel-Light.ttf: Copyright (c) 2015 Dan Reynolds. Copyright (c) 2010-2015, Sorkin Type Co (www.sorkintype.com) with Reserved Font Name 'Merriweather' Martel-Regular.ttf: Copyright (c) 2015 Dan Reynolds. Copyright (c) 2010-2015, Sorkin Type Co (www.sorkintype.com) with Reserved Font Name 'Merriweather' Martel-DemiBold.ttf: Copyright (c) 2015 Dan Reynolds. Copyright (c) 2010-2015, Sorkin Type Co (www.sorkintype.com) with Reserved Font Name 'Merriweather' Martel-Bold.ttf: Copyright (c) 2015 Dan Reynolds. Copyright (c) 2010-2015, Sorkin Type Co (www.sorkintype.com) with Reserved Font Name 'Merriweather' Martel-ExtraBold.ttf: Copyright (c) 2015 Dan Reynolds. Copyright (c) 2010-2015, Sorkin Type Co (www.sorkintype.com) with Reserved Font Name 'Merriweather' Martel-Heavy.ttf: Copyright (c) 2015 Dan Reynolds. Copyright (c) 2010-2015, Sorkin Type Co (www.sorkintype.com) with Reserved Font Name 'Merriweather'
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+(Each is licensed under the SIL Open Font License 1.1, reproduced above.)
+
+=== Street pack (v0.4.0): Anton, Permanent Marker, Special Elite, Rubik Spray Paint, Black Ops One, Rubik Glitch, Archivo Black, Rock Salt, Bungee, Bebas Neue ===
+--- Anton ---
+Copyright 2020 The Anton Project Authors (https://github.com/googlefonts/AntonFont.git)
+--- Permanent Marker ---
+Apache License
+--- Special Elite ---
+Apache License
+--- Rubik Spray Paint ---
+Copyright 2020 The Rubik Filtered Project Authors (https://github.com/NaN-xyz/Rubik-Filtered)
+--- Black Ops One ---
+Copyright 2022 The PinyonScript Project Authors (https://github.com/SorkinType/Black-Ops)
+--- Rubik Glitch ---
+Copyright 2020 The Rubik Filtered Project Authors (https://github.com/NaN-xyz/Rubik-Filtered)
+--- Archivo Black ---
+Copyright 2017 The Archivo Black Project Authors (https://github.com/Omnibus-Type/ArchivoBlack)
+--- Rock Salt ---
+Apache License
+--- Bungee ---
+Copyright 2023 The Bungee Project Authors (https://github.com/djrrb/Bungee)
+--- Bebas Neue ---
+Copyright 2019 The Bebas Neue Project Authors (https://github.com/dharmatype/Bebas-Neue)
+(Each is licensed under the SIL Open Font License 1.1, reproduced above.)

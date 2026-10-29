@@ -1017,6 +1017,38 @@ await step('speed ramp: the picture follows the curve in preview and in the expo
   await shot('31-speed-ramp');
 });
 
+await step('type packs: every lockup (2 and 3 fonts, Hindi and street) lays out and draws; Hindi per-letter animation reproduces the whole-line shaping', async () => {
+  await resetProject();
+  await page.click('#panel-left [data-tab="type"]');
+  await ev(() => { const { store } = window.__app; store.mutate((p) => { p.settings.width = 960; p.settings.height = 540; }); });
+  const names = await ev(async () => (await import('/shared/text-defs.js')).LOCKUPS.map((l) => ({ name: l.name, n: l.sub ? 3 : 2 })));
+  assert.ok(names.length >= 12, `${names.length} lockups`);
+  const logsBefore = logs.length;
+  let i = 0;
+  for (const L of names) {
+    await ev(() => { const { store } = window.__app; store.mutate((p) => { p.clips = []; }); store.setPlayhead(0); });
+    if (L.name === 'Rose script') await page.click('#add-lockup'); else await page.click(`[data-lockup="${L.name}"]`);
+    const info = await ev(() => { const { store } = window.__app; const tracks = new Set(store.project.clips.map((c) => c.trackId)); store.setPlayhead(2.2); return { clips: store.project.clips.length, tracks: tracks.size, fonts: [...new Set(store.project.clips.map((c) => c.text.font))] }; });
+    assert.equal(info.clips, L.n, `${L.name}: ${L.n} clips`); assert.equal(info.tracks, L.n, `${L.name}: each part on its own track`);
+    await settle(650);
+    const lit = await ev(() => { const d = window.__grab(96, 54); let n = 0; for (let k = 0; k < d.length; k += 3) if (d[k] + d[k + 1] + d[k + 2] > 120) n++; return n / (d.length / 3); });
+    assert.ok(lit > 0.004, `${L.name}: text is drawn (${lit.toFixed(3)} lit)`);
+    await page.locator('#preview').screenshot({ path: path.join(shots, `lockup-${String(i++).padStart(2, '0')}.png`) });
+  }
+  assert.equal(logs.slice(logsBefore).filter((l) => /error|failed|tofu/i.test(l)).length, 0, 'no console errors while drawing the lockups');
+
+  // Hindi: drawing letter by letter (the 'letters' animation after it finished) must look like drawing the line in one go
+  const diff = await ev(async () => {
+    const { store } = window.__app; const T = await import('/shared/text-defs.js'); const TL = await import('/shared/timeline.js');
+    const grab = (anim) => { store.mutate((p) => { p.clips = []; const c = T.createTextClip(T.TEXT_PRESETS.find((x) => x.name.startsWith('Bollywood')), 0, 6); c.text.content = 'हिन्दी क्षत्रिय तूफ़ान'; c.text.fx = { ...c.text.fx, gradient: false, shadow: 0, glow: 0, split: 0 }; c.text.color = '#ffffff'; c.text.anim = { type: anim, duration: 0.5, speed: 1 }; c.trackId = p.tracks.find((t) => t.kind === 'video').id; TL.addClipRaw(p, c); }); store.setPlayhead(4); return window.__grab(240, 135); };
+    const a = grab('none'), b = grab('letters');
+    let s = 0, on = 0; for (let k = 0; k < a.length; k++) { s += Math.abs(a[k] - b[k]); if (a[k] > 128) on++; }
+    return { mean: s / a.length, on: on / a.length };
+  });
+  assert.ok(diff.on > 0.01, `the Hindi line is drawn (${diff.on.toFixed(3)})`);
+  assert.ok(diff.mean < 2.5, `letter-by-letter drawing matches the single-line shaping (mean pixel difference ${diff.mean.toFixed(2)})`);
+});
+
 await step('timeline tracks reorder: drag the grip or use the arrows, audio can sit above video, rename, remove an empty row, video order changes what draws on top', async () => {
   await resetProject();
   await ev(async (c) => { await window.__app.importPaths([c]); const { store } = window.__app; const { addMediaClip } = await import('/shared/timeline.js');
