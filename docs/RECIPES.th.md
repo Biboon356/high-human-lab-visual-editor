@@ -127,5 +127,5 @@ Preset: **Xerox Photocopy** (คอนทราสต์สูง + toner noise 
 3. **Vaporwave / city pop**: ฟอนต์ Monoton, Shrikhand, Righteous, Audiowide + ลุค Vapor Sunset / Vapor Tape / City Pop Dusk
 4. **Brutalist / Swiss**: ฟอนต์ Space Grotesk, Space Mono, Syne, Unbounded, Big Shoulders Display + ลุค Concrete / Swiss Red
 5. **Dark / metal**: ฟอนต์ Metal Mania, New Rocker, Cinzel Decorative, Grenze Gotisch, IM Fell English SC + ลุค Black Metal / Blood Moon / Candlelit Crypt
-6. **Lockup รวม 20 แบบ** (แท็บ Type) มี 3 ฟอนต์ 9 แบบ ทุกส่วนเป็นคลิปข้อความแยก แก้ได้อิสระ ใหม่: Ransom zine, Cut-up, Vapor sign, Neon line, Swiss grid, Brutal wide, Black metal logo, Crypt poster
+6. **Lockup รวม 20 แบบ** (แท็บ Type) มี 3 ฟอนต์ 8 แบบ ทุกส่วนเป็นคลิปข้อความแยก แก้ได้อิสระ ใหม่: Ransom zine, Cut-up, Vapor sign, Neon line, Swiss grid, Brutal wide, Black metal logo, Crypt poster
 

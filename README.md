@@ -160,7 +160,7 @@ None of this has been measured against real Thai recordings yet (see status belo
 - **Vaporwave / city pop:** fonts *Monoton, Shrikhand, Righteous, Audiowide* (the Japanese kicker uses the bundled pixel face); looks *Vapor Sunset, Vapor Tape, City Pop Dusk*.
 - **Brutalist / Swiss:** *Space Grotesk, Space Mono, Syne, Unbounded, Big Shoulders Display*; looks *Concrete, Swiss Red*.
 - **Dark / metal:** *Metal Mania, New Rocker, Cinzel Decorative, Grenze Gotisch, IM Fell English SC*; looks *Black Metal, Blood Moon, Candlelit Crypt*.
-- **Lockups: 20 in all** (Type tab), nine of them with **three typefaces** — each part is its own text clip, so wording, font, colour and position stay editable. New: *Ransom zine, Cut-up, Vapor sign, Neon line, Swiss grid, Brutal wide, Black metal logo, Crypt poster*.
+- **Lockups: 20 in all** (Type tab), eight of them with **three typefaces** — each part is its own text clip, so wording, font, colour and position stay editable. New: *Ransom zine, Cut-up, Vapor sign, Neon line, Swiss grid, Brutal wide, Black metal logo, Crypt poster*.
 - **Limits:** the pattern designs are tuned by eye on Linux; at very large *Size / repeat* values the paisley and lattice cells get coarse. Not verified on real Mac/Windows installs.
 
 ## Updating without reinstalling
