@@ -98,7 +98,7 @@ export function mountInspector(root) {
 
   function textCard(clip, lt) {
     const T = clip.text;
-    T.fx = { split: 0, shadow: 0, glow: 0, gradient: false, grad1: '#ffffff', grad2: '#7d8f85', ...(T.fx || {}) };
+    T.fx = { split: 0, shadow: 0, glow: 0, halo: 0, gradient: false, grad1: '#ffffff', grad2: '#7d8f85', ...(T.fx || {}) };
     const ta = field(el('textarea', { rows: 3, spellcheck: false }), 'input', (i) => { T.content = i.value; });
     ta.value = T.content;
     ensureFontList();
@@ -130,7 +130,7 @@ export function mountInspector(root) {
     return card('Typography', [ta, flatRow('Font', font), flatRow('Weight', weight, el('label', { class: 'chk' }, italic, 'italic')),
       flatRow('Size', size), flatRow('Fit width', fit), flatRow('Align', align, el('label', { class: 'chk' }, upper, 'CAPS')), flatRow('Vertical', vert, colGap), flatRow('Fill', color),
       flatRow('Outline', stroke, strokeC), flatRow('Hollow', hollow, fillA), flatRow('Plate', bgOn, bgC, bgPad),
-      flatRow('Chrome fill', gradOn, g1, g2), flatRow('RGB split', sl('split')), flatRow('Shadow', sl('shadow')), flatRow('Glow', sl('glow')),
+      flatRow('Chrome fill', gradOn, g1, g2), flatRow('RGB split', sl('split')), flatRow('Shadow', sl('shadow')), flatRow('Glow', sl('glow')), flatRow('Halo (readability)', sl('halo')),
       flatRow('Animation', anim), flatRow('Anim. time', aDur), flatRow('Anim. speed', aSpd)]);
   }
 

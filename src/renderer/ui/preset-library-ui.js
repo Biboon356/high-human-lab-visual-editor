@@ -41,6 +41,7 @@ export function mountPresetLibrary() {
     count.textContent = `${found.length} of ${PRESET_LIBRARY.length}`;
     list.replaceChildren(...(found.length ? found.map((p) => {
       const onClip = el('button', { class: 'p-clip', 'data-preset': p.id, title: `Add "${p.name}" to the selected clip: ${p.chain.map((e) => e.type).join(' → ')}`, onclick: () => {
+        if (p.fade) { addAdjustLayer(p); toast(`"${p.name}" placed at the ${p.fade === 'out' ? 'end' : 'start'} of the cut.`); return; } // fades are always a layer
         const c = applyPresetToClip(p);
         if (!c) { addAdjustLayer(p); toast(`No clip selected — "${p.name}" added as an adjustment layer.`); } else toast(`"${p.name}" added to ${c.name || 'the clip'}.`);
       } }, el('span', { class: 'pn', text: p.name }), el('small', { text: `${p.note || p.category} · ${p.chain.length} fx` }));

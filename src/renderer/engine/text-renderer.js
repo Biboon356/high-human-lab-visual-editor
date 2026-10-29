@@ -112,7 +112,7 @@ export function drawTextClip(ctx, W, H, clip, t, p) {
     px0 = ((T.fit * W) / wmax) * 100 * scale;
   }
   const px = Math.max(4, px0);
-  const FX = { split: 0, shadow: 0, glow: 0, gradient: false, grad1: '#fff', grad2: '#888', ...(T.fx || {}) };
+  const FX = { split: 0, shadow: 0, glow: 0, halo: 0, gradient: false, grad1: '#fff', grad2: '#888', ...(T.fx || {}) };
   ctx.save();
   ctx.font = fontString(T, px);
   ctx.letterSpacing = `${p.tracking * px}px`;
@@ -197,6 +197,15 @@ export function drawTextClip(ctx, W, H, clip, t, p) {
         ctx.roundRect(x0 - padX, top - padY, x1 - x0 + padX * 2, bottom - top + padY * 2, px * 0.22); ctx.fill(); ctx.restore();
       });
     }
+  }
+  // halo: a soft dark cloud behind the letters so a title stays readable over bright or busy pictures. The glyphs are painted far
+  // off-canvas and their shadow is pushed back onto the page (shadow offsets ignore the transform, so rotate the push with the text).
+  if (FX.halo > 0) {
+    const far = W * 4, rot = (p.rotation * Math.PI) / 180;
+    ctx.save(); ctx.fillStyle = '#000';
+    ctx.shadowColor = 'rgba(0,0,0,0.92)'; ctx.shadowBlur = px * 0.5 * FX.halo; ctx.shadowOffsetX = far * Math.cos(rot); ctx.shadowOffsetY = far * Math.sin(rot);
+    for (let k = 0; k < 3; k++) pass((l, x, y) => ctx.fillText(l, x - far, y));
+    ctx.restore();
   }
   // glow (soft, coloured) underneath, then drop shadow for depth
   if (FX.glow > 0) {

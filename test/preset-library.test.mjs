@@ -56,3 +56,12 @@ test('search: every word must match, category filter works, empty query lists al
   assert.ok(searchPresets('', '3D').every((p) => p.category === '3D'));
   assert.equal(searchPresets('zzzzqqq').length, 0);
 });
+
+test('fade presets are self-placing single colour layers and the tamed kaleido no longer blows out', () => {
+  const fades = PRESET_LIBRARY.filter((p) => p.fade);
+  assert.deepEqual(fades.map((p) => p.fade).sort(), ['in', 'out', 'out']);
+  for (const p of fades) assert.equal(p.chain.length, 1);
+  const kal = PRESET_LIBRARY.find((p) => p.name === 'Lucid Kaleido');
+  const bloom = kal.chain.find((e) => e.type === 'bloom');
+  assert.ok(bloom.params.threshold >= 0.7 && bloom.params.intensity <= 0.5);
+});

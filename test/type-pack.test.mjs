@@ -34,3 +34,11 @@ test('every lockup builds a kicker and a title clip and honours custom words', (
     assert.ok(FONTS.some((f) => (f.name || f.family || f) === t.text.font));
   }
 });
+
+test('halo (readability) text effect defaults off and the brand title presets use it', () => {
+  const by = (n) => TEXT_PRESETS.find((p) => p.name.startsWith(n));
+  assert.equal(createTextClip(TEXT_PRESETS[0], 0, 3).text.fx.halo, 0);
+  const t = by('Brand Title (halo)').text, s = by('Brand Sub (halo)').text;
+  assert.ok(t.fx.halo > 0 && s.fx.halo > 0 && t.fx.halo <= 1);
+  assert.equal(t.content, 'HIGH HUMAN LAB');
+});

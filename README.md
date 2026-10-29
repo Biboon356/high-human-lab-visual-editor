@@ -136,6 +136,12 @@ None of this has been measured against real Thai recordings yet (see status belo
 - **Timeline like an editor:** Ctrl/⌘/Shift-click adds to a selection; **drag a rubber band** on empty lane space to select (Shift adds); **⌘/Ctrl+A** selects every clip, **Esc** clears. Dragging a selection moves all of it **together, across tracks** (the clip you grab decides the row offset; only compatible rows are allowed), snaps to clips, the playhead, beats and the render range with a guide line, scrolls the timeline when you reach an edge, and refuses a drop that would overlap another clip instead of freezing. While you drag, nothing is rebuilt — only the clips move — and one Undo reverts the whole move.
 - **Render range:** press **I** / **O** (or *[ In* / *Out ]* in the timeline toolbar) to mark where rendering starts and ends; the stretch is shaded on the ruler and the flags can be dragged. In the Export dialog *Render only the marked range* is ticked automatically; the video starts at the In point and the sound is cut to the same window (effects, text animation and audio-reactive values are evaluated at their true timeline time, not restarted). **Alt+X** clears the range. The range is saved with the project.
 
+## v0.3.2 — readable titles, fades, calmer kaleido
+
+- **Halo (readability)** in the text inspector: a soft dark glow behind the letters (not a hard outline) that keeps a title legible over busy footage such as full-frame Organic veins. Presets *Brand Title (halo)* and *Brand Sub (halo)*.
+- **Fade presets** (Presets → Clean): *Fade out to black*, *Fade in from black*, *Fade out to white* place themselves — out covers the last 1.5 s, in covers the first 1.2 s — as an adjustment layer you can drag or trim.
+- *Lucid Kaleido* and *Kaleido Trip* bloom thresholds raised so the opener no longer clips to white.
+
 ## Updating without reinstalling
 
 From version 0.2.0 the app updates itself **in place**: on start (and every few hours) it asks GitHub for the latest release, downloads a small checksummed bundle of the app's own code (`src/**`, a few hundred KB), and shows **Update x.y.z · Restart** in the top bar. Nothing is applied until you press it; the next start then runs the new code from the app's data folder. *Project → Updates* shows the version and has a manual *Check for updates* (also *Tools → Check for Updates…*).

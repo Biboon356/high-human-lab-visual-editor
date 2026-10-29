@@ -93,11 +93,15 @@ export function appendToTimeline(mediaId) {
 
 // an adjustment layer needs a track to itself above the footage it grades, so it never shares a lane with another clip
 export function addAdjustLayer(look) {
-  const start = Math.max(0, store.playhead);
-  const rest = projectDuration(store.project) - start;
-  const len = rest >= 1 ? rest : 8; // cover what is left of the cut; an empty timeline gets a default length
+  const total = projectDuration(store.project);
+  // fade presets place themselves: "out" covers the last 1.5 s and ramps in to full strength, "in" covers the first 1.2 s and ramps out
+  const fadeLen = look.fade ? Math.min(look.fade === 'out' ? 1.5 : 1.2, Math.max(0.3, total)) : 0;
+  const start = look.fade === 'out' ? Math.max(0, total - fadeLen) : look.fade === 'in' ? 0 : Math.max(0, store.playhead);
+  const rest = total - start;
+  const len = look.fade ? fadeLen : rest >= 1 ? rest : 8; // cover what is left of the cut; an empty timeline gets a default length
   const clip = store.mutate((p) => {
     const c = createAdjustClip(look, start, len);
+    if (look.fade === 'out') c.fadeIn = len; else if (look.fade === 'in') c.fadeOut = len;
     const top = p.tracks.find((t) => t.kind === 'video');
     const t = top && !overlaps(p, top.id, start, len) ? top : addTrack(p, 'video');
     c.trackId = t.id;

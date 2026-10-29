@@ -85,7 +85,7 @@ add('Dream', 'Pastel Fog', 'milky pastel haze', [fx('blur', { radius: 10, mix: 0
 add('Dream', 'Soft Focus Glow', 'portrait glow', [fx('blur', { radius: 6, mix: 0.5 }), fx('bloom', { threshold: 0.45, intensity: 0.8, radius: 60 }), fx('film', { lift: 0.08, grain: 0.15, vignette: 0.25, weave: 0, halation: 0.3 })], ['glow']);
 add('Dream', 'Hypnagogic', 'half-asleep wobble', [fx('fluid', { amount: 0.05, scale: 2.2, speed: 0.25 }), fx('chroma', { amount: 0.012 }), fx('bloom', { threshold: 0.55, intensity: 0.7, radius: 60 })], ['trippy']);
 add('Dream', 'Liquid Memory', 'melting edges', [fx('fluid', { amount: 0.12, scale: 1.6, speed: 0.3 }), fx('distort', { amount: 0.01, freq: 6, speed: 0.6 }), fx('color', { saturation: 1.2 })], ['liquid']);
-add('Dream', 'Lucid Kaleido', 'slow mirror bloom', [fx('kaleido', { segments: 8, spin: 5, zoom: 1.2, mix: 0.55 }), fx('bloom', { threshold: 0.55, intensity: 0.7, radius: 60 }), fx('chroma', { amount: 0.008 })], ['kaleidoscope']);
+add('Dream', 'Lucid Kaleido', 'slow mirror bloom', [fx('kaleido', { segments: 8, spin: 5, zoom: 1.2, mix: 0.55 }), fx('bloom', { threshold: 0.78, intensity: 0.35, radius: 50 }), fx('color', { brightness: -0.04, contrast: 1.1 }), fx('chroma', { amount: 0.008 })], ['kaleidoscope']);
 add('Dream', 'Opal Shimmer', 'iridescent veil', [fx('holo', { strength: 0.5, pastel: 0.7, shimmer: 0.2 }), fx('blur', { radius: 3, mix: 0.4 }), fx('bloom', { threshold: 0.6, intensity: 0.5, radius: 60 })], ['iridescent']);
 add('Dream', 'Heat Mirage', 'wavering air', [fx('distort', { amount: 0.008, freq: 18, speed: 2, angle: 90 }), fx('blur', { radius: 2, mix: 0.5 }), fx('color', { saturation: 1.1, brightness: 0.03 })], ['haze']);
 add('Dream', 'Cloud Noise', 'drifting cloud texture on the picture', [fx('noise', { amount: 0.5, scale: 3.5, speed: 0.2, green: 0.1 }), fx('bloom', { threshold: 0.6, intensity: 0.6, radius: 60 }), fx('color', { saturation: 1.1 })], ['clouds']);
@@ -112,6 +112,11 @@ add('Beat', 'Spin Kaleido', 'mirror zoom rides the bass', [fx('kaleido', { segme
 add('Beat', 'Bass Warp', 'the picture bulges on every low note', [fx('distort', { amount: 0.004, freq: 5, speed: 1.4 }, bind('amount', 'bass', 0.12)), fx('chroma', { amount: 0.004 }, bind('amount', 'bass', 0.3))], ['bass', 'warp']);
 add('Beat', 'Strobe Mosh', 'mosh amount tied to the kick', [fx('mosh', { amount: 0.1, block: 40, hold: 6, smear: 1 }, bind('amount', 'beat', 0.8)), fx('flash', { amount: 0, white: 0.5 }, bind('amount', 'beat', 0.3))], ['beat', 'mosh']);
 
+// ---- Fades (one-click intro / outro; they size and place themselves) -----------------------------------------------------
+NEW.push({ category: 'Clean', name: 'Fade out to black', note: 'last 1.5 s of the cut dips to black', fade: 'out', chain: [fx('color', { brightness: -1, contrast: 1 })], tags: ['outro', 'end', 'fade'] });
+NEW.push({ category: 'Clean', name: 'Fade in from black', note: 'first 1.2 s rises from black', fade: 'in', chain: [fx('color', { brightness: -1, contrast: 1 })], tags: ['intro', 'start', 'fade'] });
+NEW.push({ category: 'Clean', name: 'Fade out to white', note: 'last 1.5 s flares to white', fade: 'out', chain: [fx('color', { brightness: 1, contrast: 1 })], tags: ['outro', 'end', 'fade', 'flash'] });
+
 // ---- Clean ----------------------------------------------------------------------------------------------------------
 add('Clean', 'Punch Clean', 'light grade, a little grain', [fx('color', { contrast: 1.08, saturation: 1.12 }), fx('film', { grain: 0.14, halation: 0.12, vignette: 0.15, lift: 0.02, weave: 0 })], ['tiktok', 'natural']);
 add('Clean', 'Social Pop', 'bright, saturated, phone-screen ready', [fx('color', { saturation: 1.25, contrast: 1.12, brightness: 0.03 }), fx('bloom', { threshold: 0.8, intensity: 0.25, radius: 30 })], ['tiktok', 'bright']);
@@ -134,7 +139,7 @@ export const PRESET_LIBRARY = (() => {
     const id = `${slug(p.category)}/${slug(p.name)}`;
     if (seen.has(id)) continue;
     seen.add(id);
-    out.push({ id, name: p.name, category: p.category, note: p.note || '', tags: p.tags || [], chain: p.chain });
+    out.push({ id, name: p.name, category: p.category, note: p.note || '', tags: p.tags || [], chain: p.chain, ...(p.fade ? { fade: p.fade } : {}) });
   }
   return out;
 })();

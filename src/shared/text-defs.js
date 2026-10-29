@@ -44,7 +44,7 @@ export function defaultText() {
     bg: { enabled: false, color: '#1c4d33', pad: 0.25 },
     anim: { type: 'none', duration: 1, speed: 1 },
     // premium finish: 0..1 strengths (split = RGB fringe, shadow/glow = depth), optional vertical gradient fill
-    fx: { split: 0, shadow: 0, glow: 0, gradient: false, grad1: '#ffffff', grad2: '#7d8f85', gradStops: null },
+    fx: { split: 0, shadow: 0, glow: 0, halo: 0, gradient: false, grad1: '#ffffff', grad2: '#7d8f85', gradStops: null },
     vertical: false, colSpacing: 1.35, // tategaki (upright columns, right to left) for Japanese
     outline2: null, // { width, color }: a second, wider rim outside the outline (sticker / bubble chrome)
   };
@@ -62,6 +62,15 @@ export const TEXT_PRESETS = [
     { content: 'IN', font: 'Instrument Serif', weight: 400, size: 0.06, uppercase: true, color: '#ff3a6e',
       anim: { type: 'fade', duration: 0.5, speed: 1 }, fx: { shadow: 0.4 } },
     { x: 0.03, y: 0.15, tracking: 0.18 }),
+  // readable over busy pictures: a dark halo cloud behind clean white capitals
+  mk('Brand Title (halo)',
+    { content: 'HIGH HUMAN LAB', font: 'Instrument Serif', weight: 400, size: 0.085, fit: 0.9, uppercase: true, color: '#ffffff', strokeWidth: 0,
+      anim: { type: 'fade', duration: 0.8, speed: 1 }, fx: { halo: 0.9, shadow: 0.25, glow: 0.15 } },
+    { tracking: 0.28 }),
+  mk('Brand Sub (halo)',
+    { content: 'visual editor', font: 'Michroma', weight: 400, size: 0.04, uppercase: true, color: '#dfe9ff', strokeWidth: 0,
+      anim: { type: 'fade', duration: 1.1, speed: 1 }, fx: { halo: 0.8, shadow: 0.2 } },
+    { y: -0.12, tracking: 0.4 }),
   // ---- niche pack: Japanese, Y2K chrome, techno, pixel, blackletter, digicam ----
   mk('Cyber Katakana (pixel)',
     { content: 'サイバー・シティ', font: 'DotGothic16', weight: 400, size: 0.11, fit: 0.86, color: '#a8ffe0', strokeWidth: 0, anim: { type: 'typewriter', duration: 1.4, speed: 1 }, fx: { glow: 0.85, split: 0.35, shadow: 0.2 } },
