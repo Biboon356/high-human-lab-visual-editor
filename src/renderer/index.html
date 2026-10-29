@@ -90,6 +90,12 @@
         <div id="lockup-list" class="preset-list lockups"></div>
         <p class="hint pad">Presets add a text clip at the playhead.</p>
         <div id="text-presets" class="preset-list"></div>
+        <div class="adlib-card" id="adlib-card">
+          <h3>Ad-libs on the beat</h3>
+          <textarea id="adlib-words" rows="2" spellcheck="false" aria-label="Ad-lib words, comma separated"></textarea>
+          <div class="adlib-row"><label>every <select id="adlib-every"><option value="1">beat</option><option value="2">2 beats</option><option value="4" selected>4 beats (bar)</option><option value="8">8 beats</option></select></label>
+          <button id="adlib-place" class="primary" title="Needs the music analysed (Audio-Reactive tab). Uses the render range if you set one.">Place on beats</button></div>
+        </div>
       </section>
       <section data-pane="organic" class="pane">
         <header class="pane-head"><h2>Organic</h2><span>Roots, mycelium, terrain</span></header>
@@ -154,6 +160,9 @@
         <button id="tl-reverse" title="Play the selected clip backwards (picture and sound)"><svg class="ic"><use href="#i-reverse"/></svg>Reverse</button>
         <button id="tl-freeze" title="Hold the frame under the playhead"><svg class="ic"><use href="#i-freeze"/></svg>Freeze</button>
         <select id="tl-freeze-d" title="Freeze length" aria-label="Freeze length"><option value="1">1 s</option><option value="2" selected>2 s</option><option value="3">3 s</option><option value="5">5 s</option></select>
+        <button id="tl-stutter" title="Beat-repeat: loop the slice after the playhead (the sound stutters too)"><svg class="ic"><use href="#i-freeze"/></svg>Stutter</button>
+        <select id="tl-stutter-s" title="Slice length" aria-label="Stutter slice"><option value="0.125">⅛ s</option><option value="0.25" selected>¼ s</option><option value="0.5">½ s</option></select>
+        <select id="tl-stutter-n" title="Total plays" aria-label="Stutter repeats"><option value="3">×3</option><option value="4" selected>×4</option><option value="6">×6</option><option value="8">×8</option></select>
         <button id="tl-mark-in" title="Mark In: render starts at the playhead (I)">[ In</button><button id="tl-mark-out" title="Mark Out: render ends at the playhead (O)">Out ]</button><button id="tl-mark-clear" title="Clear the render range (Alt+X)">✕</button><span class="hint" id="tl-range">No render range — whole project</span>
         <button id="tl-ripple" title="Delete and close the gap (Shift+Delete)"><svg class="ic"><use href="#i-ripple"/></svg>Ripple</button>
         <span class="sep"></span>

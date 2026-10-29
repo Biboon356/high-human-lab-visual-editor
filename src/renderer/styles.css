@@ -305,3 +305,9 @@ kbd { font: 500 9.5px var(--mono); letter-spacing: .04em; padding: 1px 6px; bord
 .mask-ov .mask-draw { fill: transparent; pointer-events: all; cursor: crosshair; }
 .mask-ov .mask-line { stroke: var(--accent2, #7dffb0); stroke-width: 1.5; stroke-dasharray: 4 3; pointer-events: none; }
 .mask-shape.on label { color: var(--accent2, #7dffb0); }
+
+/* ad-libs card in the Type panel */
+.adlib-card { margin: 10px 14px 16px; padding: 10px 0 0; border-top: 1px solid var(--line); display: grid; gap: 8px; }
+.adlib-card h3 { margin: 0; font: 500 10px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--dim); }
+.adlib-card textarea { width: 100%; resize: vertical; }
+.adlib-row { display: flex; gap: 10px; align-items: center; justify-content: space-between; }

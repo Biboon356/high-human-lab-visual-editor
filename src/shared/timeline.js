@@ -296,6 +296,38 @@ export function freezeFrameAt(project, clipId, t, seconds, stillMediaId) {
   return { freeze, right };
 }
 
+/**
+ * Beat-repeat: loops the `slice` seconds of the clip that start at timeline time t, `repeats` times in total (the original plays
+ * once, then repeats-1 copies), and slides everything after it on that track later so the rest of the clip continues after the loop.
+ * Every copy points at the same piece of the source, so the sound stutters with the picture. Returns {parts, extra} or null.
+ */
+export function stutterAt(project, clipId, t, slice, repeats) {
+  const clip = findClip(project, clipId);
+  if (!clip || clip.type !== 'media' || !(slice >= 0.04) || !(repeats >= 2)) return null;
+  if (!(t > clip.start - 1e-6 && t + slice <= clipEnd(clip) + 1e-6)) return null;
+  const fi = clip.fadeIn || 0, fo = clip.fadeOut || 0;
+  let head = null, tail = null, mid = clip;
+  if (t > clip.start + MIN_CLIP) { head = clip; mid = splitClip(project, clip.id, t); }
+  if (!mid) return null;
+  if (mid.start + slice < clipEnd(mid) - MIN_CLIP) tail = splitClip(project, mid.id, mid.start + slice);
+  // fades belong to the ends of the original clip, not to the loop in the middle
+  if (head) head.fadeOut = 0;
+  mid.fadeIn = head ? 0 : fi; mid.fadeOut = 0;
+  if (tail) { tail.fadeIn = 0; tail.fadeOut = fo; }
+  const extra = (repeats - 1) * mid.duration;
+  for (const c of project.clips) if (c.trackId === mid.trackId && c.id !== mid.id && c.start >= clipEnd(mid) - 1e-6) c.start += extra;
+  const parts = [mid];
+  for (let k = 1; k < repeats; k++) {
+    const copy = structuredClone(mid);
+    copy.id = createClip({}).id;
+    copy.start = mid.start + k * mid.duration;
+    copy.fadeIn = 0; copy.fadeOut = k === repeats - 1 && !tail ? fo : 0;
+    project.clips.push(copy);
+    parts.push(copy);
+  }
+  return { parts, extra };
+}
+
 export function addTrack(project, kind) {
   const same = project.tracks.filter((t) => t.kind === kind);
   const name = `${kind === 'video' ? 'V' : 'A'}${same.length + 1}`;

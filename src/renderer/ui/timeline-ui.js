@@ -8,6 +8,7 @@ import { store } from '../store.js';
 import { dissolveInto, moveClips, deleteClips, overlaps, trackEnd, canPlace, clipEnd, projectDuration, moveClip, trimStart, trimEnd, splitClip, deleteClip, addMediaClip, addTrack, clipKind, moveTrack, removeEmptyTrack } from '/shared/timeline.js';
 import { findMedia, findTrack, uid } from '/shared/project.js';
 import { reverseSelected, freezeAtPlayhead } from '../engine/edit-tools.js';
+import { stutterAtPlayhead } from '../engine/rhythm-tools.js';
 import { activeRange, markRange } from '/shared/timeline.js';
 
 const LABEL_W = 118;
@@ -376,6 +377,7 @@ export function mountTimeline() {
   document.getElementById('tl-ripple').onclick = () => deleteSelected({ ripple: true });
   document.getElementById('tl-reverse').onclick = () => reverseSelected();
   document.getElementById('tl-freeze').onclick = () => freezeAtPlayhead(Number(document.getElementById('tl-freeze-d').value));
+  document.getElementById('tl-stutter').onclick = () => stutterAtPlayhead(Number(document.getElementById('tl-stutter-s').value), Number(document.getElementById('tl-stutter-n').value));
   document.getElementById('tl-mark-in').onclick = () => setMark('in');
   document.getElementById('tl-mark-out').onclick = () => setMark('out');
   document.getElementById('tl-mark-clear').onclick = () => clearRange();

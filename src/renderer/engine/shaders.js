@@ -517,6 +517,60 @@ vec4 effect(vec2 uv){
   float a = 1. - smoothstep(-f, 0., sd);
   return emit(c.rgb, c.a*clamp(a,0.,1.));
 }`),
+  xerox: wrap(`
+uniform float u_contrast, u_threshold, u_grain, u_streaks, u_dots, u_size, u_mix; uniform vec3 u_ink, u_paper;
+vec4 effect(vec2 uv){
+  vec4 c = src(uv);
+  float l = (luma(c.rgb) - .5)*u_contrast + .5;
+  // an old photocopier: toner is uneven down the page (long vertical streaks) and in soft blotches
+  l += (fbm(vec2(uv.x*55., 3.1)) - .5)*u_streaks*.5 + (fbm(uv*vec2(5.,8.) + 7.) - .5)*u_streaks*.4;
+  l += (hash12(floor(uv*u_res*.6) + floor(u_time*10.)) - .5)*u_grain*.55;
+  float hard = smoothstep(u_threshold - .05, u_threshold + .05, l);
+  // halftone dots in the mid-tones, where a copier loses detail
+  vec2 q = mat2(.7071,-.7071,.7071,.7071)*(uv*u_res)/max(u_size, 1.);
+  float d = length(fract(q) - .5);
+  float dots = 1. - smoothstep(sqrt(clamp(1.-l, 0., 1.))*.62 - .06, sqrt(clamp(1.-l, 0., 1.))*.62 + .06, d);
+  float mid = 1. - abs(2.*clamp(l,0.,1.) - 1.);
+  float ink = mix(1.-hard, dots, u_dots*mid);
+  vec3 col = mix(u_paper, u_ink, clamp(ink, 0., 1.));
+  return emit(mix(c.rgb, col, u_mix), c.a);
+}`),
+  fisheye: wrap(`
+uniform float u_amount, u_zoom, u_chroma, u_vignette;
+vec3 lens(vec2 uv, float k){
+  vec2 p = (uv - .5)*vec2(u_res.x/u_res.y, 1.)*2.;
+  float r2 = dot(p, p);
+  vec2 s = p*(1. + k*r2)/max(u_zoom, .1);
+  vec2 q = (s/(vec2(u_res.x/u_res.y, 1.)*2.)) + .5;
+  if(q.x < 0. || q.x > 1. || q.y < 0. || q.y > 1.) return vec3(-1.);
+  return vec3(q, 1.);
+}
+vec4 effect(vec2 uv){
+  vec3 a = lens(uv, u_amount), b = lens(uv, u_amount*(1. + u_chroma*8.)), r = lens(uv, u_amount*(1. - u_chroma*8.));
+  if(a.z < 0.) return vec4(0.);
+  vec4 c = src(a.xy);
+  vec3 rgb = vec3(src(r.z < 0. ? a.xy : r.xy).r, c.g, src(b.z < 0. ? a.xy : b.xy).b);
+  float rr = length((uv - .5)*vec2(u_res.x/u_res.y, 1.)*2.);
+  rgb *= 1. - u_vignette*smoothstep(.55, 1.5, rr);
+  return emit(rgb, c.a);
+}`),
+  torn: wrap(`
+uniform float u_amount, u_rough, u_rim, u_shadow, u_seed; uniform vec3 u_paper;
+vec4 effect(vec2 uv){
+  float asp = u_res.x/u_res.y;
+  vec2 e = min(uv, 1. - uv)*vec2(asp, 1.);                       // distance to the nearest edge, in height units
+  float d = min(e.x, e.y);
+  float n = fbm(uv*vec2(asp, 1.)*u_rough + u_seed*13.7) + .35*fbm(uv*vec2(asp,1.)*u_rough*4. + 5.);
+  float t = u_amount*.16*(.25 + n);                                // how far the ragged edge has eaten in
+  float inside = smoothstep(t, t + 1.2/u_res.y, d);
+  float rim = (1. - smoothstep(t + u_rim, t + u_rim + 1.2/u_res.y, d))*inside;
+  vec4 c = src(uv);
+  vec3 col = mix(c.rgb, u_paper, rim*.9);
+  float sh = u_shadow*.55*(1. - smoothstep(t - .03, t + .004, d))*(1. - inside);
+  float a = max(inside*c.a, sh);
+  vec3 outc = mix(vec3(0.), col, inside);
+  return vec4(outc*(inside*c.a) , a);
+}`),
   object3d: wrap(`
 uniform float u_shape, u_material, u_background, u_size, u_x, u_y, u_rx, u_ry, u_rz, u_sx, u_sy, u_sz, u_shine;
 uniform vec3 u_tint;

@@ -1108,6 +1108,66 @@ await step('niche looks render: dither, holo, kaleidoscope, spores, cells, HUD, 
   await shot('26-niche-looks');
 });
 
+await step('street looks render: xerox, fisheye, torn edge, CCTV, tape, bass drop each change the picture, compile cleanly, and xerox really is near black-and-white', async () => {
+  await resetProject();
+  await ev(async (c) => { await window.__app.importPaths([c]); const { store } = window.__app; const { addMediaClip } = await import('/shared/timeline.js');
+    store.mutate((p) => { p.settings.width = 480; p.settings.height = 270; addMediaClip(p, p.media[0].id, p.tracks.find((t) => t.kind === 'video').id, 0); }); store.setPlayhead(1.2); }, clip);
+  await settle(700);
+  const grab = () => ev(() => window.__grab(96, 54));
+  const diff = (a, b) => { let s = 0; for (let i = 0; i < a.length; i++) s += Math.abs(a[i] - b[i]); return s / a.length; };
+  const base = await grab();
+  const names = ['Xerox Flyer', 'Xerox Red', 'Newsprint', 'Fisheye Cam', 'Basement Flash', 'Night CCTV', 'Basement Tape', 'Torn Frame', 'Bass Drop (beat)', 'Beat Zoom'];
+  assert.equal(await ev(async (n) => { const L = (await import('/shared/adjust-defs.js')).ADJUST_LOOKS; return n.filter((x) => L.some((l) => l.name === x)).length; }, names), names.length, 'all street looks exist');
+  const errorsBefore = logs.length;
+  const put = (n) => ev(async (n) => { const { store } = window.__app; const A = await import('/shared/adjust-defs.js'); const T = await import('/shared/timeline.js');
+    store.mutate((p) => { p.clips = p.clips.filter((c) => c.type !== 'adjust'); const c = A.createAdjustClip(A.ADJUST_LOOKS.find((l) => l.name === n), 0, 6); c.trackId = T.addTrack(p, 'video').id; T.addClipRaw(p, c); }); store.setPlayhead(5); }, n);
+  for (const n of names) {
+    await put(n); await settle(650);
+    const d = diff(base, await grab());
+    assert.ok(d > 1.2, `${n} changes the picture (Δ${d.toFixed(1)})`);
+  }
+  await put('Xerox Flyer'); await settle(600);
+  const x = await ev(() => { const d = window.__grab(96, 54); let ext = 0, n = 0; for (let i = 0; i < d.length; i += 3) { const v = (d[i] + d[i + 1] + d[i + 2]) / 3; n++; if (v < 55 || v > 200) ext++; } return ext / n; });
+  assert.ok(x > 0.8, `xerox pushes the picture to ink and paper (${(x * 100).toFixed(0)}% of pixels at the extremes)`);
+  await put('Torn Frame'); await settle(600);
+  const corner = await ev(() => { const d = window.__grab(96, 54); return { c: d[0] + d[1] + d[2], mid: d[(27 * 96 + 48) * 3] + d[(27 * 96 + 48) * 3 + 1] + d[(27 * 96 + 48) * 3 + 2] }; });
+  assert.ok(corner.c < 60 && corner.mid > 30, `torn edge eats the corner and leaves the middle (${JSON.stringify(corner)})`);
+  assert.equal(logs.slice(errorsBefore).filter((l) => /shader|compile|GLSL|WebGL/i.test(l)).length, 0, 'no shader errors in the console');
+  await put('Fisheye Cam'); await settle(600); await shot('32-street-looks');
+});
+
+await step('rhythm tools: ad-libs land on the beats of the analysed song; stutter loops a slice with the same source and slides the rest', async () => {
+  await resetProject();
+  await ev(async ([c, k]) => { await window.__app.importPaths([c, k]); const { store } = window.__app; const { addMediaClip } = await import('/shared/timeline.js');
+    store.mutate((p) => { addMediaClip(p, p.media.find((m) => m.kind === 'audio').id, p.tracks.find((t) => t.kind === 'audio').id, 0); }); await window.__app.runAnalysis({ quiet: true }); }, [clip, kick]);
+  const beats = await ev(() => window.__app.store.analysis?.beats || []);
+  assert.ok(beats.length >= 4, `the click track has beats (${beats.length})`);
+  await page.click('#panel-left [data-tab="type"]');
+  await page.fill('#adlib-words', 'yeah!, x2, what?');
+  await page.selectOption('#adlib-every', '2');
+  await page.click('#adlib-place');
+  const r = await ev(() => { const { store } = window.__app; const ad = store.project.clips.filter((c) => c.name.startsWith('Ad-lib')); return { n: ad.length, starts: ad.map((c) => c.start), words: ad.map((c) => c.text.content), tracks: new Set(ad.map((c) => c.trackId)).size, trackName: store.project.tracks.find((t) => t.id === ad[0]?.trackId)?.name, maxDur: Math.max(...ad.map((c) => c.duration)) }; });
+  assert.ok(r.n >= 2 && r.n === Math.ceil(beats.length / 2), `one ad-lib on every 2nd beat (${r.n} of ${beats.length} beats)`);
+  assert.ok(r.starts.every((s) => beats.some((b) => Math.abs(b - s) < 1e-6)), 'each starts exactly on a beat');
+  assert.equal(r.tracks, 1, 'all on one track'); assert.equal(r.trackName, 'Ad-libs');
+  assert.ok(r.words.every((w) => ['yeah!', 'x2', 'what?'].includes(w)), `only the given words (${r.words})`);
+  await ev(() => window.__app.store.setPlayhead(0)); await ev((s) => window.__app.store.setPlayhead(s), r.starts[1] + 0.12); await settle(700);
+  assert.ok((await px()).lit > 0.0005, 'an ad-lib is on screen right after its beat');
+  await ev(() => window.__app.store.undo()); await settle(200);
+  assert.equal(await ev(() => window.__app.store.project.clips.filter((c) => c.name.startsWith('Ad-lib')).length), 0, 'one Undo removes them all');
+
+  // stutter
+  await resetProject(); await ev((p) => window.__app.importPaths([p]), clip);
+  await ev(() => { const { store } = window.__app; store.mutate((p) => { const c = p.clips.find((x) => x.type === 'media'); c.duration = 4; c.in = 1; }); store.select(store.project.clips[0].id); store.setPlayhead(1.5); });
+  await page.selectOption('#tl-stutter-s', '0.25'); await page.selectOption('#tl-stutter-n', '4'); await page.click('#tl-stutter');
+  const s = await ev(async () => { const { store } = window.__app; const T = await import('/shared/timeline.js'); const cs = store.project.clips.filter((c) => c.type === 'media').sort((a, b) => a.start - b.start); return { n: cs.length, starts: cs.map((c) => +c.start.toFixed(3)), ins: cs.map((c) => +c.in.toFixed(3)), total: T.projectDuration(store.project) }; });
+  assert.equal(s.n, 6, `head, 4 loop plays, tail (${s.starts})`);
+  assert.deepEqual(s.ins.slice(1, 5), [2.5, 2.5, 2.5, 2.5], 'every loop play shows the same source');
+  assert.ok(Math.abs(s.total - 4.75) < 0.01, `the cut grew by the 3 extra plays (${s.total})`);
+  await ev(() => window.__app.store.undo()); await settle(200);
+  assert.equal(await ev(() => window.__app.store.project.clips.filter((c) => c.type === 'media').length), 1, 'one Undo restores the clip');
+});
+
 await step('montage v2: favourites and skip flags, hook + calm close, Y2K style grades the whole cut, optional title card, footage sound muted, exports', async () => {
   await resetProject();
   // regression: asking for an analysis while there is no song yet must not wedge the analysis for good

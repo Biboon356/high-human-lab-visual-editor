@@ -14,6 +14,8 @@ export const MONTAGE_STYLES = {
     transitions: { hi: ['punch', 'glitch', 'flash'], mid: ['flash', 'punch'], lo: ['none'] }, punch: 1.08, density: 0.1 },
   street: { label: 'Street · xerox / VHS', base: null, accents: ['Xerox Photocopy', 'Halftone Print (B&W)', 'Tour Tape (VHS)', 'Midnight Purple'], accentRate: 0.6, hero: 'Comic Flash (red/yellow)',
     transitions: { hi: ['glitch', 'whip', 'flash'], mid: ['flash', 'none'], lo: ['none'] }, punch: 1.06, density: 0.05 },
+  underground: { label: 'Underground · tape / xerox', base: null, adjust: 'Basement Tape', accents: ['Night Photocopy', 'Xerox Photocopy', 'Halftone Print (B&W)', 'Tour Tape (VHS)'], accentRate: 0.5, hero: 'Beat Punch (audio)',
+    transitions: { hi: ['glitch', 'whip', 'flash', 'punch'], mid: ['flash', 'none'], lo: ['none'] }, punch: 1.1, density: 0.12 },
   cinematic: { label: 'Cinematic · slow burn', base: 'Halation 35mm', accents: [], accentRate: 0, hero: 'Halation 35mm',
     transitions: { hi: ['punch'], mid: ['dissolve', 'none'], lo: ['dissolve'] }, punch: 1, density: -0.2 },
   y2k: { label: 'Y2K · chrome / digicam', base: null, adjust: 'Digicam 2002', accents: ['Low-Res Rave', 'Tour Tape (VHS)'], accentRate: 0.3, hero: 'Beat Punch (audio)',

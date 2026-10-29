@@ -193,6 +193,40 @@ export const EFFECTS = {
       { key: 'feather', label: 'Feather', min: 0, max: 0.2, step: 0.002, def: 0 },
     ],
   },
+  xerox: {
+    label: 'Xerox (photocopy)',
+    params: [
+      { key: 'contrast', label: 'Contrast', min: 0.5, max: 5, step: 0.05, def: 2.2 },
+      { key: 'threshold', label: 'Black point', min: 0.15, max: 0.85, step: 0.01, def: 0.5 },
+      { key: 'streaks', label: 'Toner streaks', min: 0, max: 1, step: 0.01, def: 0.45 },
+      { key: 'grain', label: 'Grain', min: 0, max: 1, step: 0.01, def: 0.5 },
+      { key: 'dots', label: 'Halftone dots', min: 0, max: 1, step: 0.01, def: 0.4 },
+      { key: 'size', label: 'Dot size (px)', min: 2, max: 16, step: 0.5, def: 5 },
+      { key: 'ink', label: 'Ink', kind: 'color', def: '#0b0b0b' },
+      { key: 'paper', label: 'Paper', kind: 'color', def: '#f1efe6' },
+      { key: 'mix', label: 'Mix', min: 0, max: 1, step: 0.01, def: 1 },
+    ],
+  },
+  fisheye: {
+    label: 'Fisheye lens',
+    params: [
+      { key: 'amount', label: 'Bulge', min: -0.6, max: 1.5, step: 0.01, def: 0.55 },
+      { key: 'zoom', label: 'Zoom', min: 0.5, max: 2, step: 0.01, def: 1 },
+      { key: 'chroma', label: 'Colour fringe', min: 0, max: 0.05, step: 0.001, def: 0.01 },
+      { key: 'vignette', label: 'Vignette', min: 0, max: 1, step: 0.01, def: 0.35 },
+    ],
+  },
+  torn: {
+    label: 'Torn paper edge',
+    params: [
+      { key: 'amount', label: 'How torn', min: 0, max: 1, step: 0.01, def: 0.5 },
+      { key: 'rough', label: 'Roughness', min: 1, max: 24, step: 0.5, def: 7 },
+      { key: 'rim', label: 'Paper rim', min: 0, max: 0.03, step: 0.001, def: 0.009 },
+      { key: 'shadow', label: 'Shadow', min: 0, max: 1, step: 0.01, def: 0.5 },
+      { key: 'seed', label: 'Seed', min: 0, max: 50, step: 1, def: 3 },
+      { key: 'paper', label: 'Paper colour', kind: 'color', def: '#ece6d6' },
+    ],
+  },
   object3d: {
     label: '3D Object (wrap the picture on a shape)',
     params: [
