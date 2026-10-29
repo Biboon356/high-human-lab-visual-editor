@@ -1607,6 +1607,48 @@ await step('safe-zone guide toggles and follows the 9:16 canvas', async () => {
   await page.click('#t-safe'); assert.equal(await ev(() => document.querySelector('.safe-zone').hidden), true);
 });
 
+await step('mutation engine: 100 seeded rolls render through the real compositor with no GL errors and no blank frames, and a saved seed reproduces the picture', async () => {
+  await resetProject();
+  await ev(async (c) => { await window.__app.importPaths([c]); const { store } = window.__app; // importing places the first clip on the timeline by itself
+    store.mutate((p) => { p.settings.width = 480; p.settings.height = 270; }); store.setPlayhead(1.2); }, clip);
+  await settle(700);
+  const errorsBefore = logs.length;
+  const r = await ev(async () => {
+    const { store, preview } = window.__app;
+    const M = await import('/shared/mutation/mutate.js'), C = await import('/shared/mutation/chain.js'), A = await import('/shared/adjust-defs.js'), F = await import('/shared/effects-defs.js');
+    const cl = store.project.clips.find((x) => x.type === 'media');
+    const gl = preview.comp.gl;
+    const grab = () => { preview.stats.lastError = null; const d = window.__grab(64, 36); let s = 0, nz = 0, nan = false; for (let i = 0; i < d.length; i += 3) { const v = d[i] + d[i + 1] + d[i + 2]; if (!Number.isFinite(v)) nan = true; s += v; if (v > 30) nz++; } return { d, mean: s / d.length, lit: nz / (d.length / 3), nan, glError: gl.getError(), threw: preview.stats.lastError?.message || null }; };
+    const apply = async (chain) => { store.mutate(() => { cl.effects = C.chainToEffects(chain); }); await new Promise((res) => setTimeout(res, 220)); }; // the preview needs a moment to take a changed chain, as in the effects step
+    gl.getError();
+    await apply([]); const base = grab();
+    const looks = [...A.ADJUST_LOOKS, ...A.ORGANIC_LOOKS];
+    const seen = new Set(), bad = [], changed = [], diffs = [];
+    for (let seed = 0; seed < 100; seed++) {
+      const fromLook = seed % 2 === 1 ? looks[(seed * 7) % looks.length] : null;
+      const out = fromLook ? M.mutate(C.effectsToChain(F.instantiatePreset(fromLook)), { seed, strength: 0.7 }) : M.generate({ seed, strength: 0.8, length: 2 + (seed % 4) });
+      out.chain.forEach((c) => seen.add(c.type));
+      await apply(out.chain);
+      const g = grab();
+      let diff = 0; for (let i = 0; i < g.d.length; i++) diff += Math.abs(g.d[i] - base.d[i]); diff /= g.d.length;
+      changed.push(diff > 0.6); diffs.push(+diff.toFixed(2));
+      if (g.glError || g.threw || g.nan || g.lit < 0.02 || g.mean < 4) bad.push({ seed, chain: out.chain.map((c) => c.type), glError: g.glError, threw: g.threw, nan: g.nan, lit: +g.lit.toFixed(3), mean: +g.mean.toFixed(1) });
+    }
+    // a saved seed reproduces the picture exactly
+    const roll = M.generate({ seed: 4242, length: 4 });
+    await apply(roll.chain); const first = grab().d;
+    await apply([]);
+    await apply(M.generate({ seed: 4242, length: 4 }).chain); const again = grab().d;
+    return { diffs: diffs.slice(0, 12), baseMean: +base.mean.toFixed(1), bad, effects: seen.size, changedShare: changed.filter(Boolean).length / changed.length, same: first.every((v, i) => v === again[i]), undo: (() => { store.undo(); return store.project.clips.find((x) => x.type === 'media').effects.length; })() };
+  });
+  assert.deepEqual(r.bad, [], 'no roll produced a GL error, a shader failure, NaN or a blank frame');
+  assert.ok(r.effects >= 25, `the 100 rolls exercised ${r.effects} different effects`);
+  assert.ok(r.changedShare > 0.85, `rolls actually change the picture (${(r.changedShare * 100).toFixed(0)}%) ${JSON.stringify(r.diffs)} base ${r.baseMean}`);
+  assert.equal(r.same, true, 'the same seed renders the same pixels');
+  assert.equal(r.undo, 0, 'one Undo takes back an applied roll');
+  assert.equal(logs.slice(errorsBefore).filter((l) => /shader|compile|GLSL|WebGL/i.test(l)).length, 0, 'no shader errors in the console');
+});
+
 await step('light theme + collapsible panels', async () => {
   await ev(() => { document.getElementById('toggle-theme').click(); document.getElementById('toggle-left').click(); });
   await settle(300); await shot('11-light-collapsed');

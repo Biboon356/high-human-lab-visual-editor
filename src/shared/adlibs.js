@@ -1,9 +1,9 @@
 // Ad-libs on the beat: short pop-up words ("yeah!", "x2", "skrrt") placed on chosen beats at slightly different spots and angles.
 // Pure planning only; the clips are made from the "Ad-lib Pop (marker)" text preset.
+import { rng } from './mutation/rng.js';
 
 export const DEFAULT_ADLIBS = ['yeah!', 'x2', 'what?', 'skrrt', 'ayy', 'uh', 'gang', 'run it'];
 
-function rng(seed) { let a = seed >>> 0; return () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 
 /**
  * @param beats  beat times in seconds
