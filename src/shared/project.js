@@ -29,6 +29,7 @@ export function createProject(name = 'Untitled Lab') {
     ],
     clips: [],
     reactive: { enabled: true },
+    dna: [], // saved Mutation Engine configurations (see shared/mutation/dna.js)
   };
 }
 
@@ -99,5 +100,6 @@ export function validateProject(p) {
     }
   }
   p.reactive ||= { enabled: true };
+  if (!Array.isArray(p.dna)) p.dna = []; // entries are repaired when the library is first used (dna.js: libraryOf)
   return p;
 }

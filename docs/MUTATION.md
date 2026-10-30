@@ -10,8 +10,8 @@ else, and the source media is never touched.
 |---|---|---|
 | M1 | Effect meta, chain validation, shared seeded RNG | done (this folder: `src/shared/mutation/`) |
 | M2 | `mutate()` / `generate()` / `variations()`, `composeChain()`, e2e render check | done |
-| M3 | DNA model and library (save, duplicate, diff, import/export), migrate user presets | next |
-| M4 | Variation grid UI, apply with one undo step | planned |
+| M3 | DNA model and library (save, duplicate, diff, import/export text, migrate user presets) — pure data layer | done (`dna.js`); no UI or file dialog yet |
+| M4 | Variation grid UI, apply with one undo step, DNA panel, `.hhdna` open/save dialogs, one-time migration of the old `localStorage` presets | next |
 | M5 | Per-effect wet/dry `mix` in the compositor, A/B compare | planned (decided: a small compositor change is allowed) |
 | M6 | Rule-based Creative Director (no external API) | planned |
 | M7 | Optional LLM adapter emitting the same constraints JSON | optional |
@@ -36,6 +36,17 @@ All pure (no DOM, no GL, no `Math.random` except `newSeed()`), unit-tested in `t
   * `mutate(base, {seed, strength, pool, bias, minLength, maxLength, maxHeavy})` — same inputs, same chain.
   * `generate({seed, length, ...})` — a chain from nothing.
   * `variations(base, {seed, count, ...})` — `count` different chains from one master seed; each one reproduces alone from its own seed.
+
+* `dna.js` — saved configurations:
+  * `createDna` / `normalizeDna` — validate and repair; `dnaFromRoll` runs a roll and stores its recipe; `reproduceDna` rebuilds the
+    chain from the recipe (`same: false` once the DNA was edited).
+  * `diffChains` — added / removed / reordered / enabled / changed parameters between two chains or DNA.
+  * Library in `project.dna[]` (`addDna`, `removeDna`, `renameDna`, `duplicateDna`, `lineage`, `libraryOf` repairs on use). It saves
+    with the `.hhlab` file and is covered by undo and autosave. Capped at 500 entries.
+  * `builtinDna()` — the 87 ready-made looks as read-only DNA (`builtin:<group>:<name>`), never copied into a project until saved.
+  * `exportDna` / `parseDnaFile` — `.hhdna` JSON text; reading never throws, clashing ids get fresh ones, imports are never
+    read-only and every value is clamped by `validateChain`.
+  * `migrateUserPresets` — converts the old "Save chain" presets once (matched by name and content).
 
 A chain item is `{type, enabled, params, keyframes, bindings, locked?, lockedParams?}`.
 
@@ -62,5 +73,5 @@ with timings.
 
 ## What is deliberately not here yet
 
-Persistence of results, the DNA library, the variation grid and any UI (M3–M4); per-effect wet/dry (M5); description-to-chain
+The variation grid and any UI, file dialogs for `.hhdna`, and the actual migration trigger (M4); per-effect wet/dry (M5); description-to-chain
 translation (M6). Effects that keep state between frames, feedback loops and custom GLSL remain roadmap items in `ROADMAP.md`.
