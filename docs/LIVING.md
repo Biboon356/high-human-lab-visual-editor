@@ -39,3 +39,35 @@ renderer, the Memory Bleed shaders and bounded texture state, project-identity d
 * GPU: no readback in the render path, bounded history, pooled textures, freed when a clip or effect disappears.
 * Preview and export share one code path. Where state depends on playback order (Memory Bleed), a seek resets it, exactly as an
   export starting at that frame would.
+
+## Phase 2–3 — Trace and Take (done)
+
+* **Take**: REC plays the timeline; every Inspector slider (via the one hook in `param-row.js`) and the XY pad report their moves to
+  `shared/living/take.js`. A parameter you touch is taken over (its old keyframes set aside); at stop the performance is
+  simplified and punched over the stretch you played, old keys before and after come back. One session = one undo step; Esc cancels
+  and leaves nothing. A MIDI source would call `LabTake.perform(slot, value)`; none is built.
+* **Simplifying** (`living/simplify.js`): keys at the turning points first, then wherever the *real* smoothstep interpolation is
+  furthest off, then redundant keys are pruned. A rest between two moves stays flat (the smoothing window is in seconds, not samples).
+* **Trace**: draw over the picture while it plays. Motion (clip x/y, relative to where it was) and Influence (any parameters; across,
+  up/down, speed) write ordinary keyframes. Residue and Grow create a generator clip of style `trace` whose path keeps your timing
+  (`engine/trace-renderer.js`, `buildRootsAlong` in `shared/roots.js`, Catmull-Rom smoothing). The clip's `growth/glow/thickness…`
+  are the ordinary generator parameters.
+* Not live: while you draw, only the overlay shows; the clip moves / the roots grow after you stop.
+
+## Phase 4 — Memory Bleed (done)
+
+The `memory` effect: Ghost (past frames fade into the present), Stain (colour from earlier frames leaks forward), Scar (movement
+leaves a mark that slowly changes colour), Echo (fragments of earlier frames return on a rhythm). Controls: length, decay,
+intensity, blend (behind / screen / add / difference), drift, echo rate; plus the effect's wet/dry like any effect.
+
+* **State** (`engine/memory-bleed.js`): per effect instance, textures at a fraction of the picture size (0.5 by default). Ghost/Stain
+  2 textures, Scar 4, Echo 7. At most 8 memories at once (the extra ones pass the picture through). Textures come from a pool,
+  go back the moment a clip or effect is not drawn, on resize and on dispose; `liveTextures` counts them. No CPU readback.
+* **Preview = export** (`shared/living/memory-plan.js`): a memory only grows from consecutive frames. A seek (backwards, or forwards by
+  more than 0.35 s) starts it afresh — what an export beginning at that frame does. Drawing the same frame again (a paused preview)
+  never adds to it. Fading is by time, not by frame count, so another frame rate looks the same. The e2e renders the same frames after
+  a detour (identical pixels) and compares a preview frame with an exported one.
+* **Adaptive quality**: the preview lowers the history size (0.5 → 0.35 → 0.25) when playback stutters while a memory is on screen and
+  raises it again when calm (`MemoryAdapt`). The export always uses 0.5.
+* Limits: a still thumbnail (Mutate grid) cannot show a memory, so a roll never adds one; the memory must be built up by playback; the
+  history is 8-bit, so very long memories are cut off by a small straight fade (`decay` sets how crisp that tail is).

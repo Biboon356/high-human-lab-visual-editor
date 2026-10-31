@@ -13,6 +13,7 @@ import { rasterizeMask } from './mask-renderer.js';
 import { normalizeMask, normalizeMatte, canBeMatte, matteSourceIds, maskKey } from '/shared/mask.js';
 import { drawRoots } from './roots-renderer.js';
 import { drawTrace } from './trace-renderer.js';
+import { MemoryBleed } from './memory-bleed.js';
 
 const STYLE_INDEX = { roots: 0, fluid: 1, cells: 2, dust: 3 };
 const hexToRgb = (h) => { const n = parseInt(String(h).replace('#', '').padEnd(6, '0').slice(0, 6), 16) || 0; return [(n >> 16 & 255) / 255, (n >> 8 & 255) / 255, (n & 255) / 255]; };
@@ -34,6 +35,7 @@ export class Compositor {
     this.maskTex = new Map(); // clip id -> {key, tex}: a mask is redrawn only when something about it changed
     this.imageTex = new WeakMap();
     this.pixels = null;
+    this.memory = new MemoryBleed(this); // per-effect state that outlives a frame (the Memory Bleed effect)
     this._initQuad();
     this.resize(width, height);
   }
@@ -113,12 +115,18 @@ export class Compositor {
     for (const e of this.maskTex.values()) gl.deleteTexture(e.tex);
     this.maskTex.clear();
     this.pixels = null;
+    this.memory?.clear(); // every memory texture has the old size
   }
 
   _target(f) {
     const gl = this.gl;
     gl.bindFramebuffer(gl.FRAMEBUFFER, f ? f.fbo : null);
     gl.viewport(0, 0, this.w, this.h);
+  }
+  _targetSized(f, w, h) {
+    const gl = this.gl;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, f.fbo);
+    gl.viewport(0, 0, w, h);
   }
   _draw() {
     const gl = this.gl;
@@ -211,10 +219,11 @@ export class Compositor {
     gl.clear(gl.COLOR_BUFFER_BIT);
   }
 
-  _runEffect(fx, src, dst, clip, tLocal, feats, time) {
+  /** hook (optional, for effects with state): {target(): bind a different render target, bind(): bind extra textures / set extra uniforms} */
+  _runEffect(fx, src, dst, clip, tLocal, feats, time, hook = null) {
     const def = EFFECTS[fx.type];
     const p = this._program(`fx:${fx.type}`, VERT_QUAD, EFFECT_FRAG[fx.type]);
-    this._target(dst);
+    if (hook?.target) hook.target(); else this._target(dst);
     this.gl.disable(this.gl.BLEND);
     this._use(p);
     this._bindTex(src.tex);
@@ -226,6 +235,7 @@ export class Compositor {
       else if (d.options) this._set1(`u_${d.key}`, Number(fx.params[d.key] ?? d.def));
       else this._set1(`u_${d.key}`, resolveParam(fx, d.key, fx.params[d.key] ?? d.def, tLocal, feats, [d.min, d.max]));
     }
+    hook?.bind?.();
     this._draw();
   }
 
@@ -329,7 +339,8 @@ export class Compositor {
       if (!fx.enabled || !EFFECTS[fx.type]) continue;
       const wet = fx.wet === undefined && !fx.keyframes?.wet && !fx.bindings?.wet ? 1 : resolveParam(fx, 'wet', fx.wet ?? 1, tl, features, [0, 1]);
       if (wet <= 0.002) continue; // fully dry: the effect contributes nothing, so do not pay for it
-      this._runEffect(fx, cur, other, clip, tl, features, t);
+      if (fx.type === 'memory') this.memory.run({ fx, src: cur, dst: other, clip, tl, feats: features, time: t });
+      else this._runEffect(fx, cur, other, clip, tl, features, t);
       if (wet < 0.998) { this._wetMix(cur, other, spare, wet); [cur, other, spare] = [spare, cur, other]; } // the mix is the new picture; the two older buffers are free
       else [cur, other] = [other, cur];
     }
@@ -343,6 +354,7 @@ export class Compositor {
   render({ project, t, sources, features }) {
     const gl = this.gl;
     const missing = [];
+    this.memory.beginFrame();
     this._clear(this.fbos.acc, 0, 0, 0, 1);
     const active = activeVisualClips(project, t);
     const matteIds = matteSourceIds(project); // clips that only serve as someone's matte are not drawn themselves
@@ -380,6 +392,8 @@ export class Compositor {
       gl.disable(gl.BLEND);
     }
 
+    this.memory.endFrame();
+
     // Blit to the visible canvas.
     this._target(null);
     gl.disable(gl.BLEND);
@@ -406,6 +420,7 @@ export class Compositor {
   }
 
   dispose() {
+    this.memory.dispose();
     this.gl.getExtension('WEBGL_lose_context')?.loseContext();
   }
 }

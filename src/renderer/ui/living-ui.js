@@ -5,6 +5,9 @@ import { store } from '../store.js';
 import { LivingLabController } from '../living/controller.js';
 import { TRACE_MODES } from '../living/human-trace.js';
 import { paramSlots } from '/shared/living/slots.js';
+import { createEffect } from '/shared/effects-defs.js';
+import { createAdjustClip } from '/shared/adjust-defs.js';
+import { projectDuration, addTrack, addClipRaw } from '/shared/timeline.js';
 
 const fmt = (s) => `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, '0')}`;
 
@@ -70,6 +73,36 @@ export function mountLiving({ preview }) {
   pad.addEventListener('pointermove', (e) => { if (padState.down) for (const c of e.getCoalescedEvents?.() || [e]) padMove(c); });
   pad.addEventListener('pointerup', () => { padState.down = false; drawPad(); if (!store.recorder?.active) store.touch('project', 'keyframes'); });
 
+  // ---- MEMORY ----
+  const MEM_MODES = [['Ghost', 'Past frames fade into the present.'], ['Stain', 'Colour from earlier frames slowly leaks forward.'], ['Scar', 'Movement leaves a mark that changes slowly.'], ['Echo', 'Fragments of earlier motion return on a rhythm.']];
+  const mem = { mode: 0, length: 1.2, intensity: 0.8, blend: 1 };
+  const memMode = el('select', { id: 'memory-mode', 'aria-label': 'Memory mode' }, MEM_MODES.map(([l], i) => el('option', { value: i, text: l })));
+  const memLine = el('p', { class: 'hint', id: 'memory-line', text: MEM_MODES[0][1] });
+  memMode.addEventListener('change', () => { mem.mode = Number(memMode.value); memLine.textContent = MEM_MODES[mem.mode][1]; });
+  const slider = (id, label, min, max, step, key, unit = '') => {
+    const input = el('input', { type: 'range', min, max, step, value: mem[key], id, 'aria-label': label });
+    const out = el('span', { class: 'mut-out', text: `${mem[key]}${unit}` });
+    input.addEventListener('input', () => { mem[key] = Number(input.value); out.textContent = `${input.value}${unit}`; });
+    return el('label', { class: 'mut-row' }, el('span', { class: 'liv-axis', text: label }), input, out);
+  };
+  const memBlend = el('select', { id: 'memory-blend', 'aria-label': 'Memory blend' }, ['Behind (normal)', 'Screen', 'Add', 'Difference'].map((l, i) => el('option', { value: i, text: l, ...(i === mem.blend ? { selected: true } : {}) })));
+  memBlend.addEventListener('change', () => { mem.blend = Number(memBlend.value); });
+  const memEffect = () => createEffect('memory', { mode: mem.mode, length: mem.length, intensity: mem.intensity, blend: mem.blend });
+  const memClip = el('button', { id: 'memory-add-clip', text: 'Add to clip', title: "Adds a Memory Bleed effect to the selected clip's chain (edit it in the Inspector like any effect)", onclick: () => {
+    const clip = store.selectedClip;
+    if (!clip) { memStatus.textContent = 'Select a clip first.'; return; }
+    store.mutate(() => { clip.effects.push(memEffect()); });
+    memStatus.textContent = `Memory Bleed added to "${clip.name || clip.type}". Press play: it remembers while the timeline runs.`;
+  } });
+  const memLayer = el('button', { id: 'memory-add-layer', text: 'Add as layer', title: 'An adjustment layer over the whole project: everything underneath remembers', onclick: () => {
+    const dur = projectDuration(store.project);
+    if (dur <= 0) { memStatus.textContent = 'Put something on the timeline first.'; return; }
+    store.mutate((p) => { const c = createAdjustClip({ name: `Memory Bleed · ${MEM_MODES[mem.mode][0]}`, chain: [{ type: 'memory', params: { mode: mem.mode, length: mem.length, intensity: mem.intensity, blend: mem.blend } }] }, 0, dur); c.trackId = addTrack(p, 'video').id; addClipRaw(p, c); store.select(c.id); });
+    memStatus.textContent = 'Memory Bleed layer added over the whole project.';
+  } });
+  const memStatus = el('p', { class: 'hint', id: 'memory-status' });
+  const memQuality = el('p', { class: 'hint', id: 'memory-quality' });
+
   const status = el('p', { class: 'hint liv-status', id: 'living-status' });
 
   root.append(
@@ -81,6 +114,10 @@ export function mountLiving({ preview }) {
       el('div', { class: 'mut-row' }, el('span', { class: 'hint', text: 'Move Inspector sliders, or the pad, while it plays.' }), takeRec),
       pad,
       el('div', { class: 'liv-padsel' }, el('label', {}, 'Across', padSel.x), el('label', {}, 'Up / down', padSel.y))),
+    section('memory', 'MEMORY', 'Let the image remember.',
+      el('div', { class: 'mut-row' }, memMode, memBlend), memLine,
+      slider('memory-length', 'Length', 0.3, 6, 0.1, 'length', ' s'), slider('memory-intensity', 'Intensity', 0, 1.5, 0.05, 'intensity'),
+      el('div', { class: 'mut-row' }, memClip, memLayer), memStatus, memQuality),
     status, result);
 
   function refreshSlots() {
@@ -98,12 +135,14 @@ export function mountLiving({ preview }) {
       btn.classList.toggle('on', mine); btn.textContent = mine ? '■ STOP' : '● REC'; btn.disabled = !!rec && !mine;
     }
     result.textContent = ctrl.last?.text || '';
+    const m = preview.comp.memory;
+    memQuality.textContent = `Memory quality ${Math.round(m.scale * 100)}% of the picture${m.scale < 0.5 ? ' (lowered automatically because playback was stuttering)' : ''}. It builds up while the timeline plays; seeking starts it afresh, exactly as an export from that frame would.${m.overflow ? ' More than ' + 8 + ' memories are in view: the extra ones are passed through.' : ''}`;
     status.textContent = rec ? `Recording ${rec.kind}… ${fmt(Math.max(0, ctrl.clock() - rec.t0))}${rec.kind === 'take' ? ` · ${ctrl.take.rec.touched} parameter${ctrl.take.rec.touched === 1 ? '' : 's'} touched` : ctrl.trace.g ? ` · ${ctrl.trace.g.pts.length} points` : ''} · Esc cancels` : '';
   };
   store.on('living', render);
   store.on('selection', refreshSlots);
   store.on('project', () => { if (!ctrl.busy) refreshSlots(); });
-  setInterval(() => { if (ctrl.busy) render(); }, 150);
+  setInterval(() => { if (ctrl.busy || pane.classList.contains('on')) render(); }, ctrl.busy ? 150 : 700);
   pane.addEventListener('transitionend', drawPad);
   refreshSlots(); render(); drawPad();
   return ctrl;

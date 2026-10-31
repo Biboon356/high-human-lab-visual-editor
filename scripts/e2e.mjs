@@ -1714,6 +1714,97 @@ await step('living lab (take + trace): a take becomes ordinary keyframes in one 
   await page.click('#panel-left [data-tab="media"]'); await settle(200);
 });
 
+await step('memory bleed: all four modes render cleanly, a seek or a repaint never changes what the memory shows, preview agrees with export, and its GPU memory stays bounded and is given back', async () => {
+  await resetProject();
+  await ev(async (c) => { await window.__app.importPaths([c]); const { store } = window.__app; const { createEffect } = await import('/shared/effects-defs.js'); const { addMediaClip } = await import('/shared/timeline.js');
+    store.mutate((p) => { p.settings.width = 320; p.settings.height = 180; const clip = p.clips.find((x) => x.type === 'media') || addMediaClip(p, p.media[0].id, p.tracks.find((t) => t.kind === 'video').id, 0); clip.duration = 3; clip.keyframes.x = [{ t: 0, v: -0.3 }, { t: 1.5, v: 0.3 }]; clip.effects = [createEffect('memory', { mode: 0, length: 1.5, intensity: 1, blend: 1, rate: 4 })]; });
+    store.select(store.project.clips.find((x) => x.type === 'media').id); store.setPlayhead(0); }, pic);
+  await settle(700);
+  const errorsBefore = logs.length;
+  const api = (fn, arg) => ev(fn, arg);
+  // frame-by-frame like playback or an export: n frames from t0, returns the last picture and any GL trouble
+  const run = (o) => ev(async ({ t0, n, mode, off }) => {
+    const { store, preview } = window.__app; const gl = preview.comp.gl; gl.getError();
+    const clip = store.project.clips.find((x) => x.type === 'media'); const fx = clip.effects[0];
+    if (mode !== undefined) fx.params.mode = mode; if (off !== undefined) fx.enabled = !off;
+    let last = null;
+    for (let i = 0; i < n; i++) { store.setPlayhead(t0 + i / 30); preview.stats.lastError = null; last = window.__grab(80, 45); }
+    return { px: last, gl: gl.getError(), threw: preview.stats.lastError?.message || null, states: preview.comp.memory.states.size, live: preview.comp.memory.liveTextures };
+  }, o);
+  const diff = (a, b) => { let s = 0; for (let i = 0; i < a.length; i++) s += Math.abs(a[i] - b[i]); return s / a.length; };
+
+  const none = await run({ t0: 0, n: 46, off: true }); // 46 frames end at 1.5 s: right on an Echo beat (4 Hz), where the fragments are strongest
+  assert.equal(none.states, 0, 'with the effect off there is no memory at all');
+  const bad = [];
+  const finals = {};
+  for (const mode of [0, 1, 2, 3]) {
+    const r = await run({ t0: 0, n: 46, mode, off: false });
+    finals[mode] = r.px;
+    if (r.gl || r.threw) bad.push({ mode, gl: r.gl, threw: r.threw });
+    assert.equal(r.states, 1, `mode ${mode}: exactly one memory`);
+    assert.ok(diff(r.px, none.px) > 0.25, `mode ${mode} visibly changes the picture (Δ${diff(r.px, none.px).toFixed(2)})`);
+  }
+  assert.deepEqual(bad, [], 'no GL errors or shader failures in any mode');
+  assert.ok(new Set(Object.values(finals).map((p) => p.join(',').length + diff(p, finals[0]).toFixed(1))).size >= 3, 'the modes look different from each other');
+
+  // a seek, a long detour or a repaint must not change what the memory shows for a given run of frames
+  await run({ t0: 0, n: 45, mode: 0, off: false });
+  const a = await run({ t0: 0, n: 40 });
+  await ev(() => window.__app.store.setPlayhead(2.5)); await ev(() => window.__grab(8, 8));
+  const b = await run({ t0: 0, n: 40 });
+  assert.deepEqual(b.px, a.px, 'the same 40 frames after a detour give the very same picture');
+  const again = await ev(() => { const p1 = window.__grab(80, 45), p2 = window.__grab(80, 45); window.__app.preview.forceDraw(); const p3 = window.__grab(80, 45); return p1.every((v, i) => v === p2[i] && v === p3[i]); });
+  assert.equal(again, true, 'repainting the same frame (a paused preview) does not add to the memory');
+  const hw = await ev(() => { const m = window.__app.preview.comp.memory; m.scale = 0.25; window.__app.store.setPlayhead(0.5); window.__grab(8, 8); const st = [...m.states.values()][0]; const r = { hw: st.hw, w: window.__app.preview.comp.w }; m.scale = 0.5; return r; });
+  assert.equal(hw.hw, Math.round(hw.w * 0.25), 'a lower memory scale really makes the history smaller');
+
+  // preview and export agree on the same frames
+  await run({ t0: 0, n: 1, mode: 0, off: false });
+  const prev = await run({ t0: 0, n: 28 }); // frame index 27 = 0.9 s
+  const full = await ev(() => window.__grab(320, 180));
+  const out = path.join(dir, 'memory.mp4');
+  await ev(() => { const { store } = window.__app; store.mutate((p) => { p.clips.find((x) => x.type === 'media').duration = 1; }); });
+  await ev((o) => window.__app.exportTo(o, { width: 320, height: 180, fps: 30, quality: 'draft' }), out);
+  const raw = (f) => spawnSync(FFMPEG, ['-v', 'error', '-i', f, '-vf', 'select=eq(n\\,27)', '-frames:v', '1', '-pix_fmt', 'rgb24', '-f', 'rawvideo', '-'], { maxBuffer: 1 << 26 }).stdout;
+  const withMem = raw(out);
+  assert.equal(withMem.length, 320 * 180 * 3, 'a frame came out of the export');
+  const dExport = diff(Array.from(withMem), full);
+  await run({ t0: 0, n: 1, off: true });
+  const outNone = path.join(dir, 'memory-none.mp4');
+  await ev((o) => window.__app.exportTo(o, { width: 320, height: 180, fps: 30, quality: 'draft' }), outNone);
+  const dNone = diff(Array.from(raw(outNone)), full);
+  assert.ok(dExport < 9, `the exported frame matches the preview frame (mean difference ${dExport.toFixed(1)} of 255; codec noise only)`);
+  assert.ok(dNone > dExport + 1.5, `and an export without the memory does not (${dNone.toFixed(1)} vs ${dExport.toFixed(1)}): the memory really is in the export`);
+
+  // bounded and given back
+  const mem = await ev(async () => {
+    const { store, preview } = window.__app; const m = preview.comp.memory; const { createEffect } = await import('/shared/effects-defs.js');
+    const clip = store.project.clips.find((x) => x.type === 'media');
+    clip.effects = Array.from({ length: 11 }, (_, i) => createEffect('memory', { mode: i % 4, length: 1 }));
+    for (let i = 0; i < 6; i++) { store.setPlayhead(i / 30); window.__grab(8, 8); }
+    const crowded = { states: m.states.size, overflow: m.overflow, live: m.liveTextures, max: 8 };
+    clip.effects = [];
+    store.setPlayhead(0.2); window.__grab(8, 8);
+    const after = { states: m.states.size, live: m.liveTextures };
+    // many resets in a row must not leak
+    clip.effects = [createEffect('memory', { mode: 3 })];
+    for (let i = 0; i < 60; i++) { store.setPlayhead((i % 2) * 2 + (i % 5) * 0.01); window.__grab(8, 8); }
+    clip.effects = []; store.setPlayhead(0.1); window.__grab(8, 8);
+    // a separate compositor frees everything on dispose
+    const { Compositor } = await import('./engine/compositor.js');
+    const c2 = new Compositor(document.createElement('canvas'), 160, 90);
+    clip.effects = [createEffect('memory', { mode: 3 })];
+    for (let i = 0; i < 4; i++) c2.render({ project: store.project, t: i / 30, sources: preview.sources, features: null });
+    const liveBefore = c2.memory.liveTextures; c2.dispose();
+    return { crowded, after, churn: { states: m.states.size, live: m.liveTextures }, c2: { liveBefore, liveAfter: c2.memory.liveTextures } };
+  });
+  assert.ok(mem.crowded.states <= mem.crowded.max && mem.crowded.overflow === true, `11 memories in one chain: at most 8 are kept, the rest pass through (${mem.crowded.states}, overflow ${mem.crowded.overflow})`);
+  assert.equal(mem.after.states, 0, 'removing the effects forgets every memory');
+  assert.ok(mem.churn.states === 0 && mem.churn.live <= 24, `60 seeks in a row do not leak textures (${mem.churn.live} alive, all of them pooled)`);
+  assert.ok(mem.c2.liveBefore > 0 && mem.c2.liveAfter === 0, `dispose gives every texture back (${mem.c2.liveBefore} -> ${mem.c2.liveAfter})`);
+  assert.equal(logs.slice(errorsBefore).filter((l) => /shader|compile|GLSL|WebGL|error/i.test(l)).length, 0, 'no errors in the console');
+});
+
 await step('wet / dry: any effect can be mixed back over its input (preview, keyframes, Inspector row, export), and an effect at 0 costs nothing', async () => {
   await resetProject();
   await ev(async (c) => { await window.__app.importPaths([c]); const { store } = window.__app;

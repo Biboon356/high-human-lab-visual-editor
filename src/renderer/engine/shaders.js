@@ -39,6 +39,11 @@ void main(){
 
 export const FRAG_BLIT = FRAG_LAYER;
 
+// Plain copy (used to keep a smaller picture of a frame for Memory Bleed).
+export const FRAG_COPY = `#version 300 es
+precision highp float; in vec2 v_uv; out vec4 o; uniform sampler2D u_tex;
+void main(){ o = texture(u_tex, v_uv); }`;
+
 // Wet / dry between the picture that went into an effect (u_a) and what came out (u_b). Both are premultiplied, so a plain mix is right.
 export const FRAG_WET = `#version 300 es
 precision highp float; in vec2 v_uv; out vec4 o; uniform sampler2D u_a, u_b; uniform float u_w;
@@ -68,6 +73,64 @@ vec3 hueRot(vec3 c, float deg){ float a=radians(deg), co=cos(a), si=sin(a);
 const wrap = (body) => `${PRELUDE}\n${body}\nvoid main(){ o = effect(v_uv); }`;
 
 export const EFFECT_FRAG = {
+  // Memory Bleed. Two passes use this one program: pass 0 updates the memory (at the small history size), pass 1 lays the memory
+  // over the present picture (full size). u_prev = the memory before this frame, u_new = after it, u_aux = the previous picture
+  // (Scar), u_r0..u_r3 = Echo snapshots with u_ages their ages in seconds (< 0 = empty). The memory fades by time, not by frame count,
+  // so a different frame rate looks the same.
+  memory: wrap(`
+uniform sampler2D u_prev, u_new, u_aux, u_r0, u_r1, u_r2, u_r3;
+uniform float u_pass, u_first, u_dt, u_mode, u_blend, u_length, u_decay, u_intensity, u_rate, u_spread;
+uniform vec4 u_ages;
+vec4 fadeMem(vec4 m){
+  m *= exp(-3.9*u_dt/max(.05, u_length));                       // 2% of it is left after u_length seconds
+  float e = (.4 + 1.6*u_decay)/255. * u_dt*30.;                  // plus a straight fade, so the tail really ends (8-bit buffers would stall)
+  float a = max(m.a - e, 0.);
+  return vec4(m.rgb * (m.a > 1e-4 ? a/m.a : 0.), a);
+}
+vec4 blendMem(vec4 P, vec4 M){
+  if(u_blend < .5) return P + M*(1.-P.a);                                         // behind the present
+  if(u_blend < 1.5) return vec4(1.-(1.-P.rgb)*(1.-M.rgb), max(P.a, M.a));          // screen
+  if(u_blend < 2.5) return vec4(min(P.rgb + M.rgb, 1.), max(P.a, M.a));            // add
+  return vec4(abs(P.rgb - M.rgb), max(P.a, M.a));                                  // where the present departs from the memory
+}
+vec4 echoFrag(sampler2D s, float age, float i, vec2 uv, float pulse){
+  if(age < 0.) return vec4(0.);
+  vec2 cell = floor(uv * vec2(14. + (1.-u_spread)*18., 8. + (1.-u_spread)*10.));
+  float show = step(.6, hash12(cell + i*17.3 + floor(u_time*u_rate)*3.1));        // about four blocks in ten return
+  vec2 off = (hash22(cell + i*5.1) - .5) * .05 * u_spread;
+  return texture(s, uv + off) * (show * exp(-3.9*age/max(.05, u_length)) * pulse);
+}
+vec4 effect(vec2 uv){
+  vec4 P = texture(u_tex, uv);
+  vec4 A = u_first > .5 ? vec4(0.) : texture(u_prev, uv);
+  if(u_pass < .5){                                                                 // ---- update the memory
+    if(u_mode < .5) return P + fadeMem(A)*(1.-P.a);                                // GHOST: the picture over its own faded past
+    if(u_mode < 1.5){                                                              // STAIN: the colour seeps outward and drifts
+      vec2 fl = (vec2(vnoise(uv*3. + u_time*.07), vnoise(uv*3. + 7.3 - u_time*.05)) - .5) * .02 * (.2 + u_spread*2.);
+      vec4 S = u_first > .5 ? vec4(0.) : (texture(u_prev, uv+fl) + texture(u_prev, uv-fl*1.7) + texture(u_prev, uv+fl.yx*1.3)) / 3.;
+      S = fadeMem(S);
+      vec3 c = P.a > 1e-3 ? P.rgb/P.a : vec3(0.);
+      vec3 paint = clamp(mix(vec3(luma(c)), c, 2.2), 0., 1.);                       // the colour, not the light
+      float dep = .12*P.a;
+      return S + vec4(paint*dep, dep)*(1. - S.a*.6);
+    }
+    // SCAR: wherever the picture moved, a mark stays, and slowly changes colour
+    vec4 Q = texture(u_aux, uv);
+    float m = u_first > .5 ? 0. : smoothstep(.10, .35, length(P.rgb - Q.rgb) + abs(P.a - Q.a)*.5);
+    vec4 S = fadeMem(A);
+    if(S.a > 1e-3) S = vec4(clamp(hueRot(S.rgb/S.a, u_dt*14.), 0., 1.)*S.a, S.a);
+    vec3 c = P.a > 1e-3 ? P.rgb/P.a : vec3(0.);
+    return vec4(max(S.rgb, c*m), max(S.a, m));
+  }
+  vec4 M = vec4(0.);                                                               // ---- lay the memory over the present
+  if(u_mode < .5) M = fadeMem(A);
+  else if(u_mode < 2.5) M = texture(u_new, uv);
+  else {                                                                           // ECHO: old fragments come back on the beat of u_rate
+    float pulse = pow(1. - fract(u_time*u_rate), 2.5);
+    M = echoFrag(u_r0, u_ages.x, 0., uv, pulse) + echoFrag(u_r1, u_ages.y, 1., uv, pulse) + echoFrag(u_r2, u_ages.z, 2., uv, pulse) + echoFrag(u_r3, u_ages.w, 3., uv, pulse);
+  }
+  return blendMem(P, M * u_intensity);
+}`),
   glitch: wrap(`
 uniform float u_amount, u_blocks, u_split, u_rate;
 vec4 effect(vec2 uv){

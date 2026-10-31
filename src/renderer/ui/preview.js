@@ -5,6 +5,7 @@ import { Sources } from '../engine/sources.js';
 import { sampleFeatures } from '/shared/audio-analysis.js';
 import { projectDuration } from '/shared/timeline.js';
 import { fmtTime } from './dom.js';
+import { MemoryAdapt } from '/shared/living/memory-plan.js';
 
 const MAX_PREVIEW_W = 1280;
 
@@ -79,8 +80,15 @@ export function mountPreview() {
   }
   const toggle = () => (store.playing ? pause() : play());
 
+  // Memory Bleed keeps its history at a fraction of the picture size; if playback stutters while one is on screen, that fraction drops
+  // (the export never does this: it always uses the full-quality setting, and the memory itself is the same either way)
+  const memoryAdapt = new MemoryAdapt();
+  let lastFrameAt = 0;
   function frame() {
     requestAnimationFrame(frame);
+    const nowMs = performance.now();
+    if (store.playing && lastFrameAt && nowMs - lastFrameAt < 500) comp.memory.scale = memoryAdapt.update(nowMs - lastFrameAt, comp.memory.active);
+    lastFrameAt = nowMs;
     if (store.playing) {
       let t = tStart + (performance.now() - wallStart) / 1000;
       const d = duration();
@@ -133,5 +141,5 @@ export function mountPreview() {
 
   fitSize(); updateUI();
   requestAnimationFrame(frame);
-  return { play, pause, toggle, sources, comp, stats, forceDraw: draw };
+  return { play, pause, toggle, sources, comp, stats, forceDraw: draw, memoryAdapt };
 }

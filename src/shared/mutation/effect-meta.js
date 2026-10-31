@@ -59,6 +59,7 @@ export const EFFECT_META = {
   slices: m('distort', 'warp', 'light', ['slices', 'cut', 'bars', 'glitch'], {}, { bands: r(4, 40), shift: r(0.01, 0.3), black: r(0, 0.5), rate: r(1, 16) }),
   mask: m('alpha', 'alpha', 'light', ['mask', 'window', 'shape'], { alpha: 'writes', addable: false, wet: false }, { shape: FIX, x: FIX, y: FIX, size: FIX, aspect: FIX, rotate: FIX, feather: FIX, wobble: FIX, invert: FIX }),
   outline: m('alpha', 'alpha', 'medium', ['sticker', 'outline', 'die-cut'], { alpha: 'writes', addable: false, wet: false }, { width: r(2, 30) }),
+  memory: m('organic', 'light', 'medium', ['memory', 'ghost', 'trail', 'echo', 'stain', 'scar', 'temporal'], { addable: false }, { length: r(0.3, 4), intensity: r(0.3, 1.2), spread: r(0, 0.8), rate: r(0.5, 6) }),
   crt: m('analog', 'camera', 'light', ['crt', 'scanlines', 'broadcast', 'retro'], {}, { scan: r(0.1, 0.8), lines: r(240, 800), bleed: r(0.001, 0.015), curve: r(0, 0.2), flicker: r(0, 0.2) }),
 };
 
