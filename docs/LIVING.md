@@ -97,3 +97,33 @@ No new organism renderer. `living/organism.js` sets up effects that already exis
   highs, when the identity asks), then a `memory` Stain so the veins leave a fading colour behind.
 * **Human Trace → Grow** takes the identity's thickness / density / glow and its glow listens to the bass.
 * Without analysed music the layer still grows (over the identity's own time) and the bindings simply stay still.
+
+## Phase 7 — Lab Accident (done)
+
+Unexpected relationships **between clips that already exist** (Mutate already varies single effects). `shared/living/accident.js` finds
+the relations in the project — *cuts* (one clip ends where the next begins on a track) and *overlaps* (a clip starts inside another on a
+track above it) — and plans up to three accidents of different kinds, each with a one-line description:
+
+| Kind | What it does, with ordinary structures only |
+|---|---|
+| The cut remembers | An adjustment layer around the cut with Memory Bleed whose intensity is keyframed to appear exactly at the cut and let go: the end of clip A bleeds into B |
+| It spreads across the cut | The same veins (same seed and colour — the identity's, if there is one) creep up at the end of A, carry into B, then recede |
+| It moves like the other one | B inherits a fraction of A's existing motion keyframes (x, y, scale, rotation), stretched to B's length |
+| A window opens | The upper clip of an overlap gets an iris mask whose scale is keyframed open, over its first 1.5 s |
+| Unstable on the music | Audio bindings (bass or beat) on a pair of clips, working against each other (inert until the music is analysed) |
+
+* **Never destructive** (tested over 30 seeds): an accident only adds. It does not remove clips, replace effects, keyframes, bindings
+  or a mask the user made (it skips what would clash, or is not offered), and the result is always a valid project.
+* **Deterministic**: the same project, selection and seed plan the same accidents (compared with the random ids of new clips removed).
+* **User in control**: CAUSE ACCIDENT only plans and previews (each preview is drawn from a *copy* of the project; the e2e asserts the
+  real project is byte-identical). KEEP applies it as one undo step; REROLL gives another of the same kind; Undo restores the project
+  exactly (asserted). The list clears when the project changes.
+* Limits: thumbnails show the frame at the playhead (it is parked by the first accident), so *The cut remembers* and *Unstable* are
+  labelled “shows while the timeline plays”; a project with no cuts, overlaps or selection gets no accidents (the button says why).
+
+## What is not built (honestly)
+
+* MIDI input (the take recorder is ready for it: `LabTake.perform(slot, value)`).
+* Live feedback while tracing: the clip moves / roots grow after you stop, not while you draw.
+* The Scar mode reads like a long trail rather than isolated scars on busy footage; tuned by eye on Linux only.
+* Everything was verified on Linux with software GL; macOS and Windows have not been run.

@@ -25,5 +25,14 @@ export class VariationRenderer {
     return r;
   }
 
+  /** Draws a whole project (a preview copy, e.g. with an accident applied) at time t into `target`. */
+  paintProject({ project, sources, t, features, target }) {
+    const w = target.width, h = target.height;
+    this._ensure(w, h);
+    const r = this.comp.render({ project, t, sources, features });
+    target.getContext('2d').drawImage(this.comp.canvas, 0, 0, w, h);
+    return r;
+  }
+
   dispose() { this.comp?.dispose(); this.comp = null; this.canvas = null; }
 }

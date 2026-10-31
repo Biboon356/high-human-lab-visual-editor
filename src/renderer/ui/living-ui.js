@@ -12,12 +12,13 @@ import { collectInputs } from '/shared/living/project-inputs.js';
 import { deriveProjectDna, describeIdentity } from '/shared/living/project-dna.js';
 import { createLivingLayerClip } from '/shared/living/organism.js';
 import { musicStructure } from '/shared/music-structure.js';
+import { sampleFeatures } from '/shared/audio-analysis.js';
 import { createAdjustClip } from '/shared/adjust-defs.js';
 import { projectDuration, addTrack, addClipRaw } from '/shared/timeline.js';
 
 const fmt = (s) => `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, '0')}`;
 
-export function mountLiving({ preview, runAnalysis }) {
+export function mountLiving({ preview, runAnalysis, renderer }) {
   const ctrl = new LivingLabController({ preview });
   const root = document.getElementById('living-root');
   const pane = root.closest('.pane');
@@ -171,6 +172,56 @@ export function mountLiving({ preview, runAnalysis }) {
     ctrl.trace.mode = id.trace.mode; modeSel.value = id.trace.mode; modeSel.dispatchEvent(new Event('change'));
   }
 
+  // ---- ACCIDENT ----
+  const acc = ctrl.accident;
+  const accStatus = el('p', { class: 'hint', id: 'acc-status', text: 'Select a clip, or two, near a cut or an overlap. Nothing changes until you press Keep.' });
+  const accList = el('div', { class: 'liv-acc', id: 'acc-list' });
+  let accCanvases = [];
+  const accSize = () => { const { width, height } = store.project.settings, k = 320 / Math.max(width, height); return [Math.max(2, Math.round(width * k)), Math.max(2, Math.round(height * k))]; };
+  function renderAccidents() {
+    accList.replaceChildren(); accCanvases = [];
+    const [w, h] = accSize();
+    acc.items.forEach((a, i) => {
+      const cv = el('canvas', { width: w, height: h }); accCanvases.push(cv);
+      accList.append(el('div', { class: 'liv-acc-item', 'data-acc': i, 'data-kind': a.kind },
+        cv,
+        el('div', {}, el('b', { text: a.title }), el('p', { class: 'hint', text: a.summary }),
+          a.preview === 'playback' ? el('p', { class: 'hint liv-dim', text: 'Shows while the timeline plays.' }) : null,
+          el('div', { class: 'liv-acts' },
+            el('button', { class: 'primary', text: 'Keep', title: 'Applies it to the project (one Undo step)', 'data-acc-keep': i, onclick: () => keepAccident(i) }),
+            el('button', { text: 'Reroll', title: 'Another accident of this kind', 'data-acc-reroll': i, onclick: () => { acc.reroll(i); renderAccidents(); paintAccidents(); } })))));
+    });
+    accUndo.disabled = !acc.lastKept;
+  }
+  let accTimer = 0;
+  function paintAccidents() {
+    if (!acc.items.length || store.playing || !pane.classList.contains('on')) return;
+    const features = store.project.reactive?.enabled ? sampleFeatures(store.analysis, store.playhead) : null;
+    acc.items.forEach((a, i) => {
+      if (!accCanvases[i]) return;
+      const preview_ = structuredClone(store.project); // the real project is never drawn with an accident in it
+      a.apply(preview_);
+      try { renderer.paintProject({ project: preview_, sources: preview.sources, t: store.playhead, features, target: accCanvases[i] }); } catch (e) { accStatus.textContent = `Could not draw the preview: ${e.message}`; }
+    });
+  }
+  function keepAccident(i) {
+    const summary = acc.items[i]?.summary;
+    if (!acc.keep(i)) { accStatus.textContent = 'That accident no longer fits the project. Cause a new one.'; renderAccidents(); return; }
+    accStatus.textContent = `Kept: ${summary} Undo takes it back.`;
+    renderAccidents();
+  }
+  const accGo = el('button', { id: 'acc-cause', class: 'primary', text: 'Cause accident', title: 'Plans up to three accidents between clips you have and shows each one. Nothing is applied until you press Keep.', onclick: () => {
+    const items = acc.cause();
+    if (!items.length) { accStatus.textContent = 'Nothing to break yet: put two clips next to each other (a cut) or one on top of another, or select a clip.'; renderAccidents(); return; }
+    accStatus.textContent = `${items.length} accident${items.length === 1 ? '' : 's'}, planned from seed ${items[0].seed}. Keep one, reroll one, or cause new ones.`;
+    renderAccidents();
+    // the thumbnails show the frame at the playhead: park it by the first accident so they have something to show
+    const at = items[0].at;
+    if (store.playhead < at - 0.5 || store.playhead > at + 2.5) store.setPlayhead(at + 0.3);
+    clearTimeout(accTimer); accTimer = setTimeout(paintAccidents, 350);
+  } });
+  const accUndo = el('button', { id: 'acc-undo', text: 'Undo last keep', disabled: true, title: 'The editor\'s Undo', onclick: () => { if (acc.undo()) accStatus.textContent = 'Undone.'; renderAccidents(); } });
+
   const status = el('p', { class: 'hint liv-status', id: 'living-status' });
 
   root.append(
@@ -188,6 +239,8 @@ export function mountLiving({ preview, runAnalysis }) {
       el('div', { class: 'mut-row' }, memClip, memLayer), memStatus, memQuality),
     section('dna', 'DNA', 'Give the project a shared identity.',
       el('div', { class: 'mut-row' }, dnaSeed, dnaRead, dnaClear), dnaStatus, dnaCard),
+    section('accident', 'ACCIDENT', 'Break the rules carefully.',
+      el('div', { class: 'mut-row' }, accGo, accUndo), accStatus, accList),
     status, result);
 
   function refreshSlots() {
@@ -211,7 +264,8 @@ export function mountLiving({ preview, runAnalysis }) {
   };
   store.on('living', render);
   store.on('selection', refreshSlots);
-  store.on('project', () => { if (!ctrl.busy) { refreshSlots(); renderDna(); } });
+  store.on('project', () => { if (!ctrl.busy) { refreshSlots(); renderDna(); if (acc.items.length) { acc.items = []; renderAccidents(); accStatus.textContent = 'The project changed, so those accidents are out of date. Cause new ones.'; } else accUndo.disabled = !acc.lastKept; } });
+  store.on('playhead', () => { clearTimeout(accTimer); accTimer = setTimeout(paintAccidents, 120); });
   setInterval(() => { if (ctrl.busy || pane.classList.contains('on')) render(); }, ctrl.busy ? 150 : 700);
   pane.addEventListener('transitionend', drawPad);
   refreshSlots(); render(); drawPad(); renderDna();

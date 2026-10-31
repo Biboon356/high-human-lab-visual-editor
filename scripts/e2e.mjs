@@ -1880,6 +1880,75 @@ await step('project dna: the project gets a deterministic identity from its musi
   await page.click('#panel-left [data-tab="media"]'); await settle(200);
 });
 
+await step('lab accident: three previews from copies, nothing changes until Keep, Keep is one Undo step that restores the project exactly, and every kind renders cleanly', async () => {
+  await resetProject();
+  await ev(async (c) => { await window.__app.importPaths([c]); const { store } = window.__app; const { addMediaClip, addTrack } = await import('/shared/timeline.js');
+    store.mutate((p) => {
+      p.settings.width = 320; p.settings.height = 180;
+      const v1 = p.tracks.find((t) => t.kind === 'video'), pic = p.media[0].id;
+      const A = addMediaClip(p, pic, v1.id, 0); A.duration = 3; A.name = 'A'; A.keyframes.x = [{ t: 0, v: -0.3 }, { t: 3, v: 0.3 }]; A.keyframes.rotation = [{ t: 0, v: -5 }, { t: 3, v: 5 }];
+      const B = addMediaClip(p, pic, v1.id, 3); B.duration = 3; B.name = 'B';
+      const top = addTrack(p, 'video'); const U = addMediaClip(p, pic, top.id, 1); U.duration = 3; U.name = 'U'; U.props.scale = 0.6;
+    });
+    store.select(store.project.clips.find((x) => x.name === 'B').id); store.setPlayhead(3.3); }, pic);
+  await page.click('#panel-left [data-tab="living"]'); await settle(500);
+  const errorsBefore = logs.length;
+  const read = (cv) => ev((i) => { const cvs = document.querySelectorAll('#acc-list canvas'); const cv = cvs[i]; const o = document.createElement('canvas'); o.width = cv.width; o.height = cv.height; const c = o.getContext('2d', { willReadFrequently: true }); c.drawImage(cv, 0, 0); const d = c.getImageData(0, 0, cv.width, cv.height).data; let t = 0; for (let k = 0; k < d.length; k += 4) t += d[k] + d[k + 1] + d[k + 2]; return t / (d.length / 4) / 3; }, cv);
+  const project = () => ev(() => JSON.stringify(window.__app.store.project));
+  const original = await project();
+  await page.scrollIntoViewIfNeeded?.call(page, '#acc-cause').catch(() => {});
+  await ev(() => document.getElementById('living-accident').scrollIntoView());
+  await page.click('#acc-cause'); await settle(900);
+  const kinds = await ev(() => [...document.querySelectorAll('#acc-list [data-acc]')].map((n) => n.dataset.kind));
+  assert.equal(kinds.length, 3, `three accidents (${kinds})`); assert.equal(new Set(kinds).size, 3, 'of three different kinds');
+  for (let i = 0; i < 3; i++) assert.ok((await read(i)) > 8, `preview ${i} (${kinds[i]}) shows the picture`);
+  await ev(() => document.getElementById('acc-list').scrollIntoView()); await settle(300); await shot('38-accident-list');
+  assert.equal(await project(), original, 'planning and previewing changed nothing in the project');
+  assert.match(await ev(() => document.getElementById('acc-status').textContent), /Nothing changes until you press Keep|planned from seed/);
+
+  // Reroll: another accident of the same kind, still nothing changed
+  await page.click('[data-acc-reroll="0"]'); await settle(500);
+  assert.equal(await ev(() => document.querySelector('#acc-list [data-acc="0"]').dataset.kind), kinds[0], 'a reroll keeps the kind');
+  assert.equal(await project(), original);
+
+  // Keep: one undo step, and Undo restores the project exactly
+  const depth = await ev(() => window.__app.store.undoStack.length);
+  await page.click('[data-acc-keep="1"]'); await settle(500);
+  const kept = await project();
+  assert.notEqual(kept, original, 'Keep changed the project');
+  assert.equal(await ev(() => window.__app.store.undoStack.length), depth + 1, 'as one undo step');
+  assert.match(await ev(() => document.getElementById('acc-status').textContent), /^Kept:/);
+  assert.equal(await ev(() => document.querySelectorAll('#acc-list [data-acc]').length), 0, 'the list clears (those accidents belong to the old project)');
+  assert.equal(await ev(() => document.getElementById('acc-undo').disabled), false);
+  await page.click('#acc-undo'); await settle(400);
+  assert.equal(await project(), original, 'Undo gives back exactly the project you had');
+
+  // every kind on its own: applies, renders without GL errors or blank frames, and undoes cleanly
+  const results = await ev(async () => {
+    const { store, preview } = window.__app; const { planAccidents, ACCIDENT_KINDS } = await import('/shared/living/accident.js');
+    const out = {}; const gl = preview.comp.gl;
+    for (const kind of ACCIDENT_KINDS) {
+      const before = JSON.stringify(store.project);
+      const [acc] = planAccidents(store.project, { seed: 3, kinds: [kind], count: 1, selection: [store.selection] });
+      if (!acc) { out[kind] = { planned: false }; continue; }
+      store.mutate((p) => { acc.apply(p); });
+      gl.getError(); preview.stats.lastError = null;
+      let mean = 0; const frames = [acc.at - 0.2, acc.at + 0.1, acc.at + 0.6, acc.at + 1.2];
+      for (const t of frames) { store.setPlayhead(Math.max(0, t)); const d = window.__grab(40, 22); let s = 0; for (const v of d) s += v; mean = Math.max(mean, s / d.length); }
+      out[kind] = { planned: true, mean, gl: gl.getError(), threw: preview.stats.lastError?.message || null, restored: (store.undo(), JSON.stringify(store.project) === before) };
+    }
+    return out;
+  });
+  for (const [kind, r] of Object.entries(results)) {
+    assert.equal(r.planned, true, `${kind} fits this project`);
+    assert.ok(r.mean > 8 && !r.gl && !r.threw, `${kind} renders cleanly (mean ${r.mean?.toFixed(0)}, GL ${r.gl}, ${r.threw})`);
+    assert.equal(r.restored, true, `${kind}: Undo restores the project exactly`);
+  }
+  assert.equal(logs.slice(errorsBefore).filter((l) => /shader|compile|GLSL|WebGL|error/i.test(l)).length, 0, 'no errors in the console');
+  await shot('38-living-accident');
+  await page.click('#panel-left [data-tab="media"]'); await settle(200);
+});
+
 await step('wet / dry: any effect can be mixed back over its input (preview, keyframes, Inspector row, export), and an effect at 0 costs nothing', async () => {
   await resetProject();
   await ev(async (c) => { await window.__app.importPaths([c]); const { store } = window.__app;

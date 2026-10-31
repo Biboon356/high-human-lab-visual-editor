@@ -359,3 +359,6 @@ kbd { font: 500 9.5px var(--mono); letter-spacing: .04em; padding: 1px 6px; bord
 .liv-bar { display: block; height: 4px; background: var(--line); } .liv-bar b { display: block; height: 100%; background: var(--accent2); }
 .liv-lines { margin: 0; padding-left: 16px; font-size: 11px; color: var(--text); line-height: 1.5; }
 .liv-acts { display: flex; flex-wrap: wrap; gap: 4px; } .liv-acts button { height: 22px; padding: 0 8px; font-size: 10px; }
+
+.liv-acc { display: grid; gap: 12px; } .liv-acc-item { display: grid; grid-template-columns: 112px 1fr; gap: 10px; align-items: start; border-top: 1px solid var(--line); padding-top: 10px; }
+.liv-acc-item canvas { width: 112px; height: auto; background: #000; border: 1px solid var(--line); display: block; } .liv-acc-item b { font: 500 11px var(--mono); color: var(--accent2); letter-spacing: .06em; text-transform: uppercase; } .liv-acc-item p { margin: 3px 0 6px; } .liv-dim { opacity: .7; }

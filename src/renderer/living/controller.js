@@ -6,6 +6,7 @@ import { toast } from '../ui/dom.js';
 import { projectDuration } from '/shared/timeline.js';
 import { LabTake } from './lab-take.js';
 import { HumanTrace } from './human-trace.js';
+import { LabAccident } from './lab-accident.js';
 
 export class LivingLabController {
   constructor({ preview }) {
@@ -15,6 +16,7 @@ export class LivingLabController {
     this.last = null; // {text} shown by the UI after a session
     this.take = new LabTake(this);
     this.trace = new HumanTrace(this);
+    this.accident = new LabAccident();
   }
 
   get busy() { return !!this.session; }
