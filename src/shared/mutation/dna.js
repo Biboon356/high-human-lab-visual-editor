@@ -3,7 +3,8 @@
 //   parentId  the DNA this one was duplicated or rolled from (lineage)
 //   seed      the seed of the roll that made it, when it came from one
 //   recipe    {mode:'mutate'|'generate', base, options, engine} — everything mutate()/generate() needs, so reproduceDna() can rebuild the chain
-//   source    {kind:'manual'|'mutation'|'look'|'migrated'|'import', ...}
+//   source    {kind:'manual'|'mutation'|'look'|'migrated'|'import'|'project', ...}
+//   identity  only on a Project DNA: traits, palette, suggestions (living/identity.js)
 // The library lives in project.dna[] (so it travels with the .hhlab file and is covered by undo and autosave). Built-in looks are
 // exposed as read-only DNA by builtinDna() and are never copied into the project unless the user saves one.
 // Pure: no DOM, no storage. Time is passed in (`now`) so results stay testable.
@@ -14,11 +15,12 @@ import { EFFECT_META, isHeavy } from './effect-meta.js';
 import { validateChain, effectsToChain } from './chain.js';
 import { mutate, generate, ENGINE_VERSION } from './mutate.js';
 import { toSeed } from './rng.js';
+import { cleanIdentity } from '../living/identity.js';
 
 export const DNA_SCHEMA = 1;
 export const MAX_LIBRARY = 500;
 export const FILE_FORMAT = 'hhdna';
-const KINDS = ['manual', 'mutation', 'look', 'migrated', 'import'];
+const KINDS = ['manual', 'mutation', 'look', 'migrated', 'import', 'project'];
 
 const text = (v, max, fallback = '') => (typeof v === 'string' ? v.trim().slice(0, max) : fallback);
 const isObj = (v) => v && typeof v === 'object' && !Array.isArray(v);
@@ -47,7 +49,7 @@ function cleanRecipe(r) {
  * Builds a DNA from loose input; the chain is validated and repaired.
  * @returns {{dna: object, issues: object[]}} issues are the repairs made to the chain
  */
-export function createDna({ name, chain, note = '', tags = [], seed = null, parentId = null, source = { kind: 'manual' }, recipe = null, id, now = Date.now() } = {}) {
+export function createDna({ name, chain, note = '', tags = [], seed = null, parentId = null, source = { kind: 'manual' }, recipe = null, identity = null, id, now = Date.now() } = {}) {
   const { chain: clean, issues } = validateChain(chain || []);
   const kind = KINDS.includes(source?.kind) ? source.kind : 'manual';
   const dna = {
@@ -63,6 +65,8 @@ export function createDna({ name, chain, note = '', tags = [], seed = null, pare
     recipe: cleanRecipe(recipe),
     chain: clean,
   };
+  const idn = cleanIdentity(identity);
+  if (idn) dna.identity = idn; // Project DNA: the identity layer (living/project-dna.js); absent on ordinary DNA
   return { dna, issues };
 }
 

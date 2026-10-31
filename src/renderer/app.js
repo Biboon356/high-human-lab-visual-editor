@@ -140,7 +140,7 @@ const timeline = mountTimeline();
 mountInspector($('inspector'));
 mountMediaBin({ onImport: importResults });
 const mutateUi = mountMutate({ preview });
-const living = mountLiving({ preview });
+const living = mountLiving({ preview, runAnalysis });
 mountReactive($('reactive'));
 mountProjectSettings($('project-settings'));
 startRoots($('bg-roots'), () => store.playing || isExporting());

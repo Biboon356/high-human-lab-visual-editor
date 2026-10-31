@@ -6,12 +6,18 @@ import { LivingLabController } from '../living/controller.js';
 import { TRACE_MODES } from '../living/human-trace.js';
 import { paramSlots } from '/shared/living/slots.js';
 import { createEffect } from '/shared/effects-defs.js';
+import { normalizeDna, addDna } from '/shared/mutation/dna.js';
+import { chainToEffects } from '/shared/mutation/chain.js';
+import { collectInputs } from '/shared/living/project-inputs.js';
+import { deriveProjectDna, describeIdentity } from '/shared/living/project-dna.js';
+import { createLivingLayerClip } from '/shared/living/organism.js';
+import { musicStructure } from '/shared/music-structure.js';
 import { createAdjustClip } from '/shared/adjust-defs.js';
 import { projectDuration, addTrack, addClipRaw } from '/shared/timeline.js';
 
 const fmt = (s) => `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, '0')}`;
 
-export function mountLiving({ preview }) {
+export function mountLiving({ preview, runAnalysis }) {
   const ctrl = new LivingLabController({ preview });
   const root = document.getElementById('living-root');
   const pane = root.closest('.pane');
@@ -79,10 +85,12 @@ export function mountLiving({ preview }) {
   const memMode = el('select', { id: 'memory-mode', 'aria-label': 'Memory mode' }, MEM_MODES.map(([l], i) => el('option', { value: i, text: l })));
   const memLine = el('p', { class: 'hint', id: 'memory-line', text: MEM_MODES[0][1] });
   memMode.addEventListener('change', () => { mem.mode = Number(memMode.value); memLine.textContent = MEM_MODES[mem.mode][1]; });
+  const memInputs = {};
   const slider = (id, label, min, max, step, key, unit = '') => {
     const input = el('input', { type: 'range', min, max, step, value: mem[key], id, 'aria-label': label });
     const out = el('span', { class: 'mut-out', text: `${mem[key]}${unit}` });
     input.addEventListener('input', () => { mem[key] = Number(input.value); out.textContent = `${input.value}${unit}`; });
+    memInputs[key] = { input, out, unit };
     return el('label', { class: 'mut-row' }, el('span', { class: 'liv-axis', text: label }), input, out);
   };
   const memBlend = el('select', { id: 'memory-blend', 'aria-label': 'Memory blend' }, ['Behind (normal)', 'Screen', 'Add', 'Difference'].map((l, i) => el('option', { value: i, text: l, ...(i === mem.blend ? { selected: true } : {}) })));
@@ -103,6 +111,66 @@ export function mountLiving({ preview }) {
   const memStatus = el('p', { class: 'hint', id: 'memory-status' });
   const memQuality = el('p', { class: 'hint', id: 'memory-quality' });
 
+  // ---- DNA ----
+  const projectDna = () => normalizeDna(store.project.living?.dna).dna;
+  const dnaSeed = el('input', { type: 'number', min: 0, step: 1, value: 1, id: 'dna-seed', 'aria-label': 'Identity seed', title: 'The same project and the same seed always give the same identity' });
+  const dnaStatus = el('p', { class: 'hint', id: 'dna-status' });
+  const dnaCard = el('div', { class: 'liv-dna', id: 'dna-card' });
+  const dnaRead = el('button', { class: 'primary', id: 'dna-read', text: 'Read the project', title: 'Listens to the music on the timeline and looks at the footage you use, then names the identity. Nothing in your edit changes.', onclick: async () => {
+    dnaRead.disabled = true;
+    try {
+      dnaStatus.textContent = 'Listening…';
+      if (!store.analysis || store.analysisStale) await runAnalysis({ quiet: true });
+      const used = new Set(store.project.clips.filter((c) => c.type === 'media').map((c) => c.mediaId));
+      const media = store.project.media.filter((m) => used.has(m.id) && (m.kind === 'video' || m.kind === 'image') && !m.missing);
+      let footage = {}, note = '';
+      if (media.length) {
+        dnaStatus.textContent = `Looking at ${media.length} clip${media.length === 1 ? '' : 's'}…`;
+        try { footage = await window.hh.montageAnalyze(media.map((m) => ({ id: m.id, path: m.path, kind: m.kind }))); } catch (e) { note = ` (footage could not be analysed: ${e.message})`; }
+      }
+      const m = window.__app?.mutateUi?.state;
+      const inputs = collectInputs({ project: store.project, analysis: store.analysis, footage, styleBias: m?.style ? { [m.style]: 3 } : {}, mutateSeeds: [m?.seed, ...libSeeds()] });
+      const dna = deriveProjectDna(inputs, { seed: Math.floor(Math.abs(Number(dnaSeed.value) || 1)) });
+      store.mutate((p) => { p.living = { ...(p.living || {}), dna }; });
+      dnaStatus.textContent = `Identity read${note}. It only suggests: nothing is applied until you press a button.`;
+    } catch (e) { dnaStatus.textContent = `Could not read the project: ${e.message}`; } finally { dnaRead.disabled = false; }
+  } });
+  const libSeeds = () => (store.project.dna || []).map((d) => d.seed).filter(Number.isFinite);
+  const dnaClear = el('button', { id: 'dna-clear', text: 'Clear', title: 'Forget the project identity', onclick: () => store.mutate((p) => { if (p.living) delete p.living.dna; }) });
+  const bar = (v) => el('i', { class: 'liv-bar' }, el('b', { style: `width:${Math.round(v * 100)}%` }));
+  function renderDna() {
+    dnaCard.replaceChildren();
+    const dna = projectDna(), id = dna?.identity;
+    if (!id) { dnaCard.append(el('p', { class: 'hint', text: 'No identity yet. Read the project and it gets one: a name, a palette, how it moves, and suggestions for the tools.' })); return; }
+    const clip = store.selectedClip;
+    dnaCard.append(
+      el('h4', { id: 'dna-name', text: id.name }),
+      el('div', { class: 'liv-swatches', id: 'dna-palette' }, id.palette.map((c) => el('span', { style: `background:${c}`, title: c }))),
+      el('div', { class: 'liv-traits' }, Object.entries(id.traits).map(([k, v]) => el('span', { class: 'liv-trait', title: `${k} ${Math.round(v * 100)}%` }, el('em', { text: k }), bar(v)))),
+      el('ul', { class: 'liv-lines' }, describeIdentity(id).map((l) => el('li', { text: l }))),
+      el('p', { class: 'hint', text: `Signature look: ${dna.chain.map((c) => c.type).join(' · ')}. Seed ${dna.seed}.` }),
+      el('div', { class: 'liv-acts' },
+        el('button', { id: 'dna-use-memory', text: 'Use for Memory', title: 'Sets the MEMORY controls above from the identity', onclick: () => applyMemory(id) }),
+        el('button', { id: 'dna-use-trace', text: 'Use for Trace', title: 'Sets Smoothing and the trace mode', onclick: () => applyTrace(id) }),
+        el('button', { id: 'dna-apply-sig', text: 'Add signature look', disabled: !clip, title: "Adds the signature look's effects to the end of the selected clip's chain (one Undo step)", onclick: () => { store.mutate(() => { clip.effects.push(...chainToEffects(dna.chain)); }); } }),
+        el('button', { id: 'dna-layer', text: 'Grow a living layer', disabled: projectDuration(store.project) <= 0, title: 'An adjustment layer over the whole project: veins that grow faster in loud bars, glow with the bass, leave a stain behind. Built from existing effects; edit it like any layer.', onclick: () => {
+          const dur = projectDuration(store.project), bars = store.analysis ? musicStructure(store.analysis).bars : null;
+          store.mutate((p) => { const c = createLivingLayerClip(id, { start: 0, duration: dur, bars, seed: dna.seed ?? 1 }); c.trackId = addTrack(p, 'video').id; addClipRaw(p, c); store.select(c.id); });
+          dnaStatus.textContent = `Living layer added over ${dur.toFixed(1)} s${bars ? ': it grows with the energy of the music' : ' (analyse the music, in the Audio-Reactive tab, and it will grow with it)'}. Undo removes it.`;
+        } }),
+        el('button', { id: 'dna-save', text: 'Save to library', title: 'Copies it into the DNA library of this project (Mutate tab)', onclick: () => store.mutate((p) => { addDna(p, dna); }) })),
+      el('p', { class: 'hint', text: 'In the Mutate tab, tick “lean toward the project\'s identity” to let rolls follow it.' }));
+  }
+  function applyMemory(id) {
+    Object.assign(mem, { mode: id.memory.mode, length: id.memory.length, intensity: id.memory.intensity, blend: id.memory.blend });
+    memMode.value = String(mem.mode); memLine.textContent = MEM_MODES[mem.mode][1]; memBlend.value = String(mem.blend);
+    for (const [k, { input, out, unit }] of Object.entries(memInputs)) { input.value = mem[k]; mem[k] = Number(input.value); out.textContent = `${mem[k]}${unit}`; } // the slider's own steps decide the value actually used
+  }
+  function applyTrace(id) {
+    ctrl.settings.smooth = id.trace.smoothing; smooth.value = Math.round(id.trace.smoothing * 100); smoothOut.textContent = `${smooth.value}%`;
+    ctrl.trace.mode = id.trace.mode; modeSel.value = id.trace.mode; modeSel.dispatchEvent(new Event('change'));
+  }
+
   const status = el('p', { class: 'hint liv-status', id: 'living-status' });
 
   root.append(
@@ -118,6 +186,8 @@ export function mountLiving({ preview }) {
       el('div', { class: 'mut-row' }, memMode, memBlend), memLine,
       slider('memory-length', 'Length', 0.3, 6, 0.1, 'length', ' s'), slider('memory-intensity', 'Intensity', 0, 1.5, 0.05, 'intensity'),
       el('div', { class: 'mut-row' }, memClip, memLayer), memStatus, memQuality),
+    section('dna', 'DNA', 'Give the project a shared identity.',
+      el('div', { class: 'mut-row' }, dnaSeed, dnaRead, dnaClear), dnaStatus, dnaCard),
     status, result);
 
   function refreshSlots() {
@@ -141,9 +211,9 @@ export function mountLiving({ preview }) {
   };
   store.on('living', render);
   store.on('selection', refreshSlots);
-  store.on('project', () => { if (!ctrl.busy) refreshSlots(); });
+  store.on('project', () => { if (!ctrl.busy) { refreshSlots(); renderDna(); } });
   setInterval(() => { if (ctrl.busy || pane.classList.contains('on')) render(); }, ctrl.busy ? 150 : 700);
   pane.addEventListener('transitionend', drawPad);
-  refreshSlots(); render(); drawPad();
+  refreshSlots(); render(); drawPad(); renderDna();
   return ctrl;
 }

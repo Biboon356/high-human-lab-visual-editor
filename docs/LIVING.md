@@ -71,3 +71,29 @@ intensity, blend (behind / screen / add / difference), drift, echo rate; plus th
   raises it again when calm (`MemoryAdapt`). The export always uses 0.5.
 * Limits: a still thumbnail (Mutate grid) cannot show a memory, so a roll never adds one; the memory must be built up by playback; the
   history is 8-bit, so very long memories are cut off by a small straight fade (`decay` sets how crisp that tail is).
+
+## Phase 5 — Project DNA (done)
+
+An ordinary Mutate DNA (`shared/mutation/dna.js`) of kind `project`, with an extra `identity` field (`living/identity.js`):
+traits (energy, warmth, grit, motion, density, calm), a palette, style leanings per effect category, and suggestions for Memory,
+Trace and the organic layer. Its chain is a *signature look* made by the same `generate()` the Mutate tab uses, leaning the way
+the identity leans, with a recipe so `reproduceDna` rebuilds it.
+
+* **Derived from** (`living/project-inputs.js`): BPM and band energies (audio analysis), cutting density, motion and palette (the cached
+  footage analysis the montage uses: hue, saturation and brightness of the frames you actually use, weighted by how long each file is
+  on the timeline), the Mutate style choice and existing Mutate seeds.
+* **Deterministic**: inputs are rounded first, then hashed with the seed. Same project + same seed → the same DNA (tested, including
+  through a JSON round trip and through the e2e twice on the same project).
+* **It never edits the project.** Reading it changes nothing in the edit (e2e checks the clips are byte-identical). Every use is a
+  button: Use for Memory, Use for Trace, Add signature look (appends effects, one Undo step), Save to library, Grow a living layer; and
+  an opt-in “lean toward the project's identity” in Mutate. Stored in `project.living.dna`; Undo covers it.
+
+## Phase 6 — the organism (done)
+
+No new organism renderer. `living/organism.js` sets up effects that already exist, from the identity and the music:
+
+* **Living layer** (an adjustment layer): `veins` (colour, thickness, density from the identity; glow bound to the bass, flow to the beat;
+  **growth keyframed from the energy of each bar**, so loud bars grow it faster than quiet ones), optional `spores` (speed bound to the
+  highs, when the identity asks), then a `memory` Stain so the veins leave a fading colour behind.
+* **Human Trace → Grow** takes the identity's thickness / density / glow and its glow listens to the bass.
+* Without analysed music the layer still grows (over the identity's own time) and the bindings simply stay still.

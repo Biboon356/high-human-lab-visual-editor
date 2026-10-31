@@ -352,3 +352,10 @@ kbd { font: 500 9.5px var(--mono); letter-spacing: .04em; padding: 1px 6px; bord
 .liv-infl { display: grid; gap: 6px; } .liv-infl[hidden] { display: none; } .liv-axis { width: 62px; flex: none; font: 9.5px var(--mono); color: var(--dim); text-transform: uppercase; }
 .liv-status { color: #ff8a7d; min-height: 14px; margin: 0; } .liv-result { margin: 0; min-height: 14px; }
 .trace-surface { position: absolute; inset: 0; z-index: 30; cursor: crosshair; touch-action: none; } .trace-canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+
+.liv-dna { display: grid; gap: 8px; } .liv-dna h4 { margin: 0; font: italic 400 20px/1.1 Georgia, 'Times New Roman', serif; color: var(--text); }
+.liv-swatches { display: flex; gap: 0; height: 22px; border: 1px solid var(--line); } .liv-swatches span { flex: 1; }
+.liv-traits { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 10px; } .liv-trait { display: grid; grid-template-columns: 52px 1fr; gap: 6px; align-items: center; font: 9px var(--mono); text-transform: uppercase; color: var(--dim); } .liv-trait em { font-style: normal; }
+.liv-bar { display: block; height: 4px; background: var(--line); } .liv-bar b { display: block; height: 100%; background: var(--accent2); }
+.liv-lines { margin: 0; padding-left: 16px; font-size: 11px; color: var(--text); line-height: 1.5; }
+.liv-acts { display: flex; flex-wrap: wrap; gap: 4px; } .liv-acts button { height: 22px; padding: 0 8px; font-size: 10px; }

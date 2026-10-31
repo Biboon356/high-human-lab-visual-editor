@@ -13,6 +13,7 @@ import { findSlot } from '/shared/living/slots.js';
 import { evalTrack } from '/shared/keyframes.js';
 import { addTrack, addClipRaw } from '/shared/timeline.js';
 import { newSeed } from '/shared/mutation/rng.js';
+import { normalizeDna } from '/shared/mutation/dna.js';
 
 export const TRACE_MODES = [
   ['motion', 'Motion', 'Your hand moves the selected clip.'],
@@ -87,7 +88,7 @@ export class HumanTrace {
     const clip = store.selectedClip, aspect = this.ctrl.preview.comp.w / this.ctrl.preview.comp.h, curve = this.ctrl.curve();
     const seconds = (g.pts.at(-1)[0] - g.pts[0][0]).toFixed(1);
     if (this.mode === 'residue' || this.mode === 'grow') {
-      const c = createTraceClip(g, { mode: this.mode, seed: newSeed() % 1000, tail: Math.max(1, tEnd - g.pts.at(-1)[0] + 0.5) });
+      const c = createTraceClip(g, { mode: this.mode, seed: newSeed() % 1000, tail: Math.max(1, tEnd - g.pts.at(-1)[0] + 0.5), identity: normalizeDna(store.project.living?.dna).dna?.identity || null });
       const p = store.project;
       c.trackId = addTrack(p, 'video').id;
       addClipRaw(p, c);

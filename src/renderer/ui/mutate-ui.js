@@ -13,7 +13,7 @@ import { supportsWet } from '/shared/mutation/effect-meta.js';
 import { effectsToChain, chainToEffects } from '/shared/mutation/chain.js';
 import { variations, mutate, generate } from '/shared/mutation/mutate.js';
 import { newSeed } from '/shared/mutation/rng.js';
-import { createDna, dnaFromRoll, addDna, removeDna, renameDna, duplicateDna, libraryOf, diffChains, builtinDna, exportDna, parseDnaFile, migrateUserPresets } from '/shared/mutation/dna.js';
+import { normalizeDna, createDna, dnaFromRoll, addDna, removeDna, renameDna, duplicateDna, libraryOf, diffChains, builtinDna, exportDna, parseDnaFile, migrateUserPresets } from '/shared/mutation/dna.js';
 
 const STYLES = [['', 'Any style'], ['analog', 'Analog / tape'], ['camera', 'Camera / Y2K'], ['distort', 'Glitch / distort'], ['print', 'Print / zine'], ['colour', 'Colour'], ['organic', 'Organic'], ['pattern', 'Desi pattern'], ['scene', '3D / synth']];
 const COUNTS = [4, 6, 9];
@@ -25,7 +25,8 @@ export function mountMutate({ preview }) {
   const root = document.getElementById('mutate-root');
   const pane = root.closest('.pane');
   const renderer = new VariationRenderer();
-  const st = { seed: null, strength: 0.5, count: 6, style: '', heavy: true, base: null, items: [], cmp: new Set(), ab: { a: 0, b: null }, wipe: 50 };
+  const st = { seed: null, strength: 0.5, count: 6, style: '', heavy: true, base: null, items: [], cmp: new Set(), ab: { a: 0, b: null }, wipe: 50, lean: false };
+  const identity = () => normalizeDna(store.project.living?.dna).dna?.identity || null; // the Project DNA's identity, if the project has one
   const chainAt = (n) => (n === 0 ? baseChain() : st.items[n - 1]?.chain || null); // cell 0 is Current, then the variations
 
   // ---- the clip being worked on ----
@@ -36,7 +37,12 @@ export function mountMutate({ preview }) {
     return clip;
   };
   const baseChain = () => (st.base ? st.base.chain : effectsToChain(target()?.effects || []));
-  const opts = () => ({ strength: st.strength, bias: st.style ? { [st.style]: 5 } : {}, maxHeavy: st.heavy ? 1 : 0 });
+  const opts = () => {
+    const bias = st.style ? { [st.style]: 5 } : {};
+    const idn = st.lean ? identity() : null; // optional: rolls lean the way the project's identity leans (never on their own)
+    if (idn) for (const [k, w] of Object.entries(idn.biases)) bias[k] = (bias[k] || 0) + w;
+    return { strength: st.strength, bias, maxHeavy: st.heavy ? 1 : 0 };
+  };
   const rollOne = (base, seed) => (base.length ? mutate(base, { ...opts(), seed }) : generate({ ...opts(), seed }));
 
   // ---- controls ----
@@ -50,6 +56,9 @@ export function mountMutate({ preview }) {
   style.addEventListener('change', () => { st.style = style.value; });
   const heavy = el('input', { type: 'checkbox', checked: st.heavy, id: 'mutate-heavy' });
   heavy.addEventListener('change', () => { st.heavy = heavy.checked; });
+  const leanBox = el('input', { type: 'checkbox', id: 'mutate-lean' });
+  leanBox.addEventListener('change', () => { st.lean = leanBox.checked; });
+  const leanRow = el('label', { class: 'mut-row chk', hidden: true, title: 'Uses the style leanings of the Project DNA (Living tab → DNA)' }, leanBox, 'lean toward the project\'s identity');
   const seedInput = el('input', { type: 'number', min: 0, step: 1, placeholder: 'seed', id: 'mutate-seed', 'aria-label': 'Seed' });
   seedInput.addEventListener('input', () => { seedInput.dataset.manual = '1'; });
   const rollBtn = el('button', { class: 'primary', id: 'mutate-roll', text: 'Roll', title: 'New variations. Type a seed first to reproduce an earlier roll exactly.', onclick: () => roll() });
@@ -76,7 +85,7 @@ export function mountMutate({ preview }) {
     el('div', { class: 'mut-controls' },
       el('label', { class: 'mut-row' }, 'Strength', strength, strengthOut),
       el('div', { class: 'mut-row' }, count, style),
-      el('label', { class: 'mut-row chk' }, heavy, 'allow one heavy effect (pattern, 3D)'),
+      el('label', { class: 'mut-row chk' }, heavy, 'allow one heavy effect (pattern, 3D)'), leanRow,
       el('div', { class: 'mut-row' }, seedInput, rollBtn)),
     baseBar, lookSel, grid, keep, library);
 
@@ -295,10 +304,12 @@ export function mountMutate({ preview }) {
   }
 
   // ---- keeping up with the project ----
-  const refreshAll = () => { buildGrid(); renderKeep(); renderLibrary(); paint(); };
+  const refreshLean = () => { const has = !!identity(); leanRow.hidden = !has; if (!has) { st.lean = false; leanBox.checked = false; } };
+  const refreshAll = () => { refreshLean(); buildGrid(); renderKeep(); renderLibrary(); paint(); };
   store.on('selection', () => { st.items = []; st.base = null; st.ab = { a: 0, b: null }; refreshAll(); });
   store.on('reset', () => { st.items = []; st.base = null; st.cmp.clear(); st.ab = { a: 0, b: null }; refreshAll(); });
   store.on('project', () => {
+    refreshLean();
     if (!pane.classList.contains('on') && !st.items.length) return;
     // the "Current" cell and the library follow the project; rolled variations stay as they are
     const clip = target();

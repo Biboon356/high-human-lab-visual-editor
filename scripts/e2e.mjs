@@ -1805,6 +1805,81 @@ await step('memory bleed: all four modes render cleanly, a seek or a repaint nev
   assert.equal(logs.slice(errorsBefore).filter((l) => /shader|compile|GLSL|WebGL|error/i.test(l)).length, 0, 'no errors in the console');
 });
 
+await step('project dna: the project gets a deterministic identity from its music and footage; it only suggests, saves with the project, and rolls can lean toward it', async () => {
+  await resetProject();
+  await ev(async ([c, k]) => { await window.__app.importPaths([c, k]); const { store } = window.__app; const { addMediaClip } = await import('/shared/timeline.js');
+    store.mutate((p) => { addMediaClip(p, p.media.find((m) => m.kind === 'audio').id, p.tracks.find((t) => t.kind === 'audio').id, 0); }); store.select(store.project.clips.find((x) => x.type === 'media' && x.name === 'clip.mp4').id); }, [clip, kick]);
+  await page.click('#panel-left [data-tab="living"]'); await settle(400);
+  assert.match(await ev(() => document.getElementById('dna-card').textContent), /No identity yet/, 'before reading there is no identity');
+  const before = await ev(() => JSON.stringify(window.__app.store.project.clips));
+  const read = async (seed) => {
+    await page.fill('#dna-seed', String(seed)); await page.click('#dna-read');
+    await page.waitForFunction(() => !document.getElementById('dna-read').disabled, null, { timeout: 60000 });
+    return ev(() => { const d = window.__app.store.project.living?.dna; return d && { id: d.id, name: d.identity.name, kind: d.source.kind, palette: d.identity.palette, bpm: d.identity.inputs.bpm, chain: d.chain.map((c) => c.type), seed: d.seed, mem: d.identity.memory, trace: d.identity.trace, status: document.getElementById('dna-status').textContent }; });
+  };
+  const a = await read(5);
+  assert.ok(a && a.kind === 'project' && a.palette.length >= 3 && a.chain.length === 3, `an identity was read (${a?.name}, palette ${a?.palette.length}, chain ${a?.chain})`);
+  assert.ok(a.bpm > 60 && a.bpm < 220, `it heard the music (${a.bpm} BPM)`);
+  await ev(() => document.getElementById('living-dna').scrollIntoView()); await settle(250); await shot('37-living-dna');
+  assert.equal(await ev(() => document.getElementById('dna-name').textContent), a.name);
+  assert.equal(await ev(() => document.querySelectorAll('#dna-palette span').length), a.palette.length);
+  assert.equal(await ev(() => JSON.stringify(window.__app.store.project.clips)), before, 'reading the project changes nothing in the edit');
+  const b = await read(5);
+  assert.equal(b.id, a.id, 'the same project and seed give the very same identity'); assert.deepEqual(b.chain, a.chain);
+  const c = await read(6);
+  assert.notEqual(c.id, a.id, 'another seed gives another identity');
+  await read(5);
+
+  // it only suggests: the buttons are the user's
+  await page.click('#dna-use-memory'); await settle(150);
+  assert.equal(await ev(() => Number(document.getElementById('memory-mode').value)), a.mem.mode, 'Use for Memory fills the MEMORY controls');
+  assert.equal(await ev(() => Number(document.getElementById('memory-length').value)), Math.round(a.mem.length * 10) / 10, 'the length, as far as the slider\'s 0.1 s steps allow');
+  await page.click('#dna-use-trace'); await settle(150);
+  assert.equal(await ev(() => Number(document.getElementById('living-smooth').value)), Math.round(a.trace.smoothing * 100), 'Use for Trace sets the smoothing');
+  const n0 = await ev(() => window.__app.store.project.clips.find((x) => x.name === 'clip.mp4').effects.length);
+  await page.click('#dna-apply-sig'); await settle(200);
+  assert.equal(await ev(() => window.__app.store.project.clips.find((x) => x.name === 'clip.mp4').effects.length), n0 + 3, 'Add signature look appends its three effects');
+  await ev(() => window.__app.store.undo()); await settle(150);
+  assert.equal(await ev(() => window.__app.store.project.clips.find((x) => x.name === 'clip.mp4').effects.length), n0, 'and one Undo takes them off');
+  await page.click('#dna-save'); await settle(200);
+  assert.equal(await ev(() => window.__app.store.project.dna.some((d) => d.source.kind === 'project' && d.identity)), true, 'saved to the DNA library with its identity');
+
+  // the organism: a living layer built from the identity out of effects that already exist
+  await page.click('#dna-layer'); await settle(400);
+  const layer = await ev(() => { const { store } = window.__app; const c = store.project.clips.find((x) => x.type === 'adjust' && x.name.startsWith('Living layer')); return c && { id: c.id, track: c.trackId, types: c.effects.map((e) => e.type), growth: c.effects[0].keyframes.growth, glow: c.effects[0].bindings.glow, flow: c.effects[0].bindings.flow, color: c.effects[0].params.color, dur: c.duration, total: store.project.clips.length }; });
+  assert.ok(layer, 'a Living layer clip was added');
+  assert.equal(layer.types[0], 'veins'); assert.equal(layer.types.at(-1), 'memory', 'veins first, the memory that keeps their stain last');
+  assert.ok(layer.growth.length >= 3 && layer.growth.every((k, i) => i === 0 || (k.v >= layer.growth[i - 1].v && k.t > layer.growth[i - 1].t)) && layer.growth.at(-1).v === 1, `growth is keyframed from the music, rising to 1 (${layer.growth.length} keys)`);
+  assert.deepEqual(layer.glow, { source: 'bass', amount: 0.35 }); assert.equal(layer.flow.source, 'beat');
+  assert.equal(layer.color, a.palette[0], 'the veins take the identity\'s colour');
+  const shown = await ev(async (dur) => { const { store } = window.__app; store.setPlayhead(Math.min(3, dur * 0.5)); await new Promise((r) => setTimeout(r, 600)); return window.__grab(64, 36); }, layer.dur);
+  await shot('37-living-layer');
+  await ev((id) => { const { store } = window.__app; const c = store.project.clips.find((x) => x.id === id); store.project.tracks.find((t) => t.id === c.trackId).hidden = true; store.touch('render'); }, layer.id); await settle(500);
+  const hidden = await ev(() => window.__grab(64, 36));
+  let dLayer = 0; for (let i = 0; i < shown.length; i++) dLayer += Math.abs(shown[i] - hidden[i]); dLayer /= shown.length;
+  assert.ok(dLayer > 0.8, `the living layer really changes the picture (Δ${dLayer.toFixed(2)})`);
+  await ev(() => window.__app.store.undo()); await settle(300);
+  assert.equal(await ev(() => window.__app.store.project.clips.some((x) => x.name.startsWith('Living layer'))), false, 'one Undo removes the layer');
+
+  // it travels with the project file
+  const back = await ev(async () => { const P = await import('/shared/project.js'); const copy = P.validateProject(JSON.parse(JSON.stringify(window.__app.store.project))); return copy.living?.dna?.identity?.name; });
+  assert.equal(back, a.name, 'the identity survives save and load');
+
+  // Mutate can lean toward it (only when asked)
+  await ev(() => { const { store } = window.__app; store.select(store.project.clips.find((x) => x.name === 'clip.mp4').id); }); // undoing the layer deselected it
+  await page.click('#panel-left [data-tab="mutate"]'); await settle(300);
+  assert.equal(await ev(() => !document.getElementById('mutate-lean').closest('label').hidden), true, 'the lean option appears once the project has an identity');
+  await page.check('#mutate-lean');
+  await page.click('#mutate-roll'); await settle(900);
+  assert.equal(await ev(() => window.__app.mutateUi.state.items.length), 6, 'rolling with the identity works');
+  assert.equal(await ev(() => window.__app.mutateUi.state.lean), true);
+  await page.click('#panel-left [data-tab="living"]'); await settle(200);
+  await page.click('#dna-clear'); await settle(200);
+  assert.equal(await ev(() => window.__app.store.project.living?.dna), undefined, 'Clear forgets the identity');
+  assert.equal(await ev(() => document.getElementById('mutate-lean').closest('label').hidden), true, 'and the lean option goes away');
+  await page.click('#panel-left [data-tab="media"]'); await settle(200);
+});
+
 await step('wet / dry: any effect can be mixed back over its input (preview, keyframes, Inspector row, export), and an effect at 0 costs nothing', async () => {
   await resetProject();
   await ev(async (c) => { await window.__app.importPaths([c]); const { store } = window.__app;

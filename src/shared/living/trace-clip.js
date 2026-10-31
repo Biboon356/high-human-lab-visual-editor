@@ -5,14 +5,16 @@
 import { createClip, defaultProps } from '../project.js';
 import { GEN_PARAMS } from '../organic-defs.js';
 import { simplifyPath, gestureRange } from './gesture.js';
+import { traceVoice } from './organism.js';
 
 export const TRACE_MODES = ['residue', 'grow'];
 
 /**
  * @param g gesture (see gesture.js), times in timeline seconds
- * @param o {mode, seed, tail (seconds the clip lasts after the last point), trackId}
+ * @param o {mode, seed, tail (seconds the clip lasts after the last point), trackId, identity (a Project DNA identity: the roots take its
+ *   thickness, density and glow)}
  */
-export function createTraceClip(g, { mode = 'residue', seed = 7, tail = 2.5, trackId = null } = {}) {
+export function createTraceClip(g, { mode = 'residue', seed = 7, tail = 2.5, trackId = null, identity = null } = {}) {
   if (!TRACE_MODES.includes(mode)) throw new Error(`Unknown trace mode "${mode}"`);
   const range = gestureRange(g);
   if (!range) throw new Error('There is no gesture to turn into a trace.');
@@ -21,13 +23,15 @@ export function createTraceClip(g, { mode = 'residue', seed = 7, tail = 2.5, tra
   Object.assign(params, mode === 'grow'
     ? { density: 1.3, distortion: 0.7, thickness: 0.22, glow: 0.7, green: 0.7, seed }
     : { density: 1, distortion: 0.35, thickness: 0.2, glow: 0.55, green: 0.35, movement: 0.4, seed });
+  if (identity) Object.assign(params, traceVoice(identity));
   return createClip({
     type: 'generator',
     name: `Trace · ${mode}`,
     trackId,
     start: range.t0,
     duration: Math.max(1, range.t1 - range.t0 + tail),
-    gen: { style: 'trace', transparent: true, params, keyframes: {}, bindings: {}, mode, fade: mode === 'residue' ? 3 : 0, path: { pts } },
+    // the organism listens: Grow roots glow with the bass (inert until the project's music has been analysed)
+    gen: { style: 'trace', transparent: true, params, keyframes: {}, bindings: mode === 'grow' ? { glow: { source: 'bass', amount: 0.3 } } : {}, mode, fade: mode === 'residue' ? 3 : 0, path: { pts } },
     props: { ...defaultProps(), blend: 'screen' },
     effects: [],
   });

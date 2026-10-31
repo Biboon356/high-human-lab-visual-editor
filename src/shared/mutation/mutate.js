@@ -17,7 +17,7 @@ export const ENGINE_VERSION = 2;
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
 // ---- colour helpers (a colour moves around the wheel rather than jumping to an unrelated value) ----
-function hexToHsl(hex) {
+export function hexToHsl(hex) {
   const h = normalizeHex(hex) || '#000000';
   const n = parseInt(h.slice(1), 16), R = (n >> 16 & 255) / 255, G = (n >> 8 & 255) / 255, B = (n & 255) / 255;
   const mx = Math.max(R, G, B), mn = Math.min(R, G, B), l = (mx + mn) / 2, d = mx - mn;
@@ -29,7 +29,7 @@ function hexToHsl(hex) {
   }
   return [hue, s, l];
 }
-function hslToHex(h, s, l) {
+export function hslToHex(h, s, l) {
   const c = (1 - Math.abs(2 * l - 1)) * s, x = c * (1 - Math.abs(((h / 60) % 2) - 1)), m = l - c / 2;
   const [r, g, b] = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
   const to = (v) => Math.round(clamp(v + m, 0, 1) * 255).toString(16).padStart(2, '0');
