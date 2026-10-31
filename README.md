@@ -171,6 +171,21 @@ None of this has been measured against real Thai recordings yet (see status belo
 - **Pattern v2:** five more designs — *Lotus mandala, Henna vines, Diya row, Zari border, Torana garland* — and **Gold-leaf shading** (a *Foil* control that makes the line catch light unevenly). New looks *Foil Mandala, Lotus Bloom, Henna Vines, Diya Garden, Zari Border, Torana Garland* and **Mandala Pulse (beat)** (glow and size follow the music).
 - **Limits:** lockups are composed for 16:9; on a vertical frame the text fits by width and ornaments keep their frame proportions, so check and adjust. Not verified on real Mac/Windows installs.
 
+## v0.7.0 — Mutate (a variation engine for looks)
+
+A **Mutate** tab: select a clip, press Roll, get 4, 6 or 9 variations of its effect chain drawn on the real frame, with an A/B wipe.
+Seeds make every roll reproducible; effects or single values can be locked; DNA (saved looks with their seed and lineage) lives in the
+project and exports as `.hhdna`. Every effect now has a wet/dry mix. Details: [docs/MUTATION.md](docs/MUTATION.md).
+
+## v0.8.0 — The Living Lab, and HDR footage
+
+A **Living** tab: *Trace* (draw over the picture while it plays: motion, effect control, a fading line, or roots that grow along your
+gesture), *Take* (perform sliders or an XY pad live; the performance becomes ordinary keyframes in one undo step), *Memory* (the new
+Memory Bleed effect: Ghost, Stain, Scar, Echo, with bounded GPU history that renders the same in preview and export), *DNA* (a
+deterministic identity for the whole project from its music and footage, plus a living layer whose veins grow faster in loud bars) and
+*Accident* (controlled relationships between clips, previewed from copies and applied only on Keep). Details: [docs/LIVING.md](docs/LIVING.md).
+Also: iPhone HDR clips are tone-mapped instead of looking washed out (below).
+
 ## HDR phone footage (iPhone HLG / PQ)
 
 A clip shot in HDR is 10-bit BT.2020 with an HLG curve. Decoded as ordinary video it looks washed out. The app now recognises such
