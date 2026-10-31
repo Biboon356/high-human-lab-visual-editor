@@ -25,6 +25,12 @@ function canDecode(media) {
 
 /** Checks Chromium can play the media; if not, builds an H.264 proxy. Returns an error string or null. */
 async function finalizeMedia(media) {
+  // HDR phone footage always plays through a tone-mapped SDR proxy: the browser's own handling of HLG differs from platform to platform
+  // (and from what the export does), so one proxy keeps the preview and the export looking like the phone did.
+  if (media.hdr && media.kind === 'video') {
+    toast(`"${media.name}" is HDR. Making an SDR copy for the preview so its colours look right…`);
+    try { media.playPath = await window.hh.makeProxy(media.path); } catch (e) { return e.message; }
+  }
   let problem = await canDecode(media);
   if (problem && media.kind !== 'image') {
     toast(`"${media.name}" isn't directly playable (${problem}). Generating an H.264 proxy…`);

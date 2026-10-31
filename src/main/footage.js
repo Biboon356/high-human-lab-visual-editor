@@ -4,18 +4,19 @@ import { spawn } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { FFMPEG } from './ffmpeg.js';
+import { FFMPEG, toneMapChain } from './ffmpeg.js';
 import { analyzeFrames, stillStats, frameFeatures } from '../shared/shot-analysis.js';
 
-const FW = 64, FH = 36, FPS = 4, MAX_SECONDS = 1200, VERSION = 1;
+const FW = 64, FH = 36, FPS = 4, MAX_SECONDS = 1200, VERSION = 2; // 2: HDR clips are analysed after tone-mapping (version 1 read them flat)
 const live = new Set();
 export const killFootage = () => { for (const p of live) { try { p.kill('SIGKILL'); } catch { /* gone */ } } live.clear(); };
 
-function decodeFrames(file, { image = false, signal } = {}) {
+async function decodeFrames(file, { image = false, signal } = {}) {
+  const chain = image ? '' : await toneMapChain(file); // colours are read after the HDR tone map, as the picture really looks
   return new Promise((resolve, reject) => {
     const args = ['-hide_banner', '-loglevel', 'error', '-i', file, '-an', '-sn'];
     if (image) args.push('-frames:v', '1'); else args.push('-t', String(MAX_SECONDS));
-    args.push('-vf', image ? `scale=${FW}:${FH}:flags=area` : `fps=${FPS},scale=${FW}:${FH}:flags=area`, '-pix_fmt', 'rgb24', '-f', 'rawvideo', 'pipe:1');
+    args.push('-vf', `${image ? '' : `fps=${FPS},`}scale=${FW}:${FH}:flags=area${chain ? `,${chain}` : ''}`, '-pix_fmt', 'rgb24', '-f', 'rawvideo', 'pipe:1');
     const p = spawn(FFMPEG, args, { stdio: ['ignore', 'pipe', 'pipe'] });
     live.add(p);
     const size = FW * FH * 3, frames = [];

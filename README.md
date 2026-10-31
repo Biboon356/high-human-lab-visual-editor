@@ -171,6 +171,15 @@ None of this has been measured against real Thai recordings yet (see status belo
 - **Pattern v2:** five more designs — *Lotus mandala, Henna vines, Diya row, Zari border, Torana garland* — and **Gold-leaf shading** (a *Foil* control that makes the line catch light unevenly). New looks *Foil Mandala, Lotus Bloom, Henna Vines, Diya Garden, Zari Border, Torana Garland* and **Mandala Pulse (beat)** (glow and size follow the music).
 - **Limits:** lockups are composed for 16:9; on a vertical frame the text fits by width and ornaments keep their frame proportions, so check and adjust. Not verified on real Mac/Windows installs.
 
+## HDR phone footage (iPhone HLG / PQ)
+
+A clip shot in HDR is 10-bit BT.2020 with an HLG curve. Decoded as ordinary video it looks washed out. The app now recognises such
+clips on import and tone-maps them to ordinary SDR everywhere it turns them into pictures: the preview plays an SDR proxy (always made
+for HDR clips, so every platform shows the same thing), and the export, timeline thumbnails, stills, Reverse and the footage analysis
+(palette, motion) tone-map as they decode. The tone map uses ffmpeg's `zscale` + `tonemap=mobius` (it keeps the exposure you shot at);
+a build without those filters gets a rougher approximation. Clips imported *before* this change keep their old flat proxy: remove and
+import them again.
+
 ## Updating without reinstalling
 
 From version 0.2.0 the app updates itself **in place**: on start (and every few hours) it asks GitHub for the latest release, downloads a small checksummed bundle of the app's own code (`src/**`, a few hundred KB), and shows **Update x.y.z · Restart** in the top bar. Nothing is applied until you press it; the next start then runs the new code from the app's data folder. *Project → Updates* shows the version and has a manual *Check for updates* (also *Tools → Check for Updates…*).

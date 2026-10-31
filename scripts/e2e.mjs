@@ -1949,6 +1949,35 @@ await step('lab accident: three previews from copies, nothing changes until Keep
   await page.click('#panel-left [data-tab="media"]'); await settle(200);
 });
 
+await step('hdr phone footage: an HLG clip is detected, plays through a tone-mapped SDR copy, and the preview and the export both look like the phone did', async () => {
+  const hlg = path.join(dir, 'hlg.mov'), sdr = path.join(dir, 'hlg-source.mp4');
+  const SRC = ['-f', 'lavfi', '-i', 'testsrc2=size=320x180:rate=30:duration=2'];
+  const toHlg = 'format=yuv420p,setparams=colorspace=bt709:color_primaries=bt709:color_trc=bt709:range=tv,zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt2020:t=arib-std-b67:m=bt2020nc:r=tv,format=yuv420p10le';
+  try {
+    sh(FFMPEG, ['-v', 'error', '-y', ...SRC, '-pix_fmt', 'yuv420p', '-c:v', 'libx264', '-crf', '8', sdr]);
+    sh(FFMPEG, ['-v', 'error', '-y', ...SRC, '-vf', toHlg, '-c:v', 'libx265', '-crf', '12', '-x265-params', 'log-level=error:colorprim=bt2020:transfer=arib-std-b67:colormatrix=bt2020nc:range=limited', '-tag:v', 'hvc1', hlg]);
+  } catch (e) { throw new Error(`could not make the HLG test clip: ${e.message.split('\n')[0]}`); }
+  await resetProject();
+  await ev(async (c) => { await window.__app.importPaths([c]); const { store } = window.__app; store.mutate((p) => { p.settings.width = 320; p.settings.height = 180; p.settings.fps = 30; }); store.setPlayhead(0.3); }, hlg);
+  const media = await ev(() => { const m = window.__app.store.project.media[0]; return { hdr: m.hdr, playPath: m.playPath || null }; });
+  assert.equal(media.hdr, 'hlg', 'the clip is recognised as HLG');
+  assert.ok(media.playPath, 'it always plays through a proxy, whatever the browser could decode');
+  const px = JSON.parse(sh(FFPROBE, ['-v', 'error', '-print_format', 'json', '-show_streams', '-select_streams', 'v:0', media.playPath])).streams[0];
+  assert.equal(px.codec_name, 'h264'); assert.ok(!['arib-std-b67', 'smpte2084'].includes(px.color_transfer), 'the proxy is ordinary SDR');
+  await settle(1500);
+  const preview = await ev(() => window.__grab(320, 180));
+  const out = path.join(dir, 'hdr-export.mp4');
+  await ev((o) => window.__app.exportTo(o, { width: 320, height: 180, fps: 30, quality: 'draft' }), out);
+  const raw = (args) => spawnSync(FFMPEG, ['-v', 'error', ...args, '-vf', 'select=eq(n\\,9)', '-frames:v', '1', '-pix_fmt', 'rgb24', '-f', 'rawvideo', '-'], { maxBuffer: 1 << 26 }).stdout;
+  const ref = Array.from(raw(['-i', sdr])), flat = Array.from(raw(['-i', hlg])), exported = Array.from(raw(['-i', out]));
+  const err = (a, b) => { let t = 0; for (let i = 0; i < a.length; i++) t += Math.abs(a[i] - b[i]); return t / a.length; };
+  assert.equal(exported.length, 320 * 180 * 3);
+  const eFlat = err(ref, flat), eExport = err(ref, exported), ePreview = err(ref, preview);
+  assert.ok(eExport < eFlat * 0.7, `the export is close to the picture the phone showed (${eExport.toFixed(1)} off, against ${eFlat.toFixed(1)} for the flat decode)`);
+  assert.ok(ePreview < eFlat * 0.7, `and so is the preview (${ePreview.toFixed(1)} off)`);
+  assert.ok(err(preview, exported) < 14, `the preview and the export agree (${err(preview, exported).toFixed(1)} apart)`);
+});
+
 await step('wet / dry: any effect can be mixed back over its input (preview, keyframes, Inspector row, export), and an effect at 0 costs nothing', async () => {
   await resetProject();
   await ev(async (c) => { await window.__app.importPaths([c]); const { store } = window.__app;

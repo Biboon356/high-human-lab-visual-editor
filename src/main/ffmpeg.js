@@ -42,6 +42,60 @@ export function run(bin, args, { collect = true } = {}) {
   });
 }
 
+// ---- HDR phone footage (HLG / PQ) ----
+// An iPhone clip shot in HDR is stored as 10-bit BT.2020 with an HLG curve. Decoded as if it were ordinary video it looks washed out,
+// so every place that turns such a clip into pictures (proxy, export, thumbnails, stills, reverse, footage analysis) tone-maps it to
+// normal SDR first, with ffmpeg's own filters.
+
+/** 'hlg' | 'pq' | null from an ffprobe `color_transfer` value. */
+export function hdrKindFromTransfer(t) {
+  if (t === 'arib-std-b67') return 'hlg';
+  if (t === 'smpte2084') return 'pq';
+  return null;
+}
+
+/**
+ * The filter chain that turns HDR frames into SDR yuv420p, or '' for ordinary video. With the zimg filters it is a proper tone map
+ * (linear light, Mobius curve, back to BT.709). A build without them gets an approximation: the right primaries and matrix, then a
+ * little contrast and saturation (it will not match a real tone map, but it is far closer than leaving the clip flat).
+ */
+export function toneMapFilter(kind, { zscale = true, tonemap = true } = {}) {
+  if (!kind) return '';
+  if (zscale && tonemap) {
+    const tin = kind === 'pq' ? 'smpte2084' : 'arib-std-b67';
+    return `zscale=tin=${tin}:min=bt2020nc:pin=bt2020:rin=tv:t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=mobius:desat=0,zscale=t=bt709:m=bt709:r=tv,format=yuv420p`;
+  }
+  return 'colorspace=all=bt709:iall=bt2020:fast=1,eq=contrast=1.12:saturation=1.15,format=yuv420p';
+}
+
+let capsPromise = null;
+/** Which of the filters above this ffmpeg build has (asked once). */
+export function filterCaps() {
+  capsPromise ||= run(FFMPEG, ['-hide_banner', '-filters']).then(({ stdout }) => { const s = stdout.toString(); return { zscale: /\bzscale\b/.test(s), tonemap: /\btonemap\b/.test(s) }; }).catch(() => ({ zscale: false, tonemap: false }));
+  return capsPromise;
+}
+
+const hdrCache = new Map();
+/** 'hlg' | 'pq' | null for a video file (remembered per file and modification time). */
+export async function hdrKind(file) {
+  let key = file;
+  try { key = `${file}|${fs.statSync(file).mtimeMs}`; } catch { /* unreadable: ffprobe will say */ }
+  if (!hdrCache.has(key)) {
+    hdrCache.set(key, run(FFPROBE, ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=color_transfer', '-of', 'csv=p=0', file])
+      .then(({ stdout }) => hdrKindFromTransfer(stdout.toString().trim().split(/[\s,]+/)[0])).catch(() => null));
+  }
+  return hdrCache.get(key);
+}
+
+/** The tone-map chain for this file ('' when it is not HDR). */
+export async function toneMapChain(file) {
+  const kind = await hdrKind(file);
+  return kind ? toneMapFilter(kind, await filterCaps()) : '';
+}
+
+/** Tags for output that has been tone-mapped, so players treat it as the ordinary BT.709 it now is. */
+export const SDR_TAGS = ['-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709'];
+
 export async function probeMedia(file) {
   const ext = path.extname(file).toLowerCase();
   const { stdout } = await run(FFPROBE, ['-v', 'error', '-print_format', 'json', '-show_format', '-show_streams', file]);
@@ -73,12 +127,14 @@ export async function probeMedia(file) {
     fps: Math.round(fps * 100) / 100,
     hasAudio: kind !== 'image' && !!a,
     codec: (v || a)?.codec_name || '',
+    hdr: kind === 'video' ? hdrKindFromTransfer(v?.color_transfer) : null, // 'hlg' | 'pq' | null: such clips are tone-mapped wherever they are decoded
   };
 }
 
 /** Transcode to a universally playable H.264/AAC proxy (used when Chromium can't decode the source). */
 export async function makeProxy(src, dest) {
-  await run(FFMPEG, ['-hide_banner', '-loglevel', 'error', '-y', '-i', src, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '18',
+  const chain = await toneMapChain(src); // HDR phone footage becomes ordinary SDR here, so the preview shows it the way the phone did
+  await run(FFMPEG, ['-hide_banner', '-loglevel', 'error', '-y', '-i', src, ...(chain ? ['-vf', chain, ...SDR_TAGS] : []), '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '18',
     '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', dest]);
   return dest;
 }
@@ -96,14 +152,15 @@ export async function reverseRange(src, dest, { start = 0, duration, hasAudio = 
   const parts = [];
   try {
     let videoFile = null;
+    const chain = hasVideo ? await toneMapChain(src) : '';
     if (hasVideo) {
       const chunk = width * height > 2200000 ? 1 : 2; // 4K gets 1 s chunks
       const n = Math.max(1, Math.ceil(duration / chunk));
       for (let i = n - 1; i >= 0; i--) {
         const s0 = start + i * chunk, len = Math.min(chunk, duration - i * chunk);
         const f = path.join(tmpDir, `c${n - 1 - i}.mp4`);
-        await run(FFMPEG, [...base, '-ss', String(s0), '-t', String(len), '-i', src, '-an', '-vf', `fps=${fps},reverse`,
-          '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '16', '-pix_fmt', 'yuv420p', f]);
+        await run(FFMPEG, [...base, '-ss', String(s0), '-t', String(len), '-i', src, '-an', '-vf', `fps=${fps},${chain ? `${chain},` : ''}reverse`,
+          ...(chain ? SDR_TAGS : []), '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '16', '-pix_fmt', 'yuv420p', f]);
         parts.push(f);
       }
       videoFile = path.join(tmpDir, 'video.mp4');
@@ -126,7 +183,8 @@ export async function reverseRange(src, dest, { start = 0, duration, hasAudio = 
 
 /** One frame of a video at `time`, as a PNG at full source resolution. */
 export async function extractFrame(src, dest, time) {
-  await run(FFMPEG, ['-hide_banner', '-loglevel', 'error', '-y', '-ss', String(Math.max(0, time)), '-i', src, '-frames:v', '1', '-an', dest]);
+  const chain = await toneMapChain(src);
+  await run(FFMPEG, ['-hide_banner', '-loglevel', 'error', '-y', '-ss', String(Math.max(0, time)), '-i', src, ...(chain ? ['-vf', chain] : []), '-frames:v', '1', '-an', dest]);
   return dest;
 }
 
@@ -201,7 +259,7 @@ export class ExportSession {
  * Replaces per-frame <video> seeking during export (faster, VFR-safe, always reads the original file, never a proxy).
  */
 export class ClipDecoder {
-  constructor({ path: file, start, duration, fps, width, height, speed = 1 }) {
+  constructor({ path: file, start, duration, fps, width, height, speed = 1, toneMap = '' }) {
     this.frameBytes = width * height * 4;
     this.queue = [];
     this.waiters = [];
@@ -212,7 +270,7 @@ export class ClipDecoder {
     this.err = [];
     this.error = null;
     const args = ['-hide_banner', '-loglevel', 'error', '-ss', String(start), '-t', String(duration), '-i', file, '-an', '-sn',
-      '-vf', `${speed !== 1 ? `setpts=PTS/${speed},` : ''}fps=${fps},scale=${width}:${height}:flags=bicubic,format=rgba`, '-f', 'rawvideo', '-pix_fmt', 'rgba', 'pipe:1'];
+      '-vf', `${speed !== 1 ? `setpts=PTS/${speed},` : ''}fps=${fps},scale=${width}:${height}:flags=bicubic,${toneMap ? `${toneMap},` : ''}format=rgba`, '-f', 'rawvideo', '-pix_fmt', 'rgba', 'pipe:1'];
     this.proc = spawn(FFMPEG, args, { stdio: ['ignore', 'pipe', 'pipe'] });
     this.proc.on('error', (e) => { this.error = new Error(e.code === 'ENOENT' ? `ffmpeg not found ("${FFMPEG}")` : e.message); this._finish(); });
     this.proc.stderr.on('data', (d) => this.err.push(d));
@@ -259,8 +317,9 @@ export async function makeThumbs(file, { duration, width, height, h = 56 }) {
   const step = Math.max(1, duration / 48);
   const n = Math.max(1, Math.ceil(duration / step));
   const tileW = Math.max(8, Math.round(((h * width) / Math.max(1, height)) / 2) * 2);
+  const chain = await toneMapChain(file);
   const { stdout } = await run(FFMPEG, ['-hide_banner', '-loglevel', 'error', '-skip_frame', 'nokey', '-i', file, '-an', '-sn',
-    '-vf', `fps=1/${step},scale=${tileW}:${h},tile=${n}x1`, '-frames:v', '1', '-q:v', '5', '-f', 'image2pipe', '-c:v', 'mjpeg', 'pipe:1']);
+    '-vf', `fps=1/${step},scale=${tileW}:${h},${chain ? `${chain},` : ''}tile=${n}x1`, '-frames:v', '1', '-q:v', '5', '-f', 'image2pipe', '-c:v', 'mjpeg', 'pipe:1']);
   return { jpeg: stdout, step, n, tileW, h };
 }
 

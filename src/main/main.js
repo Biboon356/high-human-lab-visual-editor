@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { Readable } from 'node:stream';
-import { probeMedia, makeProxy, decodePcm, ExportSession, ClipDecoder, makeThumbs, makePeaks, extractPcm16k, reverseRange, extractFrame, FFMPEG } from './ffmpeg.js';
+import { probeMedia, toneMapChain, makeProxy, decodePcm, ExportSession, ClipDecoder, makeThumbs, makePeaks, extractPcm16k, reverseRange, extractFrame, FFMPEG } from './ffmpeg.js';
 import { validateProject } from '../shared/project.js';
 import { MODELS, DEFAULT_MODEL, modelStatus, ensureModel, transcribePcm, transcribeChunks, releaseEngine } from './asr.js';
 import { rmsEnvelope } from '../shared/audio-analysis.js';
@@ -164,7 +164,7 @@ function registerIpc() {
   });
   ipcMain.handle('media:proxy', async (_e, src) => {
     fs.mkdirSync(proxyDir(), { recursive: true });
-    const key = crypto.createHash('sha1').update(src + fs.statSync(src).mtimeMs).digest('hex').slice(0, 16);
+    const key = crypto.createHash('sha1').update(`tm1|${src}${fs.statSync(src).mtimeMs}`).digest('hex').slice(0, 16); // tm1: proxies of HDR clips are tone-mapped (older ones were flat)
     const dest = path.join(proxyDir(), `${key}.mp4`);
     if (!fs.existsSync(dest)) await makeProxy(src, dest);
     allow(dest);
@@ -371,10 +371,10 @@ function registerIpc() {
     session: session ? { written: session.written, tail: session.tail.slice(-3), failed: session.failed?.message || null } : null,
     decoders: [...decoders].map(([id, d]) => ({ id, queued: d.queue.length, ended: d.ended, waiting: d.waiters.length, got: !!d.last, err: d.error?.message || null })),
   }));
-  ipcMain.handle('export:openDecoder', (_e, o) => {
+  ipcMain.handle('export:openDecoder', async (_e, o) => {
     if (!session) throw new Error('No export session.');
     if (!allowedMedia.has(path.resolve(o.path)) || !fs.existsSync(o.path)) throw new Error(`Source file is missing: ${o.path}`);
-    decoders.set(o.id, new ClipDecoder(o));
+    decoders.set(o.id, new ClipDecoder({ ...o, toneMap: await toneMapChain(o.path) })); // HDR phone footage is tone-mapped to SDR as it is decoded
     return true;
   });
   ipcMain.handle('export:nextFrame', async (_e, id) => {
