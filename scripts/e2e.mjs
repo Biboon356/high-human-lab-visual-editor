@@ -1949,6 +1949,126 @@ await step('lab accident: three previews from copies, nothing changes until Keep
   await page.click('#panel-left [data-tab="media"]'); await settle(200);
 });
 
+await step('still here: keep what you made, it survives Undo and the file, bring it back as one Undo step, and the curator keeps only what was worked on', async () => {
+  await resetProject();
+  await ev(async (c) => { await window.__app.importPaths([c]); const { store } = window.__app; const { addMediaClip } = await import('/shared/timeline.js'); const { createEffect } = await import('/shared/effects-defs.js');
+    store.mutate((p) => {
+      p.settings.width = 320; p.settings.height = 180;
+      const v1 = p.tracks.find((t) => t.kind === 'video'), pic = p.media[0].id;
+      const A = addMediaClip(p, pic, v1.id, 0); A.duration = 3; A.name = 'A'; A.keyframes.x = [{ t: 0, v: -0.3 }, { t: 1.5, v: 0 }, { t: 3, v: 0.3 }]; A.keyframes.scale = [{ t: 0, v: 1 }, { t: 3, v: 1.4 }];
+      A.effects.push(createEffect('gradmap', { shadow: '#1a0000', mid: '#d8140f', high: '#ffe11a', contrast: 1.4 }), createEffect('grain', { amount: 0.4 }));
+      const B = addMediaClip(p, pic, v1.id, 3); B.duration = 3; B.name = 'B';
+      const C = addMediaClip(p, pic, v1.id, 6); C.duration = 3; C.name = 'C';
+    });
+    store.select(store.project.clips.find((x) => x.name === 'A').id); store.setPlayhead(1); }, pic);
+  await page.click('#panel-left [data-tab="living"]'); await settle(500);
+  await ev(() => document.getElementById('living-still').scrollIntoView()); await settle(200);
+  const errorsBefore = logs.length;
+  const S = () => ev(() => { const s = window.__app.store; return { shelf: s.project.stillHere.length, kinds: s.project.stillHere.map((m) => m.kind), undo: s.undoStack.length, cards: document.querySelectorAll('#still-list .still-card').length }; });
+  const dis = (k) => ev((k) => document.getElementById(`still-keep-${k}`).disabled, k);
+
+  // what can be kept depends on the selection, and the button says why not
+  assert.deepEqual([await dis('moved'), await dis('looked'), await dis('felt'), await dis('rhythm')], [false, false, false, true]);
+  assert.match(await ev(() => document.getElementById('still-keep-rhythm').title), /three clips/);
+  assert.equal((await S()).shelf, 0);
+
+  // keep: movement, look (with a small picture), colours; the same thing twice is refused politely
+  const u0 = (await S()).undo;
+  await page.click('#still-keep-moved'); await page.click('#still-keep-looked'); await page.click('#still-keep-felt'); await settle(300);
+  let s = await S();
+  assert.deepEqual(s.kinds, ['moved', 'looked', 'felt']); assert.equal(s.cards, 3);
+  assert.equal(s.undo, u0, 'keeping is not an edit: nothing was added to Undo');
+  assert.ok(await ev(() => window.__app.store.project.stillHere[1].thumb?.startsWith('data:image/jpeg')), 'a look keeps a small picture of itself');
+  assert.ok(await ev(() => JSON.stringify(window.__app.store.project.stillHere).length) < 30000, 'a few fragments are small');
+  await page.click('#still-keep-moved'); await settle(150);
+  assert.match(await ev(() => document.getElementById('still-status').textContent), /Already on the shelf/);
+  assert.equal((await S()).shelf, 3);
+  await ev(() => document.getElementById('living-still').scrollIntoView()); await settle(200); await shot('39-still-here');
+
+  // it survives the Undo of the edit around it, and snapshots do not carry it
+  await ev(() => { const s = window.__app.store; s.mutate((p) => { p.clips = p.clips.filter((c) => c.name !== 'A'); }); });
+  await ev(() => window.__app.store.undo()); await settle(200);
+  assert.equal(await ev(() => window.__app.store.project.clips.some((c) => c.name === 'A')), true, 'Undo brought the clip back');
+  assert.equal((await S()).shelf, 3, 'and the kept fragments stayed');
+  assert.equal(await ev(() => window.__app.store.undoStack.some((j) => j.includes('stillHere'))), false, 'undo snapshots do not carry the shelf');
+
+  // bring back onto B: one Undo step; Undo takes it back and the shelf stays
+  await ev(() => { const s = window.__app.store; s.select(s.project.clips.find((c) => c.name === 'B').id); }); await settle(150);
+  const depth = (await S()).undo;
+  await page.click('#still-list [data-kind="moved"] .still-back'); await settle(200);
+  assert.equal(await ev(() => (window.__app.store.project.clips.find((c) => c.name === 'B').keyframes.x || []).length), 3, 'B moves like A did');
+  assert.equal((await S()).undo, depth + 1, 'as one Undo step');
+  assert.match(await ev(() => document.getElementById('still-status').textContent), /Brought back how it moved/);
+  await page.click('#still-list [data-kind="looked"] .still-back'); await settle(200);
+  assert.equal(await ev(() => window.__app.store.project.clips.find((c) => c.name === 'B').effects.length), 2);
+  await ev(() => { window.__app.store.undo(); window.__app.store.undo(); }); await settle(200);
+  assert.equal(await ev(() => (window.__app.store.project.clips.find((c) => c.name === 'B').keyframes.x || []).length), 0, 'Undo gives B back its own motion');
+  assert.equal((await S()).shelf, 3);
+  // a memory that cannot be applied changes nothing and leaves no empty Undo step
+  const d2 = (await S()).undo;
+  await ev(() => { const s = window.__app.store; s.select(s.project.clips.find((c) => c.name === 'B').id); }); await settle(100);
+  await page.click('#still-list [data-kind="felt"] .still-back'); await settle(150);
+  assert.match(await ev(() => document.getElementById('still-status').textContent), /no colour settings/);
+  assert.equal((await S()).undo, d2, 'no empty Undo step');
+
+  // it travels with the file (a save/open round trip of the project data), and a damaged shelf never blocks opening
+  await ev(() => { const s = window.__app.store; const json = JSON.stringify(s.project); s.loadProject(JSON.parse(json)); }); await settle(300);
+  s = await S(); assert.equal(s.shelf, 3); assert.equal(s.cards, 3);
+  await ev(() => { const s = window.__app.store; const p = JSON.parse(JSON.stringify(s.project)); p.stillHere = [null, 7, { id: 'x', kind: 'felt', data: { colors: ['#112233'] } }]; s.loadProject(p); }); await settle(300);
+  s = await S(); assert.equal(s.cards, 1, 'only the sound memory is shown');
+
+  // rhythm: three cuts of 1 s, 3 s, 1 s are kept, and brought back onto three equal clips
+  await ev(() => { const s = window.__app.store; s.mutate((p) => { const [A, B, C] = ['A', 'B', 'C'].map((n) => p.clips.find((c) => c.name === n)); A.start = 0; A.duration = 1; B.start = 1; B.duration = 3; C.start = 4; C.duration = 1; }); s.multi = new Set(s.project.clips.map((c) => c.id)); s.selection = s.project.clips[0].id; s.emit('selection', 'render'); }); await settle(200);
+  assert.equal(await dis('rhythm'), false);
+  await page.click('#still-keep-rhythm'); await settle(200);
+  await ev(() => { const s = window.__app.store; s.mutate((p) => { const [A, B, C] = ['A', 'B', 'C'].map((n) => p.clips.find((c) => c.name === n)); A.start = 0; A.duration = 2; B.start = 2; B.duration = 2; C.start = 4; C.duration = 2; }); s.multi = new Set(s.project.clips.map((c) => c.id)); s.emit('selection', 'render'); }); await settle(200);
+  await page.click('#still-list [data-kind="rhythm"] .still-back'); await settle(200);
+  const d = await ev(() => ['A', 'B', 'C'].map((n) => window.__app.store.project.clips.find((c) => c.name === n)).map((c) => [Math.round(c.start * 100) / 100, Math.round(c.duration * 100) / 100]));
+  assert.ok(d[1][1] > d[0][1] * 2 && d[0][1] === d[2][1], `the middle cut is the long one (${JSON.stringify(d)})`);
+  assert.ok(Math.abs(d[1][0] - (d[0][0] + d[0][1])) < 0.02 && Math.abs(d[2][0] - (d[1][0] + d[1][1])) < 0.02, 'no gaps and no overlaps');
+
+  // the curator, driven by a fake clock: work on a look for a while, delete the clip, and a copy is kept; a moment's work is not
+  const out = await ev(async () => {
+    const { store } = window.__app; const { creative } = await import('./creative/engine.js'); const { addMediaClip } = await import('/shared/timeline.js'); const { createEffect } = await import('/shared/effects-defs.js');
+    let t = 1e6; creative.clock = () => t; creative.autoKeep = true;
+    store.loadProject(JSON.parse(JSON.stringify(store.project))); creative.flush(); // a quiet sync
+    const before = store.project.stillHere.length;
+    let D;
+    store.mutate((p) => { D = addMediaClip(p, p.media[0].id, p.tracks.find((x) => x.kind === 'video').id, 20); D.name = 'Dusk'; D.effects.push(createEffect('vhs', { amount: 0.9 }), createEffect('glitch', { amount: 0.7 }), createEffect('grain', { amount: 0.5 })); });
+    creative.flush();
+    for (let i = 1; i <= 5; i++) { t += 12000; D.effects[2].params.amount = 0.5 + i * 0.07; store.touch('project'); creative.flush(); }
+    t += 20000;
+    store.mutate((p) => { p.clips = p.clips.filter((c) => c.name !== 'Dusk'); }); creative.flush();
+    const kept = store.project.stillHere.slice(before);
+    // a moment's work: nothing
+    let E; store.mutate((p) => { E = addMediaClip(p, p.media[0].id, p.tracks.find((x) => x.kind === 'video').id, 30); E.name = 'Blip'; E.effects.push(createEffect('crt', { scan: 0.9 }), createEffect('blur', { radius: 30 })); }); creative.flush();
+    t += 2000; E.effects[0].params.scan = 0.5; store.touch('project'); creative.flush();
+    t += 1000; store.mutate((p) => { p.clips = p.clips.filter((c) => c.name !== 'Blip'); }); creative.flush();
+    const afterBlip = store.project.stillHere.length - before;
+    // undo of a deletion is not abandoned work
+    let F; store.mutate((p) => { F = addMediaClip(p, p.media[0].id, p.tracks.find((x) => x.kind === 'video').id, 40); F.name = 'Undone'; F.effects.push(createEffect('vhs', { amount: 0.6 }), createEffect('glitch', { amount: 0.3 }), createEffect('grain', { amount: 0.7 })); }); creative.flush();
+    for (let i = 1; i <= 5; i++) { t += 12000; F.effects[2].params.amount = 0.3 + i * 0.05; store.touch('project'); creative.flush(); }
+    t += 20000; store.mutate((p) => { p.clips = p.clips.filter((c) => c.name !== 'Undone'); }); store.undo(); creative.flush();
+    const afterUndo = store.project.stillHere.length - before;
+    // switched off: nothing is kept by itself
+    creative.setAutoKeep(false);
+    let G; store.mutate((p) => { G = addMediaClip(p, p.media[0].id, p.tracks.find((x) => x.kind === 'video').id, 50); G.name = 'Off'; G.effects.push(createEffect('vhs', { amount: 0.5 }), createEffect('glitch', { amount: 0.5 }), createEffect('grain', { amount: 0.1 })); }); creative.flush();
+    for (let i = 1; i <= 5; i++) { t += 12000; G.effects[2].params.amount = 0.1 + i * 0.1; store.touch('project'); creative.flush(); }
+    t += 20000; store.mutate((p) => { p.clips = p.clips.filter((c) => c.name !== 'Off'); }); creative.flush();
+    const afterOff = store.project.stillHere.length - before;
+    creative.setAutoKeep(true); creative.clock = () => Date.now();
+    return { kept: kept.map((m) => [m.kind, m.source, m.from.clip, m.data.chain?.length]), afterBlip, afterUndo, afterOff, why: kept[0]?.why };
+  });
+  assert.deepEqual(out.kept, [['looked', 'curated', 'Dusk', 3]], 'one look was kept for the artist, with the clip it came from');
+  assert.match(out.why, /worked on this look/);
+  assert.equal(out.afterBlip, 1, 'a moment of work was not kept'); assert.equal(out.afterUndo, 1, 'an undone deletion was not abandoned work'); assert.equal(out.afterOff, 1, 'with “keep for me” off nothing is kept by itself');
+  await settle(300);
+  assert.equal(await ev(() => document.querySelectorAll('#still-list .still-card .still-why')[0]?.textContent.startsWith('kept for you') || [...document.querySelectorAll('#still-list .still-why')].some((n) => n.textContent.startsWith('kept for you'))), true, 'the shelf says it was kept for them');
+  assert.equal(logs.slice(errorsBefore).filter((l) => /shader|compile|GLSL|WebGL|error/i.test(l)).length, 0, 'no errors in the console');
+  await ev(() => document.getElementById('living-still').scrollIntoView()); await settle(200); await shot('39-still-here-shelf');
+  await page.click('#panel-left [data-tab="media"]'); await settle(200);
+});
+
 await step('hdr phone footage: an HLG clip is detected, plays through a tone-mapped SDR copy, and the preview and the export both look like the phone did', async () => {
   const hlg = path.join(dir, 'hlg.mov'), sdr = path.join(dir, 'hlg-source.mp4');
   const SRC = ['-f', 'lavfi', '-i', 'testsrc2=size=320x180:rate=30:duration=2'];

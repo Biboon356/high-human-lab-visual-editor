@@ -1,5 +1,6 @@
 // The LIVING tab: a compact workspace for the Living Lab. One section per system, each with a one-line promise.
 // This file is only the surface; the work is done by living/controller.js and the modules under it.
+import { mountStillHere } from './still-here-ui.js';
 import { el } from './dom.js';
 import { store } from '../store.js';
 import { LivingLabController } from '../living/controller.js';
@@ -241,6 +242,7 @@ export function mountLiving({ preview, runAnalysis, renderer }) {
       el('div', { class: 'mut-row' }, dnaSeed, dnaRead, dnaClear), dnaStatus, dnaCard),
     section('accident', 'ACCIDENT', 'Break the rules carefully.',
       el('div', { class: 'mut-row' }, accGo, accUndo), accStatus, accList),
+    mountStillHere({ preview, renderer }).el,
     status, result);
 
   function refreshSlots() {

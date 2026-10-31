@@ -3,6 +3,9 @@ import { createProject, validateProject, findClip } from '/shared/project.js';
 import { audioSources } from '/shared/export-plan.js';
 
 const HISTORY_LIMIT = 100;
+// Still Here (project.stillHere) is deliberately outside undo: a fragment the artist kept must survive the undo of the edit that made
+// it. Snapshots leave it out (it also holds thumbnails, which would multiply by the history size) and a restore keeps the live shelf.
+const snapJson = (project) => JSON.stringify(project, (k, v) => (k === 'stillHere' ? undefined : v));
 
 class Store {
   constructor() {
@@ -24,6 +27,7 @@ class Store {
     this.clipboard = null; // copied clip (JSON)
     this.relinkedMedia = null;
     this.recorder = null; // a running Lab Take (see living/lab-take.js); param-row.js reports value changes to it
+    this.changeKind = 'load'; // what the last 'project' notification was: 'edit' | 'undo' | 'redo' | 'load' (the Creative Memory Engine reads it)
   }
 
   on(topic, fn) {
@@ -39,7 +43,7 @@ class Store {
 
   /** Take an undo snapshot once per gesture; subsequent calls with same token are ignored. */
   snapshot() {
-    this.undoStack.push(JSON.stringify(this.project));
+    this.undoStack.push(snapJson(this.project));
     if (this.undoStack.length > HISTORY_LIMIT) this.undoStack.shift();
     this.redoStack = [];
   }
@@ -57,6 +61,7 @@ class Store {
 
   /** Notify after an in-place change (used inside gestures). Marks the project dirty and the audio analysis stale. */
   touch(...topics) {
+    this.changeKind = 'edit';
     this.setDirty(true);
     if (topics.includes('project')) this.analysisStale = this.audioSignature() !== this.analysisSig;
     this.emit(...topics, 'render');
@@ -71,8 +76,11 @@ class Store {
     if (this.dirty !== d) { this.dirty = d; this.emit('dirty'); }
   }
 
-  _restore(json) {
+  _restore(json, kind) {
+    const shelf = this.project.stillHere;
     this.project = JSON.parse(json);
+    this.project.stillHere = Array.isArray(shelf) ? shelf : [];
+    this.changeKind = kind;
     if (this.selection && !findClip(this.project, this.selection)) this.selection = null;
     this.multi = new Set([...this.multi].filter((id) => findClip(this.project, id)));
     if (this.selection) this.multi.add(this.selection);
@@ -82,13 +90,13 @@ class Store {
   }
   undo() {
     if (!this.undoStack.length) return;
-    this.redoStack.push(JSON.stringify(this.project));
-    this._restore(this.undoStack.pop());
+    this.redoStack.push(snapJson(this.project));
+    this._restore(this.undoStack.pop(), 'undo');
   }
   redo() {
     if (!this.redoStack.length) return;
-    this.undoStack.push(JSON.stringify(this.project));
-    this._restore(this.redoStack.pop());
+    this.undoStack.push(snapJson(this.project));
+    this._restore(this.redoStack.pop(), 'redo');
   }
 
   loadProject(project, filePath = null) {
@@ -101,6 +109,7 @@ class Store {
     this.undoStack = []; this.redoStack = [];
     this.analysis = null; this.analysisStale = true; this.analysisSig = null;
     this.dirty = false;
+    this.changeKind = 'load';
     this.emit('project', 'selection', 'playhead', 'analysis', 'dirty', 'render', 'reset');
   }
 

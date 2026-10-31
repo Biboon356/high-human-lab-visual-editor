@@ -30,6 +30,7 @@ export function createProject(name = 'Untitled Lab') {
     clips: [],
     reactive: { enabled: true },
     dna: [], // saved Mutation Engine configurations (see shared/mutation/dna.js)
+    stillHere: [], // kept fragments of how clips moved / looked / felt (see shared/creative/still-here.js); not part of undo
   };
 }
 
@@ -101,5 +102,6 @@ export function validateProject(p) {
   }
   p.reactive ||= { enabled: true };
   if (!Array.isArray(p.dna)) p.dna = []; // entries are repaired when the library is first used (dna.js: libraryOf)
+  if (!Array.isArray(p.stillHere)) p.stillHere = []; // entries are repaired when the shelf is first used (still-here.js: shelfOf)
   return p;
 }

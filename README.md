@@ -186,6 +186,22 @@ deterministic identity for the whole project from its music and footage, plus a 
 *Accident* (controlled relationships between clips, previewed from copies and applied only on Keep). Details: [docs/LIVING.md](docs/LIVING.md).
 Also: iPhone HDR clips are tone-mapped instead of looking washed out (below).
 
+
+## v0.9.0 — Still Here (the project remembers)
+
+The first layer of the **Creative Memory Engine** (`docs/CREATIVE.md`): a quiet, shared foundation that watches what you do to the
+project, works out what you are doing right now, and keeps what is worth keeping. Nothing is suggested yet, and nothing is ever changed
+without you.
+
+* **STILL HERE** (Living tab): keep how a clip *moved*, *looked*, *felt* (its colours) or the *rhythm* of a run of cuts; **LOOK BACK** at
+  the shelf and **BRING BACK** any fragment onto the selection (one Undo step). Fragments are tiny recipes, not copies of footage.
+* The shelf is saved with the project but is **not part of Undo**: undoing an edit never takes away something you kept.
+* A strict **curator** may keep a look or movement you worked on for a while and then let go (deleted, cleared or swapped). It never
+  keeps the same thing twice, and the *Keep good leftovers for me* switch turns it off.
+* Under the hood: an event-driven observer and a present-focused context model (`src/shared/creative/`), ready for the Living Timeline
+  and the Decision Gate in the next release. If any of it fails, the editor carries on.
+* Tests: 226 unit, plus an end-to-end step that keeps, undoes, brings back, round-trips the file and drives the curator on a fake clock.
+
 ## HDR phone footage (iPhone HLG / PQ)
 
 A clip shot in HDR is 10-bit BT.2020 with an HLG curve. Decoded as ordinary video it looks washed out. The app now recognises such
