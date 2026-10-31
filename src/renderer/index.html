@@ -78,6 +78,7 @@
         <button data-tab="type"><i>02</i>Type</button>
         <button data-tab="organic"><i>03</i>Organic</button>
         <button data-tab="looks"><i>04</i>Looks</button>
+        <button data-tab="mutate"><i>05</i>Mutate</button>
       </nav>
       <section data-pane="media" class="pane on">
         <header class="pane-head"><h2>Library</h2><span>Footage, sound, stills</span></header>
@@ -110,6 +111,10 @@
         <header class="pane-head"><h2>Looks</h2><span>Y2K, grade the whole frame</span></header>
         <p class="hint pad">An adjustment layer grades everything under it. Drag its edges on the timeline to cover a section; lower its opacity to blend.</p>
         <div id="look-list" class="preset-list"></div>
+      </section>
+      <section data-pane="mutate" class="pane">
+        <header class="pane-head"><h2>Mutate</h2><span>Roll variations of a look</span></header>
+        <div id="mutate-root" class="mut"></div>
       </section>
     </aside>
 

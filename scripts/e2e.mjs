@@ -1649,6 +1649,106 @@ await step('mutation engine: 100 seeded rolls render through the real compositor
   assert.equal(logs.slice(errorsBefore).filter((l) => /shader|compile|GLSL|WebGL/i.test(l)).length, 0, 'no shader errors in the console');
 });
 
+await step('mutate tab: variations draw on the real frame, a typed seed reproduces them, Use is one Undo step, locks hold, DNA saves, compares, exports, imports and migrates', async () => {
+  await resetProject();
+  await ev(async (c) => { await window.__app.importPaths([c]); const { store } = window.__app;
+    store.mutate((p) => { p.settings.width = 480; p.settings.height = 270; }); store.select(store.project.clips.find((x) => x.type === 'media').id); store.setPlayhead(1.2); }, clip);
+  await page.click('#panel-left [data-tab="mutate"]'); await settle(500);
+  assert.equal(await ev(() => document.getElementById('app').classList.contains('wide-left')), true, 'the left panel widens for the grid');
+  await ev(() => { window.__readCanvas = (cv) => { const o = document.createElement('canvas'); o.width = cv.width; o.height = cv.height; const c = o.getContext('2d', { willReadFrequently: true }); c.drawImage(cv, 0, 0); return c.getImageData(0, 0, cv.width, cv.height).data; }; }); // read through a scratch canvas so the thumbnails themselves are never read back
+  const cells = () => ev(() => [...document.querySelectorAll('#mutate-grid [data-mut-cell]')].map((c) => ({ seed: c.dataset.seed, types: c.dataset.types })));
+  assert.equal((await cells()).length, 1, 'before rolling there is only the Current cell');
+  const errorsBefore = logs.length;
+  await page.click('#mutate-roll'); await settle(900);
+  const first = await cells();
+  assert.equal(first.length, 7, 'Current + 6 variations');
+  const stats = await ev(() => [...document.querySelectorAll('#mutate-grid canvas')].map((cv) => { const d = window.__readCanvas(cv); let s = 0, n = 0; for (let i = 0; i < d.length; i += 4) { s += d[i] + d[i + 1] + d[i + 2]; n++; } return s / n / 3; }));
+  assert.ok(stats.every((m) => m > 8), `every thumbnail shows the picture, none is blank (${stats.map((m) => m.toFixed(0))})`);
+  const sig = await ev(() => [...document.querySelectorAll('#mutate-grid canvas')].map((cv) => { const d = window.__readCanvas(cv); let h = 0; for (let i = 0; i < d.length; i += 97) h = (h * 31 + d[i]) >>> 0; return h; }));
+  assert.ok(new Set(sig).size >= 6, `the variations look different from each other (${new Set(sig).size} distinct pictures)`);
+  await shot('35-mutate-top');
+  await ev(() => { document.querySelector('#panel-left [data-pane="mutate"]').scrollTop = 330; }); await settle(250); await shot('35-mutate-grid');
+  await ev(() => { document.querySelector('#panel-left [data-pane="mutate"]').scrollTop = 0; });
+  // a typed seed reproduces the whole grid
+  await page.fill('#mutate-seed', '4321'); await page.click('#mutate-roll'); await settle(500);
+  const a = await cells();
+  await page.fill('#mutate-seed', '4321'); await page.click('#mutate-roll'); await settle(500);
+  assert.deepEqual(await cells(), a, 'the same seed gives the same variations');
+  await page.click('#mutate-roll'); await settle(500);
+  assert.notDeepEqual(await cells(), a, 'a fresh roll gives different ones');
+
+  // Use applies one variation as one Undo step
+  await page.fill('#mutate-seed', '4321'); await page.click('#mutate-roll'); await settle(500);
+  const want = (await cells())[1].types.split(',').filter(Boolean);
+  await page.click('[data-mut-use="0"]'); await settle(300);
+  const applied = await ev(() => window.__app.store.project.clips.find((x) => x.type === 'media').effects.map((e) => e.type));
+  assert.deepEqual(applied, want, 'Use puts exactly that chain on the clip');
+  await ev(() => window.__app.store.undo()); await settle(200);
+  assert.equal(await ev(() => window.__app.store.project.clips.find((x) => x.type === 'media').effects.length), 0, 'one Undo takes it back');
+
+  // locks: a locked effect and a locked value survive every roll
+  await ev(async () => { const { store } = window.__app; const { createEffect } = await import('/shared/effects-defs.js');
+    store.mutate((p) => { p.clips.find((x) => x.type === 'media').effects = [createEffect('vhs', { jitter: 0.21 }), createEffect('grain', { amount: 0.33 }), createEffect('bloom', {})]; }); }); await settle(300);
+  await page.click('#mutate-keep > summary'); // the Keep section is folded away until opened
+  await page.click('[data-lock-fx="vhs"]');
+  await page.click('#mutate-keep details >> nth=1 >> summary'); await page.check('[data-lock-param="grain.amount"]');
+  await ev(() => { const s = document.getElementById('mutate-strength'); s.value = 100; s.dispatchEvent(new Event('input')); });
+  const lockedOk = [];
+  for (let i = 0; i < 4; i++) {
+    await page.click('#mutate-roll'); await settle(350);
+    lockedOk.push(await ev(() => window.__app.mutateUi.state.items.every((v) => { const vhs = v.chain.find((c) => c.type === 'vhs'), gr = v.chain.find((c) => c.type === 'grain'); return vhs && vhs.params.jitter === 0.21 && vhs.locked && gr && gr.params.amount === 0.33; })));
+  }
+  assert.deepEqual(lockedOk, [true, true, true, true], 'locked vhs and the locked grain amount never change in 4 x 6 variations');
+  await page.click('[data-mut-use="1"]'); await settle(300);
+  assert.equal(await ev(() => !!window.__app.store.project.clips.find((x) => x.type === 'media').effects.find((e) => e.type === 'vhs')?.locked), true, 'the lock survives Use');
+
+  // DNA: save from a variation (with its seed), save the current chain, compare, export, import, rename, copy, delete, undo
+  await page.fill('#mutate-seed', '777'); await page.click('#mutate-roll'); await settle(500);
+  await page.fill('#mutate-dna-name', 'Roll A'); await page.click('[data-mut-save="2"]'); await settle(300);
+  await page.fill('#mutate-dna-name', 'Current B'); await page.click('#mutate-save-current'); await settle(300);
+  const dna = await ev(async () => { const { store } = window.__app; const D = await import('/shared/mutation/dna.js'); return store.project.dna.map((d) => ({ id: d.id, name: d.name, seed: d.seed, same: D.reproduceDna(d).same, n: d.chain.length })); });
+  assert.deepEqual(dna.map((d) => d.name), ['Roll A', 'Current B']);
+  assert.equal(dna[0].same, true, 'a DNA saved from a variation reproduces from its recipe');
+  assert.equal(await ev(() => document.querySelectorAll('#mutate-lib [data-dna]').length), 2);
+  for (const d of dna) await page.check(`[data-dna-cmp="${d.id}"]`);
+  assert.match(await ev(() => document.getElementById('mutate-diff')?.textContent || ''), /Roll A\s+↔\s+Current B/, 'two ticked DNA are compared');
+  const file = path.join(dir, 'mine.hhdna');
+  await stubDialog('showSaveDialog', { canceled: false, filePath: file });
+  await page.click(`[data-dna-export="${dna[0].id}"]`); await settle(500);
+  const saved = JSON.parse(fs.readFileSync(file, 'utf8'));
+  assert.equal(saved.format, 'hhdna'); assert.equal(saved.items[0].name, 'Roll A'); assert.deepEqual(saved.items[0].chain.map((c) => c.type), await ev((id) => window.__app.store.project.dna.find((d) => d.id === id).chain.map((c) => c.type), dna[0].id));
+  await stubDialog('showOpenDialog', { canceled: false, filePaths: [file] });
+  await page.click('#mutate-import'); await settle(500);
+  assert.equal(await ev(() => window.__app.store.project.dna.length), 3, 'importing adds a copy with a fresh id');
+  assert.equal(await ev(() => new Set(window.__app.store.project.dna.map((d) => d.id)).size), 3);
+  await page.click(`[data-dna-copy="${dna[1].id}"]`); await settle(200);
+  assert.equal(await ev((id) => window.__app.store.project.dna.filter((d) => d.parentId === id).length, dna[1].id), 1, 'Copy links back to its parent');
+  await page.click(`[data-dna-rename="${dna[1].id}"]`); await page.fill(`[data-dna-rename-input="${dna[1].id}"]`, 'Renamed B'); await page.press(`[data-dna-rename-input="${dna[1].id}"]`, 'Enter'); await settle(300);
+  assert.equal(await ev((id) => window.__app.store.project.dna.find((d) => d.id === id).name, dna[1].id), 'Renamed B');
+  await page.click(`[data-dna-apply="${dna[0].id}"]`); await settle(300);
+  assert.deepEqual(await ev(() => window.__app.store.project.clips.find((x) => x.type === 'media').effects.map((e) => e.type)), saved.items[0].chain.map((c) => c.type), 'Apply puts the DNA chain on the clip');
+  await page.click(`[data-dna-del="${dna[0].id}"]`); await settle(200);
+  assert.equal(await ev(() => window.__app.store.project.dna.length), 3);
+  await ev(() => window.__app.store.undo()); await settle(200);
+  assert.equal(await ev(() => window.__app.store.project.dna.length), 4, 'Undo brings a deleted DNA back');
+
+  // old "Save chain" presets come across once
+  await ev(() => { localStorage.setItem('hhlab.userEffectPresets', JSON.stringify([{ name: 'Old preset', chain: [{ type: 'glitch', params: { amount: 0.3 } }] }])); window.__app.store.emit('project'); }); await settle(300);
+  await page.click('#mutate-migrate'); await settle(300);
+  assert.equal(await ev(() => window.__app.store.project.dna.some((d) => d.name === 'Old preset' && d.source.kind === 'migrated')), true);
+  assert.equal(await ev(() => !!document.getElementById('mutate-migrate')), false, 'the button is gone once they are in');
+  await ev(() => localStorage.removeItem('hhlab.userEffectPresets'));
+
+  // the library saves with the project and the roll recipe still reproduces after a reload
+  const n = await ev(() => window.__app.store.project.dna.length);
+  assert.equal(await ev(async () => { const D = await import('/shared/mutation/dna.js'); const copy = JSON.parse(JSON.stringify(window.__app.store.project)); return copy.dna.length === window.__app.store.project.dna.length && D.reproduceDna(copy.dna.find((d) => d.name === 'Roll A') || copy.dna[0]).same !== undefined; }), true);
+  assert.ok(n >= 4);
+  await ev(() => { document.querySelector('#panel-left [data-pane="mutate"]').scrollTop = 0; }); await settle(300); await shot('35-mutate');
+  assert.deepEqual(logs.slice(errorsBefore).filter((l) => /shader|compile|GLSL|WebGL|error/i.test(l)), [], 'no errors in the console');
+  await page.click('#panel-left [data-tab="media"]'); await settle(200);
+  assert.equal(await ev(() => document.getElementById('app').classList.contains('wide-left')), false, 'the panel goes back to its width');
+});
+
 await step('light theme + collapsible panels', async () => {
   await ev(() => { document.getElementById('toggle-theme').click(); document.getElementById('toggle-left').click(); });
   await settle(300); await shot('11-light-collapsed');

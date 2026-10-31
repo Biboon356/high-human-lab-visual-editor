@@ -11,7 +11,7 @@ else, and the source media is never touched.
 | M1 | Effect meta, chain validation, shared seeded RNG | done (this folder: `src/shared/mutation/`) |
 | M2 | `mutate()` / `generate()` / `variations()`, `composeChain()`, e2e render check | done |
 | M3 | DNA model and library (save, duplicate, diff, import/export text, migrate user presets) — pure data layer | done (`dna.js`); no UI or file dialog yet |
-| M4 | Variation grid UI, apply with one undo step, DNA panel, `.hhdna` open/save dialogs, one-time migration of the old `localStorage` presets | next |
+| M4 | Mutate tab: variation grid on the real frame, Use (one Undo step), locks, DNA panel, `.hhdna` open/save, migration of old presets | done (`ui/mutate-ui.js`, `engine/variation-preview.js`) |
 | M5 | Per-effect wet/dry `mix` in the compositor, A/B compare | planned (decided: a small compositor change is allowed) |
 | M6 | Rule-based Creative Director (no external API) | planned |
 | M7 | Optional LLM adapter emitting the same constraints JSON | optional |
@@ -73,5 +73,24 @@ with timings.
 
 ## What is deliberately not here yet
 
-The variation grid and any UI, file dialogs for `.hhdna`, and the actual migration trigger (M4); per-effect wet/dry (M5); description-to-chain
+Per-effect wet/dry and an A/B split view (M5); description-to-chain
 translation (M6). Effects that keep state between frames, feedback loops and custom GLSL remain roadmap items in `ROADMAP.md`.
+
+## The Mutate tab (M4)
+
+Left panel, tab 05. Select a clip, put the playhead on it, press **Roll**.
+
+* The grid shows **Current** plus 4, 6 or 9 variations, each drawn on the real frame at the playhead with every layer of the
+  project, by a second small compositor that borrows the preview's decoded frames (`variation-preview.js`). The project and the
+  media are not touched until you press **Use**; that applies the chain with one `store.mutate`, so one Undo takes it back.
+* **Strength**, **style** (a category bias) and **allow one heavy effect** steer the roll. **Start from a look…** rolls from any
+  built-in look. **More** rolls again from a variation; **⟳** re-rolls only that one; **★** saves it as DNA with its seed.
+* **Seed:** every roll shows its seed. Type a seed and press Roll to reproduce a whole grid exactly; each variation also shows its
+  own seed.
+* **Keep:** lock a whole effect or single values. Locks are stored on the clip's own effects (`fx.locked`, `fx.lockedParams`), so
+  they survive Use, saving and the next roll. Locks apply when rolling from the clip, not from a look or DNA.
+* **Saved DNA:** save, apply, roll from, copy, rename, delete, tick two to see what differs, export/import `.hhdna` files, and
+  bring in the old "Save chain" presets once. The library is `project.dna[]`, so it saves with the project and Undo covers it.
+
+Not done: the grid only draws while paused and while the playhead is on the clip; there is no A/B split yet (M5); thumbnails use
+the preview's decoded frames, so a clip that has not loaded a frame yet shows nothing until it does.

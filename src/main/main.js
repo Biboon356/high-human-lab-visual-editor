@@ -301,6 +301,22 @@ function registerIpc() {
     fs.writeFileSync(file, text); return file;
   });
 
+  // Mutation Engine DNA files (.hhdna, JSON text). The renderer validates the content; this only moves bytes, with a size cap.
+  ipcMain.handle('dna:open', async () => {
+    const r = await dialog.showOpenDialog(win, { title: 'Import DNA', properties: ['openFile'], filters: [{ name: 'HHL DNA', extensions: ['hhdna', 'json'] }] });
+    if (r.canceled) return null;
+    const file = r.filePaths[0];
+    if (fs.statSync(file).size > 4 * 1024 * 1024) throw new Error('That file is too large to be a DNA file.');
+    return { name: path.basename(file), text: fs.readFileSync(file, 'utf8') };
+  });
+  ipcMain.handle('dna:save', async (_e, { text, name }) => {
+    const safe = String(name || 'dna').replace(/[\\/:*?"<>|]+/g, '_').slice(0, 80) || 'dna';
+    const r = await dialog.showSaveDialog(win, { title: 'Export DNA', defaultPath: `${safe}.hhdna`, filters: [{ name: 'HHL DNA', extensions: ['hhdna'] }] });
+    if (r.canceled) return null;
+    const file = r.filePath.endsWith('.hhdna') ? r.filePath : `${r.filePath}.hhdna`;
+    fs.writeFileSync(file, String(text)); return file;
+  });
+
   // Crash recovery: the renderer pushes the project here while it has unsaved changes.
   const autosavePath = () => path.join(app.getPath('userData'), 'autosave.hhlab');
   ipcMain.handle('autosave:write', (_e, json) => {

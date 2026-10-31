@@ -43,6 +43,8 @@ contextBridge.exposeInMainWorld('hh', {
   onAsrProgress: (cb) => ipcRenderer.on('asr:progress', (_e, v) => cb(v)),
   openSubtitles: () => invoke('subs:open'),
   saveSubtitles: (text, name) => invoke('subs:save', { text, name }),
+  openDna: () => invoke('dna:open'),
+  saveDna: (text, name) => invoke('dna:save', { text, name }),
   autosaveWrite: (json) => invoke('autosave:write', json),
   autosaveRead: (opts) => invoke('autosave:read', opts),
   autosaveClear: () => invoke('autosave:clear'),

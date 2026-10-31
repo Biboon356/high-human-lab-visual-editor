@@ -13,7 +13,7 @@ import { maskCard, matteCard } from './mask-ui.js';
 import { rampCard } from './ramp-ui.js';
 import { shapeCard } from './shape-ui.js';
 
-const USER_PRESET_KEY = 'hhlab.userEffectPresets';
+export const USER_PRESET_KEY = 'hhlab.userEffectPresets';
 const loadUserPresets = () => { try { return JSON.parse(localStorage.getItem(USER_PRESET_KEY) || '[]'); } catch { return []; } };
 const saveUserPresets = (p) => { try { localStorage.setItem(USER_PRESET_KEY, JSON.stringify(p)); } catch { /* storage unavailable */ } };
 

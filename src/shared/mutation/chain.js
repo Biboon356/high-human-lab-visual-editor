@@ -124,6 +124,8 @@ export function chainToEffects(chain) {
     e.enabled = c.enabled !== false;
     e.keyframes = structuredClone(c.keyframes || {});
     e.bindings = structuredClone(c.bindings || {});
+    if (c.locked) e.locked = true; // locks live on the effect so they survive being applied, saved and rolled again
+    if (c.lockedParams?.length) e.lockedParams = [...c.lockedParams];
     return e;
   });
 }
