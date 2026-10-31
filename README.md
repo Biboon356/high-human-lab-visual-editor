@@ -187,7 +187,7 @@ deterministic identity for the whole project from its music and footage, plus a 
 Also: iPhone HDR clips are tone-mapped instead of looking washed out (below).
 
 
-## v0.9.0 — Still Here (the project remembers)
+## v0.9.0 — Still Here, the Living Timeline, and a quiet voice
 
 The first layer of the **Creative Memory Engine** (`docs/CREATIVE.md`): a quiet, shared foundation that watches what you do to the
 project, works out what you are doing right now, and keeps what is worth keeping. Nothing is suggested yet, and nothing is ever changed
@@ -198,9 +198,16 @@ without you.
 * The shelf is saved with the project but is **not part of Undo**: undoing an edit never takes away something you kept.
 * A strict **curator** may keep a look or movement you worked on for a while and then let go (deleted, cleared or swapped). It never
   keeps the same thing twice, and the *Keep good leftovers for me* switch turns it off.
-* Under the hood: an event-driven observer and a present-focused context model (`src/shared/creative/`), ready for the Living Timeline
-  and the Decision Gate in the next release. If any of it fails, the editor carries on.
-* Tests: 226 unit, plus an end-to-end step that keeps, undoes, brings back, round-trips the file and drives the curator on a fake clock.
+* **TIMELINE** (Living tab): select two clips and **FOLLOW**, **GROW FROM**, **REMEMBER** or **BECOME** — plan (a picture from a copy of
+  the project), then Apply as one Undo step. They reuse keyframes, audio bindings, veins and Memory Bleed; BECOME glides one clip's look
+  and position into the next.
+* **Quiet suggestions**: at a quiet moment a small note may offer one of those for the clips you are working on, or a similar look from
+  Still Here. One at a time, never while playing, typing or performing, never the same one twice soon, and it goes quiet if you dismiss
+  it. The *Quiet suggestions* switch turns it off.
+* Take and Trace results can be kept in Still Here; the Project DNA colours growth and ranks suggestions (it never edits anything).
+* Under the hood: one shared Creative Memory Engine (observe → context → decide) in `src/shared/creative/`; see `docs/CREATIVE.md`. If any
+  of it fails, the editor carries on.
+* Tests: 237 unit, and end-to-end steps for Still Here, the Living Timeline and the gate (75+ steps in all).
 
 ## HDR phone footage (iPhone HLG / PQ)
 
