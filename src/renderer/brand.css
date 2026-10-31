@@ -1,0 +1,80 @@
+/* HIGH HUMAN LAB — brand layer
+   The signature: THE ROOT-LINE. A hairline that ends in a forking root, and the "H" whose crossbar drops a stem.
+   It appears on purpose and rarely: logo, library headers, empty states, dialogs, progress, loading. Never on the editing surfaces.
+   Everything here is decoration over a working UI: nothing moves while playing or exporting, and reduced-motion turns it all off. */
+:root {
+  --mark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='square'%3E%3Cpath d='M7 3v26M25 3v26'/%3E%3Cpath d='M7 12.5c3.6 0 5 2.6 9 2.6s5.4-2.6 9-2.6'/%3E%3Cpath d='M16 15.1V29'/%3E%3Cpath d='M16 21.5c-2.4-.2-4.1.8-5 3.2M16 21.5c2.4-.2 4.1.8 5 3.2'/%3E%3Cpath d='M7 8 4 5M25 8l3-3'/%3E%3C/svg%3E");
+  --fork: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 56 12' fill='none' stroke='black' stroke-width='1'%3E%3Cpath d='M0 6h28M28 6c7 0 9-4 14-4h12M28 6h26M28 6c7 0 9 4 14 4h12M42 2l4-2M42 10l4 2'/%3E%3C/svg%3E");
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .8 0 0 0 0 .85 0 0 0 0 .7 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  --panel-a: color-mix(in srgb, var(--panel) 90%, transparent);
+}
+[data-theme="light"] { --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .2 0 0 0 0 .2 0 0 0 0 .1 0 0 0 .08 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+
+/* paper grain lives on the chrome only, never over the monitor (colour judgement matters there) */
+.topbar, .left, .right, .timeline, .transport { background-image: var(--grain); }
+.topbar { background-color: var(--panel-a); } .left { background-color: var(--panel-a); }
+
+/* organic background: the roots canvas shows through the stage, the top bar and the library; it drifts a few px with the pointer */
+#bg-roots { position: fixed; inset: -24px; width: calc(100% + 48px); height: calc(100% + 48px); z-index: 0; opacity: .5; pointer-events: none; transform: translate3d(calc(var(--px, 0) * -10px), calc(var(--py, 0) * -8px), 0); will-change: transform; }
+.stage { background: transparent; }
+
+/* ---- brand lockup ---- */
+.brand .mark path { stroke-dasharray: 64; stroke-dashoffset: 64; animation: grow-line 1.5s var(--ease) .15s forwards; }
+.brand { transition: color .2s; } .brand:hover .mark { color: var(--accent2); } .brand .mark { transition: color .3s; }
+
+/* ---- library headers: editorial headline + the root-line ---- */
+.pane-head { padding: 22px 14px 14px; display: grid; gap: 4px; }
+.pane-head h2 { margin: 0; font: italic 400 34px/1 var(--serif); letter-spacing: -.005em; }
+.pane-head span { font: 500 9.5px var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--dim); }
+.pane-head::after { content: ""; display: block; height: 12px; margin-top: 12px; background: var(--root-ink); opacity: .75;
+  -webkit-mask: linear-gradient(#000, #000) left center / calc(100% - 52px) 1px no-repeat, var(--fork) right center / 56px 12px no-repeat;
+  mask: linear-gradient(#000, #000) left center / calc(100% - 52px) 1px no-repeat, var(--fork) right center / 56px 12px no-repeat; }
+
+/* ---- monitor ---- */
+.mon-meta { position: absolute; top: 7px; left: 14px; right: 14px; display: flex; justify-content: space-between; font: 500 9px var(--mono); letter-spacing: .18em; text-transform: uppercase; color: var(--faint); pointer-events: none; z-index: 2; }
+.mon-meta #mon-meta { color: var(--dim); letter-spacing: .1em; }
+.mon-empty { position: absolute; inset: 34px 26px 22px; z-index: 3; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 10px; pointer-events: none; background: var(--bg); transition: opacity .5s var(--ease); }
+.mon-empty[hidden] { display: flex; opacity: 0; visibility: hidden; transition: opacity .35s var(--ease), visibility 0s .35s; }
+.mon-empty > * { pointer-events: auto; }
+.mon-empty h1 { margin: 6px 0 0; font: italic 400 clamp(30px, 4.4vw, 58px)/1 var(--serif); letter-spacing: -.01em; }
+.mon-empty p { margin: 0 0 12px; font: 500 10px var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--dim); }
+.mon-empty .root-draw { width: clamp(120px, 16vw, 190px); color: var(--root-ink); overflow: visible; transform: translate3d(calc(var(--px, 0) * 6px), calc(var(--py, 0) * 4px), 0); }
+.mon-empty .root-draw path { stroke-dasharray: 1; stroke-dashoffset: 1; animation: grow-line 3.4s var(--ease) forwards; }
+.mon-empty .root-draw path:nth-child(2) { animation-delay: .5s; } .mon-empty .root-draw path:nth-child(3) { animation-delay: .8s; } .mon-empty .root-draw path:nth-child(4) { animation-delay: 1.1s; }
+.mon-empty .root-draw path:nth-child(n+5) { animation-delay: 1.8s; }
+.preview-msg[hidden] { display: none; }
+.preview-msg { display: flex; align-items: center; gap: 12px; }
+.preview-msg.busy::before { content: ""; width: 26px; height: 1px; background: var(--signal); transform-origin: left; animation: grow-bar 1.6s var(--ease) infinite; }
+
+/* ---- empty timeline: one line of type until the first clip lands ---- */
+[data-empty="true"] .tl-scroll::after { content: "Clips you place will grow along these lines."; position: absolute; left: 146px; top: 36px; font: italic 400 16px/1 var(--serif); color: var(--faint); pointer-events: none; white-space: nowrap; }
+
+/* ---- empty states (media list, inspector…): the mark, then a line of type ---- */
+.empty::before { content: ""; display: block; width: 26px; height: 26px; margin: 0 auto 14px; background: var(--root-ink); opacity: .8; -webkit-mask: var(--mark) center / contain no-repeat; mask: var(--mark) center / contain no-repeat; }
+.empty { font: italic 400 17px/1.35 var(--serif); color: var(--dim); letter-spacing: .005em; }
+
+/* ---- motion ---- */
+.pane.on { animation: pane-in .36s var(--ease) both; }
+.media-item, .preset-list button { animation: row-in .42s var(--ease) both; }
+.media-item:nth-child(2), .preset-list button:nth-child(2) { animation-delay: .04s; } .media-item:nth-child(3), .preset-list button:nth-child(3) { animation-delay: .08s; }
+.media-item:nth-child(4), .preset-list button:nth-child(4) { animation-delay: .12s; } .media-item:nth-child(n+5), .preset-list button:nth-child(n+5) { animation-delay: .16s; }
+#dirty-dot { animation: breathe 3.2s ease-in-out infinite; }
+@keyframes grow-line { to { stroke-dashoffset: 0; } }
+@keyframes grow-bar { 0% { transform: scaleX(0); opacity: 1; } 70% { transform: scaleX(1); opacity: 1; } 100% { transform: scaleX(1); opacity: 0; } }
+@keyframes pane-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes row-in { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; transform: none; } }
+@keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes breathe { 50% { opacity: .35; } }
+
+/* ---- tooltips: label + keyboard chips ---- */
+.tip { position: fixed; z-index: 200; max-width: 280px; padding: 7px 10px; background: var(--text); color: var(--bg); font: 500 11px/1.4 var(--sans); pointer-events: none; display: flex; align-items: center; gap: 10px; box-shadow: 0 8px 28px rgba(0,0,0,.45); animation: fade .16s ease both; }
+.tip[hidden] { display: none; }
+.tip kbd { font: 500 9.5px var(--mono); letter-spacing: .04em; padding: 1px 5px; border: 1px solid color-mix(in srgb, var(--bg) 35%, transparent); margin-left: 2px; }
+.tip .keys { display: inline-flex; gap: 3px; flex: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  #bg-roots { display: none; }
+  .brand .mark path, .mon-empty .root-draw path { stroke-dashoffset: 0 !important; }
+}
