@@ -197,6 +197,10 @@ export const TEXT_PRESETS = [
   mk('Teko Label (Latin)',
     { content: 'LIMITED RELEASE', font: 'Teko', weight: 700, size: 0.05, uppercase: true, color: '#ffffff', anim: { type: 'fade', duration: 0.6, speed: 1 }, fx: { shadow: 0.4 } },
     { y: -0.14, tracking: 0.3 }),
+  // Letters with cracks of colour running through them: the Veins effect in Invert mode, clinging to the edges inside the letters.
+  mk('Cracked Type (veins)',
+    { content: 'ROOTS', font: 'Dela Gothic One', weight: 400, size: 0.3, fit: 0.8, color: '#e8efe9' },
+    {}, [createEffect('veins', { mode: 2, origin: 5, growth: 1, density: 3.2, thickness: 0.2, glow: 1.1, cling: 1, color: '#ff4fd8' })]),
   // ---- Hindi, spiritual / niche: hand-lettered, carved and brushed faces with a gold-leaf, stone or flame finish ----
   mk('Dhyaan Gold Leaf (Tillana)',
     { content: 'ध्यान', font: 'Tillana', weight: 700, size: 0.26, fit: 0.5, color: '#f2c46b', anim: { type: 'fade', duration: 2.2, speed: 1 },
