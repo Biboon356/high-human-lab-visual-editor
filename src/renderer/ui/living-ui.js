@@ -1,6 +1,8 @@
 // The LIVING tab: a compact workspace for the Living Lab. One section per system, each with a one-line promise.
 // This file is only the surface; the work is done by living/controller.js and the modules under it.
 import { mountStillHere } from './still-here-ui.js';
+import { mountRelate } from './relate-ui.js';
+import { creative } from '../creative/engine.js';
 import { el } from './dom.js';
 import { store } from '../store.js';
 import { LivingLabController } from '../living/controller.js';
@@ -21,6 +23,7 @@ const fmt = (s) => `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, '0')
 
 export function mountLiving({ preview, runAnalysis, renderer }) {
   const ctrl = new LivingLabController({ preview });
+  creative.busyProbe = () => ctrl.busy; // a take or a trace is running: nothing may be suggested
   const root = document.getElementById('living-root');
   const pane = root.closest('.pane');
   const section = (id, title, line, ...kids) => el('section', { class: 'liv-sec', id: `living-${id}` }, el('h3', {}, title, el('em', { text: line })), ...kids);
@@ -30,6 +33,13 @@ export function mountLiving({ preview, runAnalysis, renderer }) {
   const smoothOut = el('span', { class: 'mut-out', text: `${smooth.value}%` });
   smooth.addEventListener('input', () => { ctrl.settings.smooth = Number(smooth.value) / 100; smoothOut.textContent = `${smooth.value}%`; });
   const result = el('p', { class: 'hint liv-result', id: 'living-result' });
+  // a take or a trace you like can go straight to Still Here (the same shelf, the same Keep as everywhere else)
+  const keepPerf = el('button', { id: 'living-keep', hidden: true, onclick: () => {
+    const a = creative.availability(), kind = a.moved.ok ? 'moved' : a.looked.ok ? 'looked' : null;
+    const r = kind ? creative.keep(kind) : { ok: false, reason: 'Nothing to keep on the selected clip.' };
+    ctrl.last = { text: r.ok ? 'Kept in Still Here.' : (r.existing ? 'Already on the shelf.' : r.reason) }; // no `session`: the button goes away
+    keepPerf.hidden = true; result.textContent = ctrl.last.text;
+  } });
   const slotsFor = () => paramSlots(store.selectedClip);
   const slotOptions = (sel, current) => {
     const slots = slotsFor();
@@ -242,8 +252,9 @@ export function mountLiving({ preview, runAnalysis, renderer }) {
       el('div', { class: 'mut-row' }, dnaSeed, dnaRead, dnaClear), dnaStatus, dnaCard),
     section('accident', 'ACCIDENT', 'Break the rules carefully.',
       el('div', { class: 'mut-row' }, accGo, accUndo), accStatus, accList),
+    mountRelate({ preview, renderer }).el,
     mountStillHere({ preview, renderer }).el,
-    status, result);
+    status, result, keepPerf);
 
   function refreshSlots() {
     const keep = { px: padSel.x.value, py: padSel.y.value };
@@ -260,6 +271,7 @@ export function mountLiving({ preview, runAnalysis, renderer }) {
       btn.classList.toggle('on', mine); btn.textContent = mine ? '■ STOP' : '● REC'; btn.disabled = !!rec && !mine;
     }
     result.textContent = ctrl.last?.text || '';
+    { const a = ctrl.last?.session && !ctrl.last.noop && !rec ? creative.availability() : null; keepPerf.hidden = !(a && (a.moved.ok || a.looked.ok)); keepPerf.textContent = a?.moved.ok ? 'Keep how it moved' : 'Keep how it looked'; }
     const m = preview.comp.memory;
     memQuality.textContent = `Memory quality ${Math.round(m.scale * 100)}% of the picture${m.scale < 0.5 ? ' (lowered automatically because playback was stuttering)' : ''}. It builds up while the timeline plays; seeking starts it afresh, exactly as an export from that frame would.${m.overflow ? ' More than ' + 8 + ' memories are in view: the extra ones are passed through.' : ''}`;
     status.textContent = rec ? `Recording ${rec.kind}… ${fmt(Math.max(0, ctrl.clock() - rec.t0))}${rec.kind === 'take' ? ` · ${ctrl.take.rec.touched} parameter${ctrl.take.rec.touched === 1 ? '' : 's'} touched` : ctrl.trace.g ? ` · ${ctrl.trace.g.pts.length} points` : ''} · Esc cancels` : '';

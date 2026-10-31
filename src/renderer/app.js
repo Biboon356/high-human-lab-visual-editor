@@ -12,6 +12,7 @@ import { mountMediaBin, importResults } from './ui/media-bin.js';
 import { mountMutate } from './ui/mutate-ui.js';
 import { mountLiving } from './ui/living-ui.js';
 import { creative } from './creative/engine.js';
+import { mountSuggestionChip } from './ui/suggestion-chip.js';
 import { mountReactive, runAnalysis } from './ui/reactive-ui.js';
 import { mountProjectSettings } from './ui/project-settings.js';
 import { openExportDialog, isExporting } from './ui/export-dialog.js';
@@ -142,7 +143,7 @@ mountInspector($('inspector'));
 mountMediaBin({ onImport: importResults });
 const mutateUi = mountMutate({ preview });
 const living = mountLiving({ preview, runAnalysis, renderer: mutateUi.renderer });
-try { creative.start(); } catch (e) { console.error('[creative]', e); } // the intelligence layer is an extra: if it cannot start, the editor still works
+try { mountSuggestionChip(); creative.start(); } catch (e) { console.error('[creative]', e); } // the intelligence layer is an extra: if it cannot start, the editor still works
 mountReactive($('reactive'));
 mountProjectSettings($('project-settings'));
 startRoots($('bg-roots'), () => store.playing || isExporting());

@@ -39,7 +39,7 @@ const motionKeys = (c) => MOTION_KEYS.filter((k) => (c.keyframes?.[k] || []).len
 
 // ---- the five accidents: each builder returns {kind, title, summary, at, clipIds, preview, apply} or null when it does not fit ----
 
-function memoryCut(project, rel, r) {
+export function memoryCut(project, rel, r) {
   const { a, b, at } = rel;
   const A = byId(project, a), B = byId(project, b);
   const mode = pick(r, [0, 0, 3, 1]), length = Math.round(between(r, 1.1, 2) * 20) / 20;
@@ -57,7 +57,7 @@ function memoryCut(project, rel, r) {
     } };
 }
 
-function spread(project, rel, r, ctx) {
+export function spread(project, rel, r, ctx) {
   const { a, b, at } = rel;
   const A = byId(project, a), B = byId(project, b);
   const own = [A, B].map((c) => c.effects.find((e) => e.type === 'veins')).find(Boolean);
@@ -68,7 +68,7 @@ function spread(project, rel, r, ctx) {
     apply(p) {
       const X = byId(p, a), Y = byId(p, b);
       if (!X || !Y) return false;
-      const mk = () => createEffect('veins', { mode: 0, origin: 5, density: 2.6, thickness: 0.14, glow: 1, cling: 0.6, seed, color, mix: 1 });
+      const mk = () => { const v = createEffect('veins', { mode: 0, origin: 5, density: ctx.organic?.density ?? 2.6, thickness: ctx.organic?.thickness ?? 0.14, glow: 1, cling: 0.6, seed, color, mix: 1 }); v.bindings.glow = { source: 'bass', amount: 0.3 }; return v; }; // the growth breathes with the bass once the music is analysed
       const vx = mk(), vy = mk();
       vx.keyframes.growth = [{ t: Math.max(0, Math.round((X.duration - reach) * 1000) / 1000), v: 0 }, { t: Math.round(X.duration * 1000) / 1000, v: 0.9 }];
       vy.keyframes.growth = [{ t: 0, v: 0.9 }, { t: Math.round(Math.min(reach, Y.duration) * 1000) / 1000, v: 0 }];
@@ -77,7 +77,7 @@ function spread(project, rel, r, ctx) {
     } };
 }
 
-function borrowMotion(project, rel, r) {
+export function borrowMotion(project, rel, r) {
   const { from, to } = rel;
   const A = byId(project, from), B = byId(project, to);
   const keys = motionKeys(A).filter((k) => !(B.keyframes?.[k] || []).length);
@@ -141,7 +141,7 @@ function unstable(project, rel, r) {
  */
 export function planAccidents(project, { seed, selection = [], count = 3, kinds = ACCIDENT_KINDS, identity = null } = {}) {
   if (seed === undefined || seed === null) throw new Error('planAccidents needs a seed');
-  const rel = relations(project), sel = new Set(selection), ctx = { palette: identity?.palette };
+  const rel = relations(project), sel = new Set(selection), ctx = { palette: identity?.palette, organic: identity?.organic };
   const prefer = (list, ids) => { const hit = list.filter((x) => ids(x).some((i) => sel.has(i))); return hit.length ? hit : list; };
   const r0 = rng(seed);
   const order = [...kinds].filter((k) => ACCIDENT_KINDS.includes(k)).map((k) => [k, r0()]).sort((x, y) => x[1] - y[1]).map(([k]) => k);

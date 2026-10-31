@@ -2069,6 +2069,157 @@ await step('still here: keep what you made, it survives Undo and the file, bring
   await page.click('#panel-left [data-tab="media"]'); await settle(200);
 });
 
+await step('living timeline: FOLLOW / GROW FROM / REMEMBER / BECOME plan from copies, change nothing until Apply, apply as one Undo step that restores exactly, and every one renders cleanly', async () => {
+  await resetProject();
+  await ev(async (c) => { await window.__app.importPaths([c]); const { store } = window.__app; const { addMediaClip } = await import('/shared/timeline.js'); const { createEffect } = await import('/shared/effects-defs.js');
+    store.mutate((p) => {
+      p.settings.width = 320; p.settings.height = 180;
+      const v1 = p.tracks.find((t) => t.kind === 'video'), pic = p.media[0].id;
+      const A = addMediaClip(p, pic, v1.id, 0); A.duration = 3; A.name = 'A'; A.keyframes.x = [{ t: 0, v: -0.3 }, { t: 3, v: 0.3 }];
+      A.effects.push(createEffect('glitch', { amount: 0.8 }), createEffect('vhs', { amount: 0.7 }));
+      const B = addMediaClip(p, pic, v1.id, 3); B.duration = 3; B.name = 'B'; B.effects.push(createEffect('glitch', { amount: 0.1 }), createEffect('grain', { amount: 0.4 }));
+    });
+    const ids = store.project.clips.map((x) => x.id); store.multi = new Set(ids); store.selection = ids[0]; store.emit('selection', 'render'); store.setPlayhead(3.4); }, pic);
+  await page.click('#panel-left [data-tab="living"]'); await settle(500);
+  await ev(() => document.getElementById('living-timeline').scrollIntoView()); await settle(200);
+  const errorsBefore = logs.length;
+  const project = () => ev(() => JSON.stringify(window.__app.store.project, (k, v) => (k === 'stillHere' ? undefined : v)));
+  const dis = (k) => ev((k) => document.getElementById(`rel-${k}`).disabled, k);
+  assert.deepEqual([await dis('follow'), await dis('grow'), await dis('remember'), await dis('become')], [false, false, false, false], 'all four fit two clips side by side');
+  await ev(() => { const s = window.__app.store; s.select(s.project.clips[0].id); }); await settle(150);
+  assert.deepEqual([await dis('follow'), await dis('become')], [true, true], 'with one clip selected nothing can relate');
+  assert.match(await ev(() => document.getElementById('rel-status').textContent), /Select two clips/);
+  await ev(() => { const s = window.__app.store; const ids = s.project.clips.map((x) => x.id); s.multi = new Set(ids); s.selection = ids[0]; s.emit('selection', 'render'); }); await settle(150);
+
+  // plan -> preview -> cancel, then plan -> Apply
+  const original = await project();
+  await page.click('#rel-become'); await settle(500);
+  assert.equal(await ev(() => document.getElementById('rel-card').hidden), false);
+  assert.match(await ev(() => document.querySelector('#rel-card .rel-title').textContent), /^BECOME/);
+  const mean = await ev(() => { const cv = document.querySelector('#rel-card canvas'); const o = document.createElement('canvas'); o.width = cv.width; o.height = cv.height; const c = o.getContext('2d', { willReadFrequently: true }); c.drawImage(cv, 0, 0); const d = c.getImageData(0, 0, o.width, o.height).data; let s = 0; for (let i = 0; i < d.length; i += 4) s += d[i] + d[i + 1] + d[i + 2]; return s / (d.length / 4) / 3; });
+  assert.ok(mean > 8, `the plan has a picture (${mean.toFixed(0)})`);
+  assert.equal(await project(), original, 'planning and previewing changed nothing');
+  await ev(() => document.getElementById('living-timeline').scrollIntoView()); await settle(200); await shot('40-living-timeline');
+  await page.click('#rel-cancel'); await settle(150);
+  assert.equal(await ev(() => document.getElementById('rel-card').hidden), true); assert.equal(await project(), original);
+  const depth = await ev(() => window.__app.store.undoStack.length);
+  await page.click('#rel-follow'); await settle(400); await page.click('#rel-apply'); await settle(300);
+  assert.equal(await ev(() => window.__app.store.undoStack.length), depth + 1, 'as one Undo step');
+  assert.equal(await ev(() => (window.__app.store.project.clips.find((c) => c.name === 'B').keyframes.x || []).length), 2, 'B now moves like A');
+  assert.match(await ev(() => document.getElementById('rel-status').textContent), /^FOLLOW:/);
+  await ev(() => window.__app.store.undo()); await settle(200);
+  assert.equal(await project(), original, 'Undo gives back exactly the project you had');
+
+  // every relation on its own: applies, renders without GL errors or blank frames, and undoes exactly
+  const out = await ev(async () => {
+    const { store, preview } = window.__app; const { creative } = await import('./creative/engine.js');
+    const res = {}; const gl = preview.comp.gl;
+    for (const kind of ['follow', 'grow', 'remember', 'become']) {
+      const before = JSON.stringify(store.project, (k, v) => (k === 'stillHere' ? undefined : v));
+      const plan = creative.planRelation(kind, undefined, 3);
+      if (plan.reason) { res[kind] = { planned: false, reason: plan.reason }; continue; }
+      creative.applyPlan(plan);
+      gl.getError(); preview.stats.lastError = null;
+      let mean = 0; for (const t of [plan.at - 0.2, plan.at + 0.1, plan.at + 0.6, plan.at + 1.3]) { store.setPlayhead(Math.max(0, t)); const d = window.__grab(40, 22); let s = 0; for (const v of d) s += v; mean = Math.max(mean, s / d.length); }
+      res[kind] = { planned: true, mean, gl: gl.getError(), threw: preview.stats.lastError?.message || null, restored: (store.undo(), JSON.stringify(store.project, (k, v) => (k === 'stillHere' ? undefined : v)) === before) };
+    }
+    return res;
+  });
+  for (const [kind, r] of Object.entries(out)) {
+    assert.equal(r.planned, true, `${kind} fits these clips (${r.reason || ''})`);
+    assert.ok(r.mean > 8 && !r.gl && !r.threw, `${kind} renders cleanly (mean ${r.mean?.toFixed(0)}, GL ${r.gl}, ${r.threw})`);
+    assert.equal(r.restored, true, `${kind}: Undo restores the project exactly`);
+  }
+  assert.equal(logs.slice(errorsBefore).filter((l) => /shader|compile|GLSL|WebGL|error/i.test(l)).length, 0, 'no errors in the console');
+  await page.click('#panel-left [data-tab="media"]'); await settle(200);
+});
+
+await step('decision gate: one quiet suggestion at a time; silent while playing, typing, performing or just after an edit; dismissed ones are not repeated; dismissing too often mutes it; Apply is one Undo step', async () => {
+  await resetProject();
+  await ev(async (c) => { await window.__app.importPaths([c]); const { store } = window.__app; const { addMediaClip } = await import('/shared/timeline.js');
+    store.mutate((p) => {
+      p.settings.width = 320; p.settings.height = 180;
+      const v1 = p.tracks.find((t) => t.kind === 'video'), pic = p.media[0].id;
+      const A = addMediaClip(p, pic, v1.id, 0); A.duration = 3; A.name = 'A'; A.keyframes.x = [{ t: 0, v: -0.3 }, { t: 3, v: 0.3 }];
+      const B = addMediaClip(p, pic, v1.id, 3); B.duration = 3; B.name = 'B';
+    });
+    store.multi = new Set(); store.selection = null; store.emit('selection', 'render'); }, pic);
+  // (the page's CSP forbids `new Function`, so every probe below is a plain evaluate)
+  const setup = () => ev(async () => {
+    const { creative } = await import('./creative/engine.js'); const gate = await import('/shared/creative/gate.js'); const { store } = window.__app;
+    globalThis.__t = 1e6; creative.clock = () => globalThis.__t; creative.enabled = true; creative.suggestOn = true; creative.suggestion = null; creative.cooldowns = {};
+    creative.lastShownAt = -Infinity; creative.stats = gate.newStats(); globalThis.__busy0 = creative.busyProbe; creative.busyProbe = () => false;
+    const ids = store.project.clips.map((x) => x.id); store.multi = new Set(ids); store.selection = ids[0]; store.emit('selection', 'render'); creative._refreshContext();
+    creative.lastEditAt = globalThis.__t - 100; // the artist has just edited
+    return creative.context.kind;
+  });
+  assert.equal(await setup(), 'connecting-scenes');
+  const step1 = () => ev(async () => { const { creative } = await import('./creative/engine.js'); return creative.suggestNow()?.key || null; });
+  const adv = (ms) => ev((ms) => { globalThis.__t += ms; }, ms);
+  assert.equal(await step1(), null, 'just after an edit: silent');
+  await adv(3000);
+  const key = await step1();
+  assert.match(key, /^relate:follow:/, 'a quiet moment, two clips side by side, one moves and one does not');
+  await settle(200);
+  assert.equal(await ev(() => document.querySelectorAll('#creative-chip:not([hidden])').length), 1, 'one chip');
+  assert.equal(await ev(() => document.querySelector('#creative-chip .cchip-h').textContent), 'LET IT FLOW');
+  assert.ok((await ev(() => document.querySelector('#creative-chip .cchip-l').textContent)).length <= 90, 'one short sentence');
+  await shot('41-suggestion-chip');
+  assert.equal(await ev(async () => (await import('./creative/engine.js')).creative.stats.shown), 1);
+
+  // never while something is playing, typing or performing; it leaves without any penalty
+  await ev(() => { window.__app.store.playing = true; }); await ev(async () => (await import('./creative/engine.js')).creative.revalidate()); await settle(100);
+  assert.equal(await ev(() => document.querySelectorAll('#creative-chip:not([hidden])').length), 0, 'playback takes it away');
+  assert.equal(await ev(async () => (await import('./creative/engine.js')).creative.stats.dismissed), 0, 'and that is not held against the suggestions');
+  await ev(() => { window.__app.store.playing = false; });
+  await adv(50000);
+  assert.match(await step1(), /^relate:follow:/, 'it may come back at the next quiet moment');
+  await ev(() => document.getElementById('project-name').focus());
+  await ev(async () => (await import('./creative/engine.js')).creative.revalidate()); await settle(100);
+  assert.equal(await ev(() => document.querySelectorAll('#creative-chip:not([hidden])').length), 0, 'typing takes it away');
+  await ev(() => document.getElementById('project-name').blur());
+  await adv(50000);
+  await ev(async () => { (await import('./creative/engine.js')).creative.busyProbe = () => true; });
+  assert.equal(await step1(), null, 'silent while a take or trace is running');
+  await ev(async () => { (await import('./creative/engine.js')).creative.busyProbe = () => false; });
+  await ev(async () => { const { creative } = await import('./creative/engine.js'); creative.setSuggestions(false); });
+  assert.equal(await step1(), null, 'silent when suggestions are switched off'); await settle(100);
+  assert.equal(await ev(() => document.getElementById('creative-suggest').checked), false, 'and the switch shows it');
+  await ev(async () => { (await import('./creative/engine.js')).creative.setSuggestions(true); });
+
+  // dismiss: not repeated for a while, and it counts
+  assert.match(await step1(), /^relate:follow:/);
+  await page.click('#creative-chip [data-act="dismiss"]'); await settle(100);
+  assert.equal(await ev(() => document.querySelectorAll('#creative-chip:not([hidden])').length), 0);
+  assert.equal(await ev(async () => (await import('./creative/engine.js')).creative.stats.dismissed), 1);
+  await adv(60000);
+  assert.equal(await step1(), null, 'a dismissed suggestion is not offered again straight away');
+  await adv(11 * 60000);
+  const again = await step1();
+  assert.match(again, /^relate:follow:/, 'much later it may be');
+  // Apply: one Undo step, exact restore
+  const before = await ev(() => JSON.stringify(window.__app.store.project, (k, v) => (k === 'stillHere' ? undefined : v)));
+  const depth = await ev(() => window.__app.store.undoStack.length);
+  await settle(200); await page.click('#creative-chip [data-act="apply"]'); await settle(300);
+  assert.equal(await ev(() => window.__app.store.undoStack.length), depth + 1, 'Apply is one Undo step');
+  assert.equal(await ev(() => (window.__app.store.project.clips.find((c) => c.name === 'B').keyframes.x || []).length), 2);
+  assert.equal(await ev(async () => (await import('./creative/engine.js')).creative.stats.applied), 1);
+  await ev(() => window.__app.store.undo()); await settle(200);
+  assert.equal(await ev(() => JSON.stringify(window.__app.store.project, (k, v) => (k === 'stillHere' ? undefined : v))), before, 'Undo restores exactly');
+
+  // dismissing nearly every time mutes it for a day
+  const muted = await ev(async () => {
+    const { creative } = await import('./creative/engine.js'); const gate = await import('/shared/creative/gate.js');
+    creative.cooldowns = {}; creative.lastShownAt = -Infinity; creative.stats = gate.newStats(); globalThis.__t += 60000; creative.lastEditAt = globalThis.__t - 10000;
+    let s = creative.stats; for (let i = 0; i < 6; i++) s = gate.recordDismissed(gate.recordShown(s), globalThis.__t); creative.stats = s;
+    const out = { mutedUntil: s.mutedUntil > globalThis.__t, suggestion: creative.suggestNow()?.key || null };
+    creative.stats = gate.newStats(); creative.clock = () => Date.now(); creative.busyProbe = globalThis.__busy0; creative.suggestion = null; creative.cooldowns = {};
+    return out;
+  });
+  assert.equal(muted.mutedUntil, true); assert.equal(muted.suggestion, null, 'dismissed almost every time: it goes quiet');
+  await ev(() => { const s = window.__app.store; s.multi = new Set(); s.selection = null; s.emit('selection', 'render'); });
+});
+
 await step('hdr phone footage: an HLG clip is detected, plays through a tone-mapped SDR copy, and the preview and the export both look like the phone did', async () => {
   const hlg = path.join(dir, 'hlg.mov'), sdr = path.join(dir, 'hlg-source.mp4');
   const SRC = ['-f', 'lavfi', '-i', 'testsrc2=size=320x180:rate=30:duration=2'];

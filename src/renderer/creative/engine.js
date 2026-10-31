@@ -10,11 +10,18 @@ import { store } from '../store.js';
 import { Observer } from '/shared/creative/observe.js';
 import { inferContext } from '/shared/creative/context.js';
 import { captureMemory, applyMemory, addMemory, removeMemory, renameMemory, attachThumb, shelfOf, curate, knownHashes } from '/shared/creative/still-here.js';
-import { builtinDna, chainHash } from '/shared/mutation/dna.js';
+import { builtinDna, chainHash, normalizeDna } from '/shared/mutation/dna.js';
+import { newSeed } from '/shared/mutation/rng.js';
+import { planRelation } from '/shared/creative/relate.js';
+import { suggestFor } from '/shared/creative/suggest.js';
+import { evaluate, GATE, cleanStats, recordShown, recordApplied, recordDismissed } from '/shared/creative/gate.js';
 
 const OFF_KEY = 'hhlab.creative'; // 'off' switches the whole engine off (a developer switch; the editor works the same without it)
 const AUTO_KEY = 'hhlab.stillhere.auto'; // 'off' = never keep anything by itself
+const SUGGEST_KEY = 'hhlab.suggest'; // 'off' = never suggest (the manual tools stay)
+const STATS_KEY = 'hhlab.gate.stats'; // how often suggestions were shown, dismissed and applied (the gate learns from it)
 const QUIET_MS = 600;
+const SUGGESTION_LIFE_MS = 25000; // a suggestion that is left alone fades away by itself
 const read = (k, d) => { try { return localStorage.getItem(k) ?? d; } catch { return d; } };
 const write = (k, v) => { try { localStorage.setItem(k, v); } catch { /* storage unavailable */ } };
 
@@ -30,13 +37,22 @@ export class CreativeMemoryEngine {
     this._silent = false;
     this._started = false;
     this._builtin = null;
+    // ---- Decision Gate state: at most ONE suggestion is ever active
+    this.suggestOn = read(SUGGEST_KEY, 'on') !== 'off';
+    this.suggestion = null;
+    this.cooldowns = {};
+    this.lastShownAt = -Infinity;
+    this.lastEditAt = -Infinity;
+    this.busyProbe = () => false; // the Living Lab says when a take or trace is running
+    this._sTimer = 0;
+    this.stats = (() => { try { return cleanStats(JSON.parse(read(STATS_KEY, 'null'))); } catch { return cleanStats(null); } })();
   }
 
   start() {
     if (this._started) return;
     this._started = true;
     store.on('project', () => this._mark());
-    store.on('selection', () => this._refreshContext());
+    store.on('selection', () => { this._refreshContext(); this.revalidate(); this._scheduleSuggest(); });
     this._refreshContext();
   }
 
@@ -45,6 +61,8 @@ export class CreativeMemoryEngine {
   _mark() {
     if (!this.enabled) return;
     if (store.changeKind !== 'edit') this._silent = true; // undo, redo and loading are not abandoned work
+    this.lastEditAt = this.clock();
+    this.revalidate();
     clearTimeout(this._timer);
     this._timer = setTimeout(() => this.flush(), QUIET_MS);
   }
@@ -59,6 +77,7 @@ export class CreativeMemoryEngine {
       const { ended } = this.observer.update(store.project, now, { silent });
       if (!silent && this.autoKeep && ended.length) this._curate(ended, now);
       this._refreshContext();
+      this._scheduleSuggest();
       this.failures = 0;
     } catch (e) {
       console.error('[creative]', e);
@@ -87,6 +106,98 @@ export class CreativeMemoryEngine {
       if (!same) store.emit('creative');
     } catch (e) { console.error('[creative]', e); }
   }
+
+  // ---- Living Timeline: manual relations between two clips ----
+
+  identity() { try { return normalizeDna(store.project.living?.dna).dna?.identity || null; } catch { return null; } }
+
+  /** Plans FOLLOW / GROW FROM / REMEMBER / BECOME between two selected clips. Changes nothing. */
+  planRelation(kind, ids = [...store.multi], seed = newSeed()) {
+    if (ids.length !== 2) return { reason: 'Select two clips.' };
+    return planRelation(store.project, kind, ids[0], ids[1], { seed, identity: this.identity() });
+  }
+
+  /** Applies a plan as ONE undo step; nothing changes (and no empty step is left) when it no longer applies. */
+  applyPlan(plan) {
+    const probe = structuredClone(store.project);
+    if (!plan.apply(probe)) return false;
+    store.snapshot();
+    plan.apply(store.project);
+    store.touch('project', 'keyframes');
+    return true;
+  }
+
+  // ---- the Decision Gate: suggestions, one at a time, nearly always none ----
+
+  typing() {
+    const a = document.activeElement;
+    return !!a && (a.isContentEditable || a.tagName === 'TEXTAREA' || (a.tagName === 'INPUT' && !['checkbox', 'radio', 'range', 'button', 'color'].includes(a.type)));
+  }
+  _gateState(now) {
+    return { now, enabled: this.enabled && this.suggestOn, context: this.context, selection: [...store.multi], playing: !!store.playing, busy: !!(this.busyProbe() || store.recorder),
+      typing: this.typing(), lastEditAt: this.lastEditAt, active: !!this.suggestion, lastShownAt: this.lastShownAt, cooldowns: this.cooldowns, stats: this.stats };
+  }
+  _saveStats() { write(STATS_KEY, JSON.stringify(this.stats)); }
+  _scheduleSuggest() {
+    if (!this.enabled || !this.suggestOn) return;
+    clearTimeout(this._sTimer);
+    this._sTimer = setTimeout(() => this.suggestNow(), GATE.quietMs + 150);
+  }
+
+  /** Asks the gate about what the context offers. Most of the time this returns null: that is the design. */
+  suggestNow() {
+    if (!this.enabled || !this.suggestOn || this.suggestion) return this.suggestion;
+    try {
+      const now = this.clock();
+      for (const c of suggestFor({ project: store.project, context: this.context, shelf: this.shelf, identity: this.identity() })) {
+        if (!evaluate(c, this._gateState(now)).pass) continue;
+        this.suggestion = { ...c, shownAt: now };
+        this.lastShownAt = now;
+        this.stats = recordShown(this.stats); this._saveStats();
+        store.emit('suggestion');
+        return this.suggestion;
+      }
+    } catch (e) { console.error('[creative]', e); }
+    return null;
+  }
+
+  /** Takes the suggestion away without any penalty when the moment has passed (playing, typing, the artist moved on) or after it faded. */
+  revalidate() {
+    const s = this.suggestion;
+    if (!s) return;
+    const now = this.clock(), here = new Set([...store.multi, ...this.context.clipIds]);
+    const gone = store.playing || this.busyProbe() || store.recorder || this.typing() || !s.contexts.includes(this.context.kind) || !s.clipIds.every((id) => here.has(id) && store.project.clips.some((c) => c.id === id));
+    if (gone) return this._withdraw();
+    if (now - s.shownAt > SUGGESTION_LIFE_MS) { this.cooldowns[s.key] = now + GATE.ignoredCooldownMs; this.lastShownAt = now; this._withdraw(); }
+  }
+  _withdraw() { this.suggestion = null; store.emit('suggestion'); }
+
+  /** The artist accepts. @returns {{ok, text?, reason?}} */
+  applySuggestion(itemId = null) {
+    const s = this.suggestion;
+    if (!s) return { ok: false, reason: 'That suggestion is gone.' };
+    let r;
+    if (s.kind === 'relate') {
+      const plan = planRelation(store.project, s.relation, s.clipIds[0], s.clipIds[1], { seed: newSeed(), identity: this.identity() });
+      r = plan.reason ? { ok: false, reason: plan.reason } : this.applyPlan(plan) ? { ok: true, text: plan.summary } : { ok: false, reason: 'It no longer applies.' };
+    } else r = this.bringBack(itemId || s.items[0].id, s.clipIds);
+    if (r.ok) { this.stats = recordApplied(this.stats); this._saveStats(); this.cooldowns[s.key] = Infinity; }
+    this._withdraw();
+    return r;
+  }
+
+  /** The artist says no. The same thing is not offered again for a while, and the bar rises if this keeps happening. */
+  dismissSuggestion() {
+    const s = this.suggestion;
+    if (!s) return;
+    const now = this.clock();
+    this.stats = recordDismissed(this.stats, now); this._saveStats();
+    this.cooldowns[s.key] = now + GATE.dismissCooldownMs;
+    this.lastShownAt = now;
+    this._withdraw();
+  }
+
+  setSuggestions(on) { this.suggestOn = !!on; write(SUGGEST_KEY, on ? 'on' : 'off'); if (!on && this.suggestion) this._withdraw(); store.emit('stillhere'); }
 
   // ---- Still Here ----
 

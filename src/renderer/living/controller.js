@@ -54,7 +54,7 @@ export class LivingLabController {
     let result;
     try { result = s.handlers.finish({ tEnd }); } catch (e) { console.error(e); s.handlers.cancel?.(); store.dropSnapshot(); toast(`Could not keep the ${s.kind}: ${e.message}`, 'error'); store.emit('living'); return; }
     if (result.noop) store.dropSnapshot();
-    this.last = result;
+    this.last = { ...result, session: s.kind }; // `session` lets the UI offer to keep what was just performed
     store.touch('project', 'keyframes');
     store.emit('living');
   }
