@@ -10,6 +10,7 @@ import { mountInspector } from './ui/inspector.js';
 import { mountMaskEditor, maskEdit } from './ui/mask-ui.js';
 import { mountMediaBin, importResults } from './ui/media-bin.js';
 import { mountMutate } from './ui/mutate-ui.js';
+import { mountLiving } from './ui/living-ui.js';
 import { mountReactive, runAnalysis } from './ui/reactive-ui.js';
 import { mountProjectSettings } from './ui/project-settings.js';
 import { openExportDialog, isExporting } from './ui/export-dialog.js';
@@ -44,7 +45,7 @@ document.querySelectorAll('[data-tabs]').forEach((nav) => {
   nav.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
     nav.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
     document.querySelectorAll(`#panel-${side} [data-pane]`).forEach((p) => p.classList.toggle('on', p.dataset.pane === b.dataset.tab));
-    if (side === 'left') { $('app').classList.toggle('wide-left', b.dataset.tab === 'mutate'); dispatchEvent(new Event('resize')); } // the variation grid wants room
+    if (side === 'left') { $('app').classList.toggle('wide-left', ['mutate', 'living'].includes(b.dataset.tab)); dispatchEvent(new Event('resize')); } // the variation grid wants room
     store.emit('playhead');
   }));
 });
@@ -139,6 +140,7 @@ const timeline = mountTimeline();
 mountInspector($('inspector'));
 mountMediaBin({ onImport: importResults });
 const mutateUi = mountMutate({ preview });
+const living = mountLiving({ preview });
 mountReactive($('reactive'));
 mountProjectSettings($('project-settings'));
 startRoots($('bg-roots'), () => store.playing || isExporting());
@@ -187,7 +189,7 @@ document.addEventListener('paste', (e) => { if (!inTextField() && store.clipboar
 
 // ---- automation hook (used by scripts/e2e.mjs; harmless in normal use)
 window.__app = {
-  mutateUi, reverseSelected, freezeAtPlayhead, placeAdlibs, stutterAtPlayhead, previewEdit, maskEditor, maskEdit, store, preview, timeline, autoEdit: autoEditEngine, captionEdit: { applyCaptionEdits }, smartMontage, autosave: { writeNow, offerRecovery }, runAnalysis, cutOnBeats, autoMontage, importPaths: async (paths) => importResults(await hh.probePaths(paths)),
+  mutateUi, living, reverseSelected, freezeAtPlayhead, placeAdlibs, stutterAtPlayhead, previewEdit, maskEditor, maskEdit, store, preview, timeline, autoEdit: autoEditEngine, captionEdit: { applyCaptionEdits }, smartMontage, autosave: { writeNow, offerRecovery }, runAnalysis, cutOnBeats, autoMontage, importPaths: async (paths) => importResults(await hh.probePaths(paths)),
   exportTo: async (outPath, overrides = {}) => {
     const s = store.project.settings;
     const { range: _r, ...ov } = overrides; const settings = { width: s.width, height: s.height, fps: s.fps, quality: "draft", format: outPath.endsWith(".webm") ? "webm" : "mp4", ...ov, outPath };

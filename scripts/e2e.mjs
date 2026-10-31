@@ -1607,6 +1607,113 @@ await step('safe-zone guide toggles and follows the 9:16 canvas', async () => {
   await page.click('#t-safe'); assert.equal(await ev(() => document.querySelector('.safe-zone').hidden), true);
 });
 
+await step('living lab (take + trace): a take becomes ordinary keyframes in one Undo step, Esc leaves nothing behind, and a gesture drives motion, an effect, a residue line and growing roots', async () => {
+  await resetProject();
+  await ev(async (c) => { await window.__app.importPaths([c]); const { store } = window.__app; const { createEffect } = await import('/shared/effects-defs.js');
+    store.mutate((p) => { p.settings.width = 480; p.settings.height = 270; p.clips.find((x) => x.type === 'media').effects.push(createEffect('bloom')); }); store.select(store.project.clips.find((x) => x.type === 'media').id); store.setPlayhead(0); }, clip);
+  await page.click('#panel-left [data-tab="living"]'); await settle(500);
+  assert.equal(await ev(() => document.getElementById('app').classList.contains('wide-left')), true);
+  const errorsBefore = logs.length;
+  const media = () => ev(() => { const c = window.__app.store.project.clips.find((x) => x.type === 'media'); return { kf: JSON.parse(JSON.stringify(c.keyframes)), fx: JSON.parse(JSON.stringify(c.effects[0].keyframes)), tracks: window.__app.store.project.tracks.length, clips: window.__app.store.project.clips.length }; });
+  const undoDepth = () => ev(() => window.__app.store.undoStack.length);
+  const dragPad = async (ms) => {
+    const r = await page.locator('#take-pad').boundingBox(); const t0 = Date.now();
+    await page.mouse.move(r.x + r.width * 0.1, r.y + r.height * 0.5); await page.mouse.down();
+    while (Date.now() - t0 < ms) { const k = (Date.now() - t0) / ms; await page.mouse.move(r.x + r.width * (0.1 + 0.8 * k), r.y + r.height * (0.5 + 0.35 * Math.sin(k * 9))); await page.waitForTimeout(25); }
+    await page.mouse.up();
+  };
+
+  // ---- TAKE: pad + an Inspector slider, performed while the timeline plays
+  assert.ok(await ev(() => !!document.querySelector('#pad-x option[value="clip.x"]')), 'the pad can steer the clip position');
+  await ev(() => { document.getElementById('pad-x').value = 'clip.x'; document.getElementById('pad-y').value = 'clip.y'; });
+  const d0 = await undoDepth();
+  await page.click('#take-rec'); await settle(250);
+  assert.equal(await ev(() => window.__app.store.playing), true, 'REC plays the timeline');
+  assert.equal(await ev(() => !!window.__app.store.recorder?.active), true);
+  await dragPad(1800);
+  const opacityRow = page.locator('.row', { hasText: 'Opacity' }).first();
+  for (const v of [0.9, 0.6, 0.3, 0.7]) { await opacityRow.locator('input[type=range]').evaluate((i, x) => { i.value = x; i.dispatchEvent(new Event('input', { bubbles: true })); }, v); await page.waitForTimeout(200); }
+  assert.match(await ev(() => document.getElementById('living-status').textContent), /Recording take.*3 parameters/, 'the status counts what you touched (x, y, opacity)');
+  await page.click('#take-rec'); await settle(500);
+  const take = await media();
+  assert.equal(await ev(() => window.__app.store.playing), false, 'stopping stops the timeline');
+  assert.equal(await ev(() => window.__app.store.recorder), null);
+  for (const k of ['x', 'y', 'opacity']) assert.ok(take.kf[k] && take.kf[k].length >= 2, `${k} became keyframes (${take.kf[k]?.length})`);
+  assert.ok(take.kf.x.length < 60, `a ${'1.8 s'} drag is simplified, not thousands of keys (${take.kf.x.length})`);
+  assert.ok(take.kf.x.every((k) => k.v >= -1 && k.v <= 1 && k.t >= 0), 'keys are inside the parameter range, in clip time');
+  assert.ok(take.kf.x.every((k, i) => i === 0 || k.t > take.kf.x[i - 1].t), 'sorted');
+  assert.equal(await undoDepth(), d0 + 1, 'the whole take is one undo step');
+  assert.match(await ev(() => document.getElementById('living-result').textContent), /Take kept: 3 parameters/);
+  await ev(() => window.__app.store.undo()); await settle(200);
+  const undone = await media();
+  assert.deepEqual(undone.kf, {}, 'one Undo removes the take');
+
+  // Esc throws a take away and leaves no undo step
+  const d1 = await undoDepth();
+  await page.click('#take-rec'); await settle(200); await dragPad(600);
+  await page.keyboard.press('Escape'); await settle(300);
+  assert.deepEqual((await media()).kf, {}, 'cancelled: no keyframes');
+  assert.equal(await undoDepth(), d1, 'cancelled: no undo step left behind');
+  assert.equal(await ev(() => window.__app.store.playing), false);
+  // a take that touches nothing keeps nothing
+  await page.click('#take-rec'); await settle(500); await page.click('#take-rec'); await settle(300);
+  assert.equal(await undoDepth(), d1, 'an empty take leaves no undo step');
+  assert.match(await ev(() => document.getElementById('living-result').textContent), /Nothing was touched/);
+
+  // ---- TRACE
+  const draw = async (ms) => {
+    const r = await page.locator('#preview').boundingBox(); const t0 = Date.now();
+    await page.mouse.move(r.x + r.width * 0.15, r.y + r.height * 0.5); await page.mouse.down();
+    while (Date.now() - t0 < ms) { const k = (Date.now() - t0) / ms; await page.mouse.move(r.x + r.width * (0.15 + 0.7 * k), r.y + r.height * (0.5 + 0.3 * Math.sin(k * 7))); await page.waitForTimeout(25); }
+    await page.mouse.up();
+  };
+  const trace = async (mode) => {
+    await page.selectOption('#trace-mode', mode); await ev(() => { window.__app.store.setPlayhead(0); });
+    await page.click('#trace-rec'); await settle(250);
+    assert.equal(await page.locator('#trace-surface').count(), 1, 'a drawing surface covers the picture while tracing ' + JSON.stringify(await ev(() => ({ toasts: [...document.querySelectorAll('.toast')].map((t) => t.textContent), sel: window.__app.store.selection, sess: !!window.__app.living.session, mode: window.__app.living.trace.mode }))));
+    await draw(1800); await page.click('#trace-rec'); await settle(500);
+    assert.equal(await page.locator('#trace-surface').count(), 0, 'the surface goes away afterwards');
+  };
+  const dT = await undoDepth();
+  await trace('motion');
+  const mot = await media();
+  assert.ok(mot.kf.x?.length >= 2 && mot.kf.y?.length >= 2 && mot.kf.x.length < 60, `Motion wrote x/y keyframes (${mot.kf.x?.length}/${mot.kf.y?.length})`);
+  assert.ok(mot.kf.x.every((k) => k.v >= -1 && k.v <= 1));
+  assert.equal(await undoDepth(), dT + 1, 'one gesture, one undo step');
+  await ev(() => window.__app.store.undo()); await settle(200);
+  assert.deepEqual((await media()).kf, {});
+
+  await page.selectOption('#trace-mode', 'influence'); await settle(200);
+  assert.ok(await ev(() => !document.getElementById('trace-influence').hidden), 'Influence shows its three targets');
+  await page.selectOption('[data-trace-map="x"]', 'fx0.intensity'); await page.selectOption('[data-trace-map="y"]', 'fx0.threshold');
+  await trace('influence');
+  const inf = await media();
+  assert.ok(inf.fx.intensity?.length >= 2 && inf.fx.threshold?.length >= 2, `Influence steers the effect (${inf.fx.intensity?.length}/${inf.fx.threshold?.length} keys)`);
+  assert.deepEqual(inf.kf.x, undefined, 'and does not touch the clip position');
+  await ev(() => window.__app.store.undo()); await settle(200);
+
+  for (const mode of ['residue', 'grow']) {
+    const before = await media();
+    await trace(mode);
+    const after = await media();
+    assert.equal(after.clips, before.clips + 1, `${mode}: one new clip`); assert.equal(after.tracks, before.tracks + 1, `${mode}: on a track of its own`);
+    const gen = await ev(() => { const c = window.__app.store.project.clips.find((x) => x.type === 'generator' && x.gen.style === 'trace'); return { mode: c.gen.mode, pts: c.gen.path.pts.length, t0: c.gen.path.pts[0][0], start: c.start, dur: c.duration, sel: window.__app.store.selection === c.id }; });
+    assert.equal(gen.mode, mode); assert.ok(gen.pts >= 4, `${gen.pts} path points`); // few: with software GL a simulated mouse move takes ~300 ms while the preview plays assert.equal(gen.t0, 0); assert.ok(gen.sel, 'the new clip is selected');
+    // the picture really shows it: hide the footage, look at the frame while the line is being drawn
+    await ev((g) => { const { store } = window.__app; store.mutate((p) => { for (const t of p.tracks) if (t.kind === 'video') t.hidden = !p.clips.some((c) => c.trackId === t.id && c.type === 'generator'); }); store.setPlayhead(g.start + Math.min(1.7, g.dur - 0.3)); }, gen);
+    await settle(700);
+    const lit = (await px()).lit;
+    assert.ok(lit > 0.0006, `${mode} draws on the frame (lit ${lit.toFixed(4)})`);
+    if (mode === 'grow') await shot('36-living-grow');
+    if (mode === 'residue') await shot('36-living-residue');
+    await ev(() => { const { store } = window.__app; store.mutate((p) => { for (const t of p.tracks) t.hidden = false; }); });
+    await ev(() => { const { store } = window.__app; store.undo(); store.undo(); store.undo(); }); await settle(300); // un-hide, hide, then the trace itself
+    assert.equal((await media()).clips, before.clips, `Undo removes the ${mode} clip`);
+  }
+  assert.equal(logs.slice(errorsBefore).filter((l) => /shader|compile|GLSL|WebGL|error/i.test(l)).length, 0, 'no errors in the console');
+  await page.click('#panel-left [data-tab="media"]'); await settle(200);
+});
+
 await step('wet / dry: any effect can be mixed back over its input (preview, keyframes, Inspector row, export), and an effect at 0 costs nothing', async () => {
   await resetProject();
   await ev(async (c) => { await window.__app.importPaths([c]); const { store } = window.__app;

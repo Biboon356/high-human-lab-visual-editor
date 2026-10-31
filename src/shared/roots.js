@@ -62,3 +62,56 @@ export function buildRoots({ seed = 7, density = 1, curve = 0.5, aspect = 16 / 9
   });
   return { segs, count: out.length };
 }
+
+/**
+ * Roots that grow along a hand-drawn path. Geometry only, like buildRoots, in frame heights (x spans 0..aspect, y 0..1, y down).
+ * Unlike buildRoots, `birth` is in SECONDS of the gesture, so the roots appear exactly as fast as the hand moved (a pause is a pause).
+ * @param pts   [[t, u, v, stroke], …] gesture points, t relative to the start of the gesture, u/v 0..1 across/down the frame
+ * @param o     {seed, density (branching), curve (wander), thickness, aspect, growSpeed (frame heights per second the side roots grow)}
+ * @returns {{segs: Float32Array, count:number, duration:number}} packed like buildRoots: [x0,y0,x1,y1,w0,w1,birthSeconds,depth] * count
+ */
+export function buildRootsAlong(pts, { seed = 7, density = 1, curve = 0.5, thickness = 0.15, aspect = 16 / 9, growSpeed = 0.35 } = {}) {
+  const rand = rng(seed);
+  const out = [];
+  const baseW = 0.004 + thickness * 0.05;
+  let duration = 0;
+
+  function branch(x, y, ang, len, w, depth, birth) {
+    const step = 0.012, steps = Math.max(2, Math.round(len / step)), wEnd = w * 0.12;
+    for (let i = 0; i < steps && out.length < MAX_SEGMENTS; i++) {
+      ang += (rand() - 0.5) * curve * 0.7;
+      const nx = x + Math.cos(ang) * step, ny = y + Math.sin(ang) * step, f0 = i / steps, f1 = (i + 1) / steps;
+      out.push([x, y, nx, ny, w + (wEnd - w) * f0, w + (wEnd - w) * f1, birth, depth]);
+      birth += step / growSpeed; duration = Math.max(duration, birth);
+      x = nx; y = ny;
+      if (depth < 3 && w > baseW * 0.15 && rand() < 0.05 * (0.4 + density * 0.6) / (1 + depth * 0.7)) {
+        const side = rand() < 0.5 ? -1 : 1;
+        branch(x, y, ang + side * (0.5 + rand() * 0.7), len * (0.3 + rand() * 0.3), w * 0.65, depth + 1, birth);
+      }
+    }
+  }
+
+  let prev = null, travelled = 0;
+  for (const p of pts) {
+    const x = p[1] * aspect, y = p[2];
+    if (prev && prev.s === p[3]) {
+      const d = Math.hypot(x - prev.x, y - prev.y);
+      if (d > 1e-5 && out.length < MAX_SEGMENTS) {
+        const ang = Math.atan2(y - prev.y, x - prev.x);
+        out.push([prev.x, prev.y, x, y, baseW, baseW * 0.8, p[0], 0]);
+        duration = Math.max(duration, p[0]);
+        travelled += d;
+        // side roots leave the trunk at a steady rhythm along the line, a little irregular, denser for a higher density
+        if (travelled > 0.05 / (0.4 + density * 0.6) * (0.6 + rand() * 0.8)) {
+          travelled = 0;
+          const side = rand() < 0.5 ? -1 : 1;
+          branch(x, y, ang + side * (0.6 + rand() * 0.8), 0.06 + rand() * 0.14, baseW * (0.6 + rand() * 0.3), 1, p[0]);
+        }
+      }
+    }
+    prev = { x, y, s: p[3] };
+  }
+  const segs = new Float32Array(out.length * 8);
+  out.forEach((s, i) => segs.set(s, i * 8));
+  return { segs, count: out.length, duration };
+}

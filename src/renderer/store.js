@@ -23,6 +23,7 @@ class Store {
     this.pendingSnap = null;
     this.clipboard = null; // copied clip (JSON)
     this.relinkedMedia = null;
+    this.recorder = null; // a running Lab Take (see living/lab-take.js); param-row.js reports value changes to it
   }
 
   on(topic, fn) {
@@ -42,6 +43,9 @@ class Store {
     if (this.undoStack.length > HISTORY_LIMIT) this.undoStack.shift();
     this.redoStack = [];
   }
+
+  /** Takes back the undo point made by the last snapshot() (a recording session that ended with nothing to keep). */
+  dropSnapshot() { this.undoStack.pop(); }
 
   /** Discrete edit: snapshot, mutate, notify. */
   mutate(fn, ...topics) {

@@ -2,7 +2,7 @@
 import { createClip, defaultProps } from './project.js';
 import { createEffect } from './effects-defs.js';
 
-export const GEN_STYLES = { tree: 'Root system (drawn)', roots: 'Contour network', fluid: 'Fluid bands', cells: 'Cell membrane', dust: 'Dust & scratches' };
+export const GEN_STYLES = { tree: 'Root system (drawn)', roots: 'Contour network', fluid: 'Fluid bands', cells: 'Cell membrane', dust: 'Dust & scratches', trace: 'Hand trace (from the Living tab)' };
 
 export const GEN_PARAMS = [
   { key: 'density', label: 'Density', min: 0.2, max: 4, step: 0.01, def: 1 },

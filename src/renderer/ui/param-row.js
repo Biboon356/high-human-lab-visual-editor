@@ -48,6 +48,12 @@ export function paramRow({ owner, def, getBase, setBase, localTime }) {
   let gesture = false;
   const apply = (v) => {
     v = Math.min(max, Math.max(min, v));
+    const rec = store.recorder;
+    if (rec?.active) { // a Lab Take is running: report the move (the first one sets this parameter's old keyframes aside), then write it live
+      const now = rec.clock ? rec.clock() : store.playhead;
+      rec.capture({ owner, key, v, t: localTime() + (now - store.playhead), now, def });
+      gesture = true;
+    }
     if (!gesture) { store.snapshot(); gesture = true; }
     if (hasKeys()) owner.keyframes[key] = setKey(owner.keyframes[key], localTime(), v); // auto-key
     else setBase(v);

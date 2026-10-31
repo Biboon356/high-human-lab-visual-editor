@@ -12,6 +12,7 @@ import { drawShapeClip } from './shape-renderer.js';
 import { rasterizeMask } from './mask-renderer.js';
 import { normalizeMask, normalizeMatte, canBeMatte, matteSourceIds, maskKey } from '/shared/mask.js';
 import { drawRoots } from './roots-renderer.js';
+import { drawTrace } from './trace-renderer.js';
 
 const STYLE_INDEX = { roots: 0, fluid: 1, cells: 2, dust: 3 };
 const hexToRgb = (h) => { const n = parseInt(String(h).replace('#', '').padEnd(6, '0').slice(0, 6), 16) || 0; return [(n >> 16 & 255) / 255, (n >> 8 & 255) / 255, (n & 255) / 255]; };
@@ -289,6 +290,14 @@ export class Compositor {
       ready = true;
     } else if (clip.type === 'shape') {
       drawShapeClip(this.textCtx, this.w, this.h, clip, tl, props);
+      const tex = this._upload(this.textCanvas);
+      this._clear(this.fbos.a, 0, 0, 0, 0);
+      this._drawLayer(tex, this.w / 2, this.h / 2, 0, 0, 0, 1);
+      ready = true;
+    } else if (clip.type === 'generator' && clip.gen.style === 'trace') {
+      const gp = {};
+      for (const d of GEN_PARAMS) gp[d.key] = d.options ? Number(clip.gen.params[d.key] ?? d.def) : resolveParam(clip.gen, d.key, clip.gen.params[d.key] ?? d.def, tl, features, [d.min, d.max]);
+      drawTrace(this.textCtx, this.w, this.h, !!clip.gen.transparent, clip.gen, gp, tl);
       const tex = this._upload(this.textCanvas);
       this._clear(this.fbos.a, 0, 0, 0, 0);
       this._drawLayer(tex, this.w / 2, this.h / 2, 0, 0, 0, 1);
