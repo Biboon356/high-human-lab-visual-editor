@@ -6,6 +6,7 @@
 //   alpha            'writes' when the effect changes transparency (it should not run before an effect that expects a full picture)
 //   exclusive        effects in one group are not stacked by a random roll (they do the same job and mud each other)
 //   addable          false = never inserted by a random roll (needs a deliberate setup: a crop, a mask …)
+//   wet              false = a roll never touches this effect's wet/dry (alpha shapers such as crop, mask, outline)
 //   params           per-parameter overrides: { range: [lo, hi] } a safer window than the slider's hard range,
 //                    { fixed: true } never randomised, { allow: [..] } the option indices a roll may choose
 // Hard limits always still apply; a safe range can only be narrower. test/mutation.test.mjs enforces all of this against EFFECTS.
@@ -38,7 +39,7 @@ export const EFFECT_META = {
   spores: m('organic', 'overlay', 'medium', ['spores', 'particles', 'glow'], {}, { density: r(0.4, 2.5), size: r(0.5, 2), speed: r(0, 1), glow: r(0.3, 2.2) }),
   cells: m('organic', 'overlay', 'medium', ['cells', 'glass', 'membrane'], {}, { scale: r(3, 24), lens: r(0, 1), edge: r(0.01, 0.1), glow: r(0.2, 1.4), mix: r(0.4, 1) }),
   hud: m('camera', 'ui', 'medium', ['hud', 'viewfinder', 'camcorder', 'overlay'], {}, { scale: r(0.7, 1.6), rec: FIX, timecode: FIX, grid: r(0, 0.4), alert: FIX }),
-  crop: m('alpha', 'alpha', 'light', ['crop', 'frame', 'letterbox'], { alpha: 'writes', addable: false }, { left: FIX, right: FIX, top: FIX, bottom: FIX, round: FIX, feather: FIX }),
+  crop: m('alpha', 'alpha', 'light', ['crop', 'frame', 'letterbox'], { alpha: 'writes', addable: false, wet: false }, { left: FIX, right: FIX, top: FIX, bottom: FIX, round: FIX, feather: FIX }),
   xerox: m('print', 'stylize', 'light', ['xerox', 'photocopy', 'zine', 'punk'], { exclusive: 'binarize' }, { contrast: r(1.2, 3.5), threshold: r(0.3, 0.7), size: r(3, 10), mix: r(0.5, 1) }),
   fisheye: m('camera', 'warp', 'light', ['fisheye', 'lens', 'skate', 'wide'], {}, { amount: r(-0.2, 1), zoom: r(0.8, 1.4), chroma: r(0, 0.03) }),
   torn: m('print', 'alpha', 'light', ['torn', 'paper', 'zine', 'edge'], { alpha: 'writes' }, { amount: r(0.2, 0.8), rough: r(3, 14), rim: r(0.002, 0.02), shadow: r(0.2, 0.8) }),
@@ -56,8 +57,8 @@ export const EFFECT_META = {
   threshold: m('print', 'stylize', 'light', ['threshold', 'xerox', 'bw', 'contrast'], { exclusive: 'binarize' }, { level: r(0.3, 0.7), noise: r(0, 1.2), invert: FIX }),
   solarize: m('colour', 'tone', 'light', ['solarize', 'psychedelic', 'channel'], {}, { hue: r(-90, 90) }),
   slices: m('distort', 'warp', 'light', ['slices', 'cut', 'bars', 'glitch'], {}, { bands: r(4, 40), shift: r(0.01, 0.3), black: r(0, 0.5), rate: r(1, 16) }),
-  mask: m('alpha', 'alpha', 'light', ['mask', 'window', 'shape'], { alpha: 'writes', addable: false }, { shape: FIX, x: FIX, y: FIX, size: FIX, aspect: FIX, rotate: FIX, feather: FIX, wobble: FIX, invert: FIX }),
-  outline: m('alpha', 'alpha', 'medium', ['sticker', 'outline', 'die-cut'], { alpha: 'writes', addable: false }, { width: r(2, 30) }),
+  mask: m('alpha', 'alpha', 'light', ['mask', 'window', 'shape'], { alpha: 'writes', addable: false, wet: false }, { shape: FIX, x: FIX, y: FIX, size: FIX, aspect: FIX, rotate: FIX, feather: FIX, wobble: FIX, invert: FIX }),
+  outline: m('alpha', 'alpha', 'medium', ['sticker', 'outline', 'die-cut'], { alpha: 'writes', addable: false, wet: false }, { width: r(2, 30) }),
   crt: m('analog', 'camera', 'light', ['crt', 'scanlines', 'broadcast', 'retro'], {}, { scan: r(0.1, 0.8), lines: r(240, 800), bleed: r(0.001, 0.015), curve: r(0, 0.2), flicker: r(0, 0.2) }),
 };
 
@@ -74,6 +75,9 @@ export function mutationRange(type, def) {
   const o = EFFECT_META[type]?.params?.[def.key]?.range;
   return o ? [Math.max(def.min, o[0]), Math.min(def.max, o[1])] : [def.min, def.max];
 }
+/** Can a roll change this effect's wet/dry? Not when it has its own Mix slider (that already does the job) or is an alpha shaper. */
+export const supportsWet = (type) => EFFECT_META[type]?.wet !== false && !EFFECTS[type]?.params.some((d) => d.key === 'mix');
+export const WET_RANGE = [0.35, 1];
 export const paramOverride = (type, key) => EFFECT_META[type]?.params?.[key] || null;
 export const isParamFixed = (type, key) => !!EFFECT_META[type]?.params?.[key]?.fixed;
 

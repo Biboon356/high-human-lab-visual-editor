@@ -417,6 +417,12 @@ export const EFFECTS = {
   },
 };
 
+/**
+ * Wet / dry for any effect: how much of its result is mixed over what came into it (1 = the effect alone, 0 = skipped).
+ * Stored on the effect itself as `wet` (absent = 1, so older projects are unchanged), animatable under keyframes.wet / bindings.wet.
+ */
+export const WET = { key: 'wet', label: 'Wet / dry', min: 0, max: 1, step: 0.01, def: 1 };
+
 export function defaultParams(type) {
   return Object.fromEntries(EFFECTS[type].params.map((p) => [p.key, p.def]));
 }

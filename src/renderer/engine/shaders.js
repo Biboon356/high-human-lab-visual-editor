@@ -39,6 +39,11 @@ void main(){
 
 export const FRAG_BLIT = FRAG_LAYER;
 
+// Wet / dry between the picture that went into an effect (u_a) and what came out (u_b). Both are premultiplied, so a plain mix is right.
+export const FRAG_WET = `#version 300 es
+precision highp float; in vec2 v_uv; out vec4 o; uniform sampler2D u_a, u_b; uniform float u_w;
+void main(){ o = mix(texture(u_a, v_uv), texture(u_b, v_uv), u_w); }`;
+
 const PRELUDE = `#version 300 es
 precision highp float;
 in vec2 v_uv; out vec4 o;

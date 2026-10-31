@@ -1,12 +1,12 @@
 // Effect chains as plain data, and the gate every generated or imported chain goes through.
 //
 // A "chain" is an array of items shaped like an effect instance without its id:
-//   { type, enabled, params, keyframes, bindings, locked?, lockedParams? }
+//   { type, enabled, params, keyframes, bindings, wet?, locked?, lockedParams? }   (wet: 0..1 mix of the effect over its input; absent = 1)
 // so it converts to and from clip.effects without a second format. `locked` freezes a whole effect: its parameters and on/off state
 // never change, a roll never removes or swaps it, and its order relative to other locked effects never changes (effects around it may
 // still be added or removed, so its index can move). `lockedParams` freezes single parameters (and keeps the effect from being removed). Locks are data on the item, so they
 // save with a DNA.
-import { EFFECTS, createEffect } from '../effects-defs.js';
+import { EFFECTS, WET, createEffect } from '../effects-defs.js';
 import { REACTIVE_SOURCES } from '../params.js';
 import { isHeavy, isPinnedEnd, stageOrder } from './effect-meta.js';
 
@@ -84,21 +84,28 @@ export function validateChain(input) {
     }
     for (const k of Object.keys(src)) if (!def.params.some((d) => d.key === k)) issues.push({ path: `${at}.params.${k}`, code: 'unknown-param', message: `${item.type} has no parameter "${k}"` });
 
+    let wet;
+    if (item.wet !== undefined) {
+      if (!isNum(item.wet)) issues.push({ path: `${at}.wet`, code: 'bad-wet', message: `${item.type}: wet/dry must be a number` });
+      else { const w = snapNumber(WET, item.wet); if (w !== item.wet) issues.push({ path: `${at}.wet`, code: 'clamped', message: `${item.type}.wet: clamped` }); if (w < 1) wet = w; }
+    }
+    const paramDef = (k) => (k === 'wet' ? WET : def.params.find((p) => p.key === k));
     const keyframes = {}, bindings = {};
     for (const [k, track] of Object.entries(item.keyframes || {})) {
-      const d = def.params.find((p) => p.key === k);
+      const d = paramDef(k);
       if (!d || d.kind === 'color' || d.options) { issues.push({ path: `${at}.keyframes.${k}`, code: 'bad-track', message: `cannot animate "${k}"` }); continue; }
       const t = fixTrack(d, track, `${at}.keyframes.${k}`, issues);
       if (t) keyframes[k] = t;
     }
     for (const [k, b] of Object.entries(item.bindings || {})) {
-      const d = def.params.find((p) => p.key === k);
+      const d = paramDef(k);
       if (!d || d.kind === 'color' || d.options || !b || !REACTIVE_SOURCES.includes(b.source) || !isNum(b.amount)) { issues.push({ path: `${at}.bindings.${k}`, code: 'bad-binding', message: `dropped the binding on "${k}"` }); continue; }
       bindings[k] = { source: b.source, amount: Math.min(1, Math.max(-1, b.amount)) };
     }
     const out = { type: item.type, enabled: item.enabled !== false, params, keyframes, bindings };
+    if (wet !== undefined) out.wet = wet;
     if (item.locked) out.locked = true;
-    const lp = (item.lockedParams || []).filter((k) => def.params.some((d) => d.key === k));
+    const lp = (item.lockedParams || []).filter((k) => paramDef(k));
     if (lp.length) out.lockedParams = [...new Set(lp)];
     chain.push(out);
   });
@@ -114,6 +121,7 @@ export function newItem(type, params = {}) {
 /** clip.effects -> chain (drops ids and copies everything). */
 export function effectsToChain(effects) {
   return (effects || []).map((e) => structuredClone({ type: e.type, enabled: e.enabled !== false, params: e.params || {}, keyframes: e.keyframes || {}, bindings: e.bindings || {},
+    ...(Number.isFinite(e.wet) && e.wet < 1 ? { wet: e.wet } : {}),
     ...(e.locked ? { locked: true } : {}), ...(e.lockedParams?.length ? { lockedParams: e.lockedParams } : {}) }));
 }
 
@@ -124,6 +132,7 @@ export function chainToEffects(chain) {
     e.enabled = c.enabled !== false;
     e.keyframes = structuredClone(c.keyframes || {});
     e.bindings = structuredClone(c.bindings || {});
+    if (c.wet !== undefined && c.wet < 1) e.wet = c.wet;
     if (c.locked) e.locked = true; // locks live on the effect so they survive being applied, saved and rolled again
     if (c.lockedParams?.length) e.lockedParams = [...c.lockedParams];
     return e;

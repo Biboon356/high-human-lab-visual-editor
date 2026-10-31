@@ -6,10 +6,13 @@
 //   add an effect, remove one, swap two neighbours
 // What it never touches: locked effects (never changed, removed or swapped), locked parameters, parameters marked fixed in effect-meta.js,
 // parameters that already have keyframes (a keyframe would override the new value anyway), and effects that are not addable.
-import { EFFECTS } from '../effects-defs.js';
+import { EFFECTS, WET } from '../effects-defs.js';
 import { rng, childSeed, nudge, pick, pickWeighted } from './rng.js';
-import { EFFECT_META, addableTypes, isHeavy, isPinnedEnd, mutationRange, paramOverride, isParamFixed } from './effect-meta.js';
-import { validateChain, composeChain, newItem, normalizeHex } from './chain.js';
+import { EFFECT_META, addableTypes, isHeavy, isPinnedEnd, mutationRange, paramOverride, isParamFixed, supportsWet, WET_RANGE } from './effect-meta.js';
+import { validateChain, composeChain, newItem, normalizeHex, snapNumber } from './chain.js';
+
+/** Bumped whenever the same seed would give a different result, so a saved recipe can say it no longer reproduces. */
+export const ENGINE_VERSION = 2;
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
@@ -56,6 +59,11 @@ function mutateParams(r, item, strength) {
       item.params[d.key] = clamp(v + nudge(r) * (hi - lo) * strength * 0.6, lo, hi);
     }
   }
+  // wet / dry: a gentler or stronger dose of the whole effect, for effects that have no Mix of their own
+  if (supportsWet(item.type) && !item.lockedParams?.includes('wet') && !item.keyframes?.wet && r() < pEach * 0.35) {
+    const w = snapNumber(WET, clamp((item.wet ?? 1) + nudge(r) * 0.65 * strength, WET_RANGE[0], WET_RANGE[1]));
+    if (w >= 0.98) delete item.wet; else item.wet = w;
+  }
 }
 
 /** Types a roll may insert right now, with weights. Respects the pool, duplicates, exclusive groups, the heavy budget and bias. */
@@ -96,7 +104,7 @@ export function mutate(base, o = {}) {
   const maxLength = Math.max(minLength, o.maxLength ?? 6, chain.length);
   const maxHeavy = Math.max(o.maxHeavy ?? 1, chain.filter((c) => isHeavy(c.type)).length);
   const allowDuplicates = !!o.allowDuplicates || new Set(chain.map((c) => c.type)).size < chain.length;
-  const before = new Map(chain.map((c) => [c, { ...c.params }]));
+  const before = new Map(chain.map((c) => [c, { ...c.params, wet: c.wet ?? 1 }]));
   const report = { added: [], removed: [], swapped: 0, changed: [], dropped: [] };
 
   for (const item of chain) if (!item.locked) mutateParams(r, item, strength);
@@ -136,7 +144,10 @@ export function mutate(base, o = {}) {
   for (const item of composed.chain) {
     const was = before.get(item);
     if (!was) continue;
-    for (const d of EFFECTS[item.type].params) if (was[d.key] !== item.params[d.key]) report.changed.push({ type: item.type, key: d.key, from: was[d.key], to: item.params[d.key] });
+    for (const d of [...EFFECTS[item.type].params, WET]) {
+      const now = d.key === 'wet' ? item.wet ?? 1 : item.params[d.key];
+      if (was[d.key] !== now) report.changed.push({ type: item.type, key: d.key, from: was[d.key], to: now });
+    }
   }
   const final = validateChain(composed.chain);
   return { chain: final.chain, seed, report, issues: validated.issues };

@@ -8,7 +8,8 @@ import { USER_PRESET_KEY } from './inspector.js';
 import { sampleFeatures } from '/shared/audio-analysis.js';
 import { activeVisualClips } from '/shared/timeline.js';
 import { findMedia } from '/shared/project.js';
-import { EFFECTS } from '/shared/effects-defs.js';
+import { EFFECTS, WET } from '/shared/effects-defs.js';
+import { supportsWet } from '/shared/mutation/effect-meta.js';
 import { effectsToChain, chainToEffects } from '/shared/mutation/chain.js';
 import { variations, mutate, generate } from '/shared/mutation/mutate.js';
 import { newSeed } from '/shared/mutation/rng.js';
@@ -24,7 +25,8 @@ export function mountMutate({ preview }) {
   const root = document.getElementById('mutate-root');
   const pane = root.closest('.pane');
   const renderer = new VariationRenderer();
-  const st = { seed: null, strength: 0.5, count: 6, style: '', heavy: true, base: null, items: [], cmp: new Set() };
+  const st = { seed: null, strength: 0.5, count: 6, style: '', heavy: true, base: null, items: [], cmp: new Set(), ab: { a: 0, b: null }, wipe: 50 };
+  const chainAt = (n) => (n === 0 ? baseChain() : st.items[n - 1]?.chain || null); // cell 0 is Current, then the variations
 
   // ---- the clip being worked on ----
   const target = () => {
@@ -87,6 +89,7 @@ export function mountMutate({ preview }) {
     seedInput.value = seed; delete seedInput.dataset.manual;
     st.seed = seed;
     st.items = variations(baseChain(), { ...opts(), seed, count: st.count });
+    st.ab = { a: 0, b: null };
     buildGrid(); paint();
   }
 
@@ -118,15 +121,32 @@ export function mountMutate({ preview }) {
   // ---- the grid ----
   const cellSize = () => { const { width, height } = store.project.settings, k = 320 / Math.max(width, height); return [Math.max(2, Math.round(width * k)), Math.max(2, Math.round(height * k))]; };
   let canvases = [];
+  let abCanvases = null;
 
   function buildGrid() {
     grid.replaceChildren();
     canvases = [];
+    abCanvases = null;
     baseBar.hidden = !st.base;
     baseBar.replaceChildren(...(st.base ? [el('span', { text: `Rolling from: ${st.base.label}` }), el('button', { text: '↺ back to the clip', id: 'mutate-base-reset', onclick: () => { st.base = null; st.items = []; buildGrid(); paint(); renderKeep(); } })] : []));
     if (!target()) return;
     const [w, h] = cellSize();
     const cells = [{ label: 'Current', chain: baseChain(), seed: null, report: null }, ...st.items.map((v, i) => ({ label: `#${i + 1}`, ...v, i }))];
+    if (st.ab.a >= cells.length) st.ab.a = 0;
+    if (st.ab.b !== null && st.ab.b >= cells.length) st.ab.b = null;
+    // A/B: two cells at once, with a wipe — B is shown left of the divider, A to its right
+    if (st.ab.b !== null && st.ab.b !== st.ab.a) {
+      const ca = el('canvas', { width: w, height: h }), cb = el('canvas', { width: w, height: h });
+      abCanvases = [ca, cb];
+      const wipe = el('input', { type: 'range', min: 0, max: 100, value: st.wipe, id: 'mutate-wipe', 'aria-label': 'Wipe between A and B' });
+      const clipB = () => { cb.style.clipPath = `inset(0 ${100 - st.wipe}% 0 0)`; };
+      wipe.addEventListener('input', () => { st.wipe = Number(wipe.value); clipB(); }); clipB();
+      grid.append(el('div', { class: 'mut-ab', id: 'mutate-ab' },
+        el('div', { class: 'mut-wipe' }, ca, cb),
+        wipe,
+        el('div', { class: 'mut-ab-cap' }, el('span', { text: `B · ${cells[st.ab.b].label} ${describe(cells[st.ab.b].chain)}` }), el('span', { text: `A · ${cells[st.ab.a].label} ${describe(cells[st.ab.a].chain)}` })),
+        el('button', { text: 'Close', id: 'mutate-ab-close', onclick: () => { st.ab.b = null; buildGrid(); paint(); } })));
+    }
     cells.forEach((c, n) => {
       const cv = el('canvas', { width: w, height: h });
       canvases.push(cv);
@@ -139,7 +159,10 @@ export function mountMutate({ preview }) {
           el('button', { text: '★', title: 'Save as DNA (keeps the seed, so it can be reproduced)', 'data-mut-save': c.i, onclick: () => saveDna(c) })];
       grid.append(el('div', { class: 'mut-cell', 'data-mut-cell': n, 'data-seed': c.seed ?? '', 'data-types': c.chain.map((x) => x.type).join(',') },
         cv,
-        el('div', { class: 'mut-cap' }, el('b', { text: c.label }), el('span', { text: describe(c.chain), title: describe(c.chain) })),
+        el('div', { class: 'mut-cap' }, el('b', { text: c.label }), el('span', { text: describe(c.chain), title: describe(c.chain) }),
+          el('span', { class: 'mut-abbtn' },
+            el('button', { text: 'A', class: st.ab.a === n ? 'on' : '', title: 'Compare: put this in slot A', 'data-mut-a': n, onclick: () => { st.ab.a = n; if (st.ab.b === n) st.ab.b = null; buildGrid(); paint(); } }),
+            el('button', { text: 'B', class: st.ab.b === n ? 'on' : '', title: 'Compare: put this in slot B (shows the wipe)', 'data-mut-b': n, onclick: () => { st.ab.b = n; if (st.ab.a === n) st.ab.a = 0; buildGrid(); paint(); } }))),
         el('div', { class: 'mut-meta', text: c.seed === null ? `${c.chain.length} effects` : `seed ${c.seed} · ${rep}`, title: c.seed === null ? '' : 'Type this seed in the box and press Roll to reproduce this exact result' }),
         el('div', { class: 'mut-act' }, buttons)));
     });
@@ -154,8 +177,10 @@ export function mountMutate({ preview }) {
     if (!live) { status.textContent = `Move the playhead onto “${clip.name || 'the clip'}” to see the variations on its frame.`; return; }
     const features = store.project.reactive?.enabled ? sampleFeatures(store.analysis, store.playhead) : null;
     const cells = [baseChain(), ...st.items.map((v) => v.chain)];
+    const draw = (chain, target) => renderer.paint({ project: store.project, sources: preview.sources, t: store.playhead, features, clipId: clip.id, chain, target });
     try {
-      cells.forEach((chain, n) => { if (canvases[n]) renderer.paint({ project: store.project, sources: preview.sources, t: store.playhead, features, clipId: clip.id, chain, target: canvases[n] }); });
+      cells.forEach((chain, n) => { if (canvases[n]) draw(chain, canvases[n]); });
+      if (abCanvases) { draw(chainAt(st.ab.a), abCanvases[0]); draw(chainAt(st.ab.b), abCanvases[1]); }
     } catch (e) { status.textContent = `Could not draw the variations: ${e.message}`; console.error(e); }
   }
   let timer = 0;
@@ -175,7 +200,7 @@ export function mountMutate({ preview }) {
       const def = EFFECTS[fx.type];
       if (!def) continue;
       const lock = el('input', { type: 'checkbox', checked: !!fx.locked, 'data-lock-fx': fx.type });
-      const params = el('details', {}, el('summary', { text: 'values' }), el('div', { class: 'mut-params' }, def.params.map((d) => {
+      const params = el('details', {}, el('summary', { text: 'values' }), el('div', { class: 'mut-params' }, [...def.params, ...(supportsWet(fx.type) ? [WET] : [])].map((d) => {
         const on = !!fx.lockedParams?.includes(d.key);
         const cb = el('input', { type: 'checkbox', checked: on || !!fx.locked, disabled: !!fx.locked, 'data-lock-param': `${fx.type}.${d.key}` });
         cb.addEventListener('change', () => {
@@ -271,8 +296,8 @@ export function mountMutate({ preview }) {
 
   // ---- keeping up with the project ----
   const refreshAll = () => { buildGrid(); renderKeep(); renderLibrary(); paint(); };
-  store.on('selection', () => { st.items = []; st.base = null; refreshAll(); });
-  store.on('reset', () => { st.items = []; st.base = null; st.cmp.clear(); refreshAll(); });
+  store.on('selection', () => { st.items = []; st.base = null; st.ab = { a: 0, b: null }; refreshAll(); });
+  store.on('reset', () => { st.items = []; st.base = null; st.cmp.clear(); st.ab = { a: 0, b: null }; refreshAll(); });
   store.on('project', () => {
     if (!pane.classList.contains('on') && !st.items.length) return;
     // the "Current" cell and the library follow the project; rolled variations stay as they are

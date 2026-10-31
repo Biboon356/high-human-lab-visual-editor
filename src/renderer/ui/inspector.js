@@ -4,7 +4,7 @@ import { paramRow, flatRow, rowUpdaters } from './param-row.js';
 import { findMedia } from '/shared/project.js';
 import { setSpeed, MIN_SPEED, MAX_SPEED } from '/shared/timeline.js';
 import { toast } from './dom.js';
-import { EFFECTS, EFFECT_PRESETS, createEffect, instantiatePreset } from '/shared/effects-defs.js';
+import { EFFECTS, EFFECT_PRESETS, WET, createEffect, instantiatePreset } from '/shared/effects-defs.js';
 import { CLIP_PROPS, TEXT_PROPS, BLEND_MODES, TRANSITIONS } from '/shared/params.js';
 import { TEXT_ANIMATIONS } from '/shared/text-defs.js';
 import { ensureFontList } from './fonts.js';
@@ -182,7 +182,7 @@ export function mountInspector(root) {
           el('button', { text: '↑', title: 'Move earlier in chain', disabled: i === 0, onclick: () => move(-1) }),
           el('button', { text: '↓', title: 'Move later in chain', disabled: i === clip.effects.length - 1, onclick: () => move(1) }),
           el('button', { text: '✕', title: 'Remove', onclick: () => store.mutate(() => clip.effects.splice(i, 1)) })),
-        el('div', { class: 'body' }, def.params.map((d) => paramRow({ owner: fx, def: d, getBase: () => fx.params[d.key] ?? d.def, setBase: (v) => { fx.params[d.key] = v; }, localTime: lt }))));
+        el('div', { class: 'body' }, paramRow({ owner: fx, def: WET, getBase: () => fx.wet ?? 1, setBase: (v) => { if (v >= 1) delete fx.wet; else fx.wet = v; }, localTime: lt }), def.params.map((d) => paramRow({ owner: fx, def: d, getBase: () => fx.params[d.key] ?? d.def, setBase: (v) => { fx.params[d.key] = v; }, localTime: lt }))));
       return sec;
     });
     const c = card('Effects chain (top → bottom)', [el('div', { class: 'fx-toolbar' }, addSel, presetSel, saveBtn),

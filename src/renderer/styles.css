@@ -327,9 +327,14 @@ kbd { font: 500 9.5px var(--mono); letter-spacing: .04em; padding: 1px 6px; bord
 .mut-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .mut-cell { display: grid; gap: 4px; align-content: start; min-width: 0; }
 .mut-cell canvas { width: 100%; height: auto; display: block; background: #000; border: 1px solid var(--line); }
-.mut-cap { display: flex; gap: 6px; align-items: baseline; min-width: 0; font-size: 11px; } .mut-cap b { font: 500 10px var(--mono); color: var(--accent2); } .mut-cap span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+.mut-cap { display: flex; gap: 6px; align-items: baseline; min-width: 0; font-size: 11px; } .mut-cap b { font: 500 10px var(--mono); color: var(--accent2); } .mut-cap span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); flex: 1 1 auto; min-width: 0; }
 .mut-meta { font: 9px var(--mono); color: var(--dim); letter-spacing: .04em; }
 .mut-act { display: flex; flex-wrap: wrap; gap: 4px; } .mut-act button, .mut-base button { height: 22px; padding: 0 7px; font-size: 10px; }
 .mut-lib { border-top: 1px solid var(--line); padding-top: 10px; display: grid; gap: 8px; }
 .mut-dna { display: grid; gap: 3px; padding: 7px 0; border-top: 1px solid var(--line); } .mut-dna small { color: var(--dim); font: 9.5px var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mut-diff { margin: 0; padding: 8px; background: var(--bg2, rgba(0,0,0,.25)); border: 1px solid var(--line); font: 10px/1.5 var(--mono); white-space: pre-wrap; color: var(--text); }
+
+.mut-cap .mut-abbtn { flex: none; overflow: visible; margin-left: auto; display: flex; gap: 2px; } .mut-abbtn button { height: 16px; min-width: 16px; padding: 0 4px; font: 9px var(--mono); } .mut-abbtn button.on { background: var(--accent2); color: #08110b; }
+.mut-ab { grid-column: 1 / -1; display: grid; gap: 6px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+.mut-wipe { position: relative; line-height: 0; } .mut-wipe canvas { width: 100%; height: auto; display: block; background: #000; border: 1px solid var(--line); } .mut-wipe canvas + canvas { position: absolute; left: 0; top: 0; }
+.mut-ab-cap { display: grid; gap: 2px; font: 9.5px var(--mono); color: var(--dim); } .mut-ab-cap span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }

@@ -1,7 +1,7 @@
 // WebGL2 compositor shared by the live preview and the exporter, so the render matches the preview.
 // Per frame: for each visual clip (bottom track first) -> draw source into layer buffer A
 // -> run the effect chain ping-ponging A<->B -> blend onto the accumulation buffer -> blit to canvas.
-import { VERT_QUAD, VERT_LAYER, FRAG_LAYER, FRAG_BLIT, EFFECT_FRAG, GEN_FRAG } from './shaders.js';
+import { VERT_QUAD, VERT_LAYER, FRAG_LAYER, FRAG_BLIT, FRAG_WET, EFFECT_FRAG, GEN_FRAG } from './shaders.js';
 import { activeVisualClips } from '/shared/timeline.js';
 import { findMedia } from '/shared/project.js';
 import { EFFECTS } from '/shared/effects-defs.js';
@@ -107,7 +107,7 @@ export class Compositor {
     this.canvas.width = w; this.canvas.height = h;
     this.textCanvas.width = w; this.textCanvas.height = h;
     for (const f of Object.values(this.fbos)) { gl.deleteTexture(f.tex); gl.deleteFramebuffer(f.fbo); }
-    this.fbos = { a: this._fbo(w, h), b: this._fbo(w, h), acc: this._fbo(w, h), m: this._fbo(w, h) };
+    this.fbos = { a: this._fbo(w, h), b: this._fbo(w, h), acc: this._fbo(w, h), m: this._fbo(w, h), c: this._fbo(w, h) }; // c: spare for wet/dry mixes (m is busy holding a matte while a chain runs)
     this.maskCanvas.width = this.maskScratch.width = w; this.maskCanvas.height = this.maskScratch.height = h;
     for (const e of this.maskTex.values()) gl.deleteTexture(e.tex);
     this.maskTex.clear();
@@ -228,6 +228,20 @@ export class Compositor {
     this._draw();
   }
 
+  /** dst = mix(a, b, w). All three must be different buffers; unit 1 is released afterwards (a texture left bound there would be a feedback loop the next time it is a target). */
+  _wetMix(a, b, dst, w) {
+    const p = this._program('wet', VERT_QUAD, FRAG_WET);
+    this._target(dst);
+    this.gl.disable(this.gl.BLEND);
+    this._use(p);
+    this._bindTex(a.tex);
+    this._bindUnit(1, b.tex);
+    this._set1i('u_a', 0); this._set1i('u_b', 1);
+    this._set1('u_w', w);
+    this._draw();
+    this._bindUnit(1, null);
+  }
+
   _runGenerator(clip, tLocal, feats, time) {
     const p = this._program('gen', VERT_QUAD, GEN_FRAG);
     this._target(this.fbos.a);
@@ -300,12 +314,15 @@ export class Compositor {
     }
     if (!ready) return null;
 
-    let cur = this.fbos.a, other = this.fbos.b;
+    let cur = this.fbos.a, other = this.fbos.b, spare = this.fbos.c;
     const chain = trans ? [...clip.effects, ...trans.effects] : clip.effects;
     for (const fx of chain) {
       if (!fx.enabled || !EFFECTS[fx.type]) continue;
+      const wet = fx.wet === undefined && !fx.keyframes?.wet && !fx.bindings?.wet ? 1 : resolveParam(fx, 'wet', fx.wet ?? 1, tl, features, [0, 1]);
+      if (wet <= 0.002) continue; // fully dry: the effect contributes nothing, so do not pay for it
       this._runEffect(fx, cur, other, clip, tl, features, t);
-      [cur, other] = [other, cur];
+      if (wet < 0.998) { this._wetMix(cur, other, spare, wet); [cur, other, spare] = [spare, cur, other]; } // the mix is the new picture; the two older buffers are free
+      else [cur, other] = [other, cur];
     }
     return { cur, props, t3, flat };
   }

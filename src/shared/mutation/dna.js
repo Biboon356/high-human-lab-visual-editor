@@ -2,7 +2,7 @@
 //   { schema, id, name, note, tags, createdAt, parentId, seed, source, recipe, chain }
 //   parentId  the DNA this one was duplicated or rolled from (lineage)
 //   seed      the seed of the roll that made it, when it came from one
-//   recipe    {mode:'mutate'|'generate', base, options} — everything mutate()/generate() needs, so reproduceDna() can rebuild the chain
+//   recipe    {mode:'mutate'|'generate', base, options, engine} — everything mutate()/generate() needs, so reproduceDna() can rebuild the chain
 //   source    {kind:'manual'|'mutation'|'look'|'migrated'|'import', ...}
 // The library lives in project.dna[] (so it travels with the .hhlab file and is covered by undo and autosave). Built-in looks are
 // exposed as read-only DNA by builtinDna() and are never copied into the project unless the user saves one.
@@ -12,7 +12,7 @@ import { EFFECT_PRESETS, instantiatePreset } from '../effects-defs.js';
 import { ADJUST_LOOKS, ORGANIC_LOOKS } from '../adjust-defs.js';
 import { EFFECT_META, isHeavy } from './effect-meta.js';
 import { validateChain, effectsToChain } from './chain.js';
-import { mutate, generate } from './mutate.js';
+import { mutate, generate, ENGINE_VERSION } from './mutate.js';
 import { toSeed } from './rng.js';
 
 export const DNA_SCHEMA = 1;
@@ -40,7 +40,7 @@ function cleanRecipe(r) {
   if (Array.isArray(pool)) options.pool = pool.filter((t) => typeof t === 'string');
   for (const [k, v] of Object.entries({ minLength, maxLength, maxHeavy, length })) if (Number.isFinite(v)) options[k] = v;
   const base = r.mode === 'mutate' ? validateChain(r.base || []).chain : null;
-  return { mode: r.mode, base, options };
+  return { mode: r.mode, base, options, engine: Number.isFinite(r.engine) ? r.engine : null };
 }
 
 /**
@@ -85,7 +85,7 @@ export function dnaFromRoll({ base = [], options, mode, name, parentId = null, n
   if (!options || options.seed === undefined || options.seed === null) throw new Error('dnaFromRoll needs options.seed');
   const m = mode || (base?.length ? 'mutate' : 'generate');
   const out = m === 'mutate' ? mutate(base, options) : generate(options);
-  const { dna } = createDna({ name: name || `Roll ${String(options.seed).slice(0, 10)}`, chain: out.chain, note, tags, seed: options.seed, parentId, source: { kind: 'mutation' }, recipe: { mode: m, base: m === 'mutate' ? base : null, options }, now });
+  const { dna } = createDna({ name: name || `Roll ${String(options.seed).slice(0, 10)}`, chain: out.chain, note, tags, seed: options.seed, parentId, source: { kind: 'mutation' }, recipe: { mode: m, base: m === 'mutate' ? base : null, options, engine: ENGINE_VERSION }, now });
   return { dna, report: out.report };
 }
 
@@ -93,6 +93,7 @@ export function dnaFromRoll({ base = [], options, mode, name, parentId = null, n
 export function reproduceDna(dna) {
   const r = dna?.recipe;
   if (!r) return { chain: null, same: false };
+  if (r.engine !== ENGINE_VERSION) return { chain: null, same: false, reason: 'engine' }; // rolled by an engine that gave other results for this seed
   const out = r.mode === 'mutate' ? mutate(r.base || [], r.options) : generate(r.options);
   return { chain: out.chain, same: stableStringify(out.chain) === stableStringify(validateChain(dna.chain).chain) };
 }
@@ -117,6 +118,7 @@ export function diffChains(a, b) {
     const x = ma.get(k), y = mb.get(k);
     if ((x.enabled !== false) !== (y.enabled !== false)) enabled.push(x.type);
     for (const p of new Set([...Object.keys(x.params), ...Object.keys(y.params)])) if (!same(x.params[p], y.params[p])) changed.push({ type: x.type, key: p, from: x.params[p], to: y.params[p] });
+    if (!same(x.wet ?? 1, y.wet ?? 1)) changed.push({ type: x.type, key: 'wet', from: x.wet ?? 1, to: y.wet ?? 1 });
   }
   return { identical: !added.length && !removed.length && !reordered && !changed.length && !enabled.length, added, removed, reordered, enabled, changed,
     summary: { lengthA: A.length, lengthB: B.length, heavyA: A.filter((c) => isHeavy(c.type)).length, heavyB: B.filter((c) => isHeavy(c.type)).length } };

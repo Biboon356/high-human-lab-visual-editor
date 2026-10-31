@@ -231,3 +231,50 @@ test('applying a roll: chainToEffects gives fresh instances with ids, known type
   assert.equal(new Set(effects.map((e) => e.id)).size, effects.length);
   for (const e of effects) { assert.ok(EFFECTS[e.type] && EFFECT_FRAG[e.type]); assert.equal(e.enabled, true); }
 });
+
+test('wet / dry: validated, snapped, animatable, carried through clip.effects, and absent means 1', () => {
+  const { chain, issues } = validateChain([
+    { ...newItem('glitch'), wet: 0.456 }, { ...newItem('grain'), wet: 1.7 }, { ...newItem('crt'), wet: 'x' },
+    { ...newItem('vhs'), keyframes: { wet: [{ t: 2, v: 0.2 }, { t: 0, v: 3 }] }, bindings: { wet: { source: 'beat', amount: 0.5 } }, lockedParams: ['wet', 'nope'] },
+  ]);
+  assert.equal(chain[0].wet, 0.46);
+  assert.equal('wet' in chain[1], false, 'wet 1 is the same as absent');
+  assert.equal('wet' in chain[2], false);
+  assert.deepEqual(chain[3].keyframes.wet, [{ t: 0, v: 1 }, { t: 2, v: 0.2 }]);
+  assert.deepEqual(chain[3].bindings.wet, { source: 'beat', amount: 0.5 });
+  assert.deepEqual(chain[3].lockedParams, ['wet']);
+  assert.deepEqual(issues.map((i) => i.code).sort(), ['bad-wet', 'clamped', 'clamped'], '0.456 was snapped and 1.7 clamped; "x" was refused');
+  const effects = chainToEffects(chain);
+  assert.equal(effects[0].wet, 0.46); assert.equal(effects[1].wet, undefined);
+  assert.deepEqual(effectsToChain(effects), chain, 'wet survives the round trip');
+  assert.equal(newItem('glitch').wet, undefined, 'a fresh effect carries no wet');
+});
+
+test('rolls can dial an effect down with wet/dry, but only where that makes sense, inside 0.35..1, and never when locked', () => {
+  const seen = { dialled: 0, ownMix: 0, alpha: 0, low: 1 };
+  for (let s = 0; s < 400; s++) {
+    const { chain } = generate({ seed: s, length: 4, strength: 1 });
+    for (const c of chain) if (c.wet !== undefined) {
+      seen.dialled++; seen.low = Math.min(seen.low, c.wet);
+      if (EFFECTS[c.type].params.some((d) => d.key === 'mix')) seen.ownMix++;
+      if (['crop', 'mask', 'outline'].includes(c.type)) seen.alpha++;
+      assert.ok(c.wet >= 0.35 && c.wet < 1, `wet ${c.wet}`);
+    }
+  }
+  assert.ok(seen.dialled > 40, `${seen.dialled} dialled-down effects in 400 rolls`);
+  assert.equal(seen.ownMix, 0, 'effects with their own Mix are left to it'); assert.equal(seen.alpha, 0);
+  assert.ok(seen.low <= 0.5, `it can go well down (${seen.low})`);
+  const base = [{ ...newItem('glitch'), wet: 0.8, lockedParams: ['wet'] }, { ...newItem('grain'), keyframes: { wet: [{ t: 0, v: 0.5 }, { t: 1, v: 1 }] } }];
+  for (let s = 0; s < 200; s++) {
+    const out = mutate(base, { seed: s, strength: 1 });
+    assert.equal(out.chain.find((c) => c.type === 'glitch').wet, 0.8);
+    assert.equal(out.chain.find((c) => c.type === 'grain').wet, undefined, 'animated wet is not overwritten');
+  }
+  const dialled = mutate(chainOf3(), { seed: 3, strength: 0 });
+  assert.ok(dialled.chain.every((c) => c.wet === undefined || c.wet === 0.9), 'strength 0 leaves wet alone');
+  // a change to wet shows up in the report
+  let reported = false;
+  for (let s = 0; s < 200 && !reported; s++) reported = mutate([newItem('glitch'), newItem('grain')], { seed: s, strength: 1 }).report.changed.some((c) => c.key === 'wet');
+  assert.ok(reported);
+});
+const chainOf3 = () => [{ ...newItem('glitch'), wet: 0.9 }, newItem('grain')];

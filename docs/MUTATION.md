@@ -12,7 +12,7 @@ else, and the source media is never touched.
 | M2 | `mutate()` / `generate()` / `variations()`, `composeChain()`, e2e render check | done |
 | M3 | DNA model and library (save, duplicate, diff, import/export text, migrate user presets) — pure data layer | done (`dna.js`); no UI or file dialog yet |
 | M4 | Mutate tab: variation grid on the real frame, Use (one Undo step), locks, DNA panel, `.hhdna` open/save, migration of old presets | done (`ui/mutate-ui.js`, `engine/variation-preview.js`) |
-| M5 | Per-effect wet/dry `mix` in the compositor, A/B compare | planned (decided: a small compositor change is allowed) |
+| M5 | Per-effect wet/dry in the compositor, A/B wipe compare | done |
 | M6 | Rule-based Creative Director (no external API) | planned |
 | M7 | Optional LLM adapter emitting the same constraints JSON | optional |
 
@@ -73,7 +73,7 @@ with timings.
 
 ## What is deliberately not here yet
 
-Per-effect wet/dry and an A/B split view (M5); description-to-chain
+Description-to-chain translation (M6); description-to-chain
 translation (M6). Effects that keep state between frames, feedback loops and custom GLSL remain roadmap items in `ROADMAP.md`.
 
 ## The Mutate tab (M4)
@@ -94,3 +94,17 @@ Left panel, tab 05. Select a clip, put the playhead on it, press **Roll**.
 
 Not done: the grid only draws while paused and while the playhead is on the clip; there is no A/B split yet (M5); thumbnails use
 the preview's decoded frames, so a clip that has not loaded a frame yet shows nothing until it does.
+
+## Wet / dry and A/B (M5)
+
+* **Wet / dry** is a universal effect property: `fx.wet` (0..1, absent = 1, so older projects are unchanged), animatable under
+  `keyframes.wet` and `bindings.wet`. The compositor mixes the effect's result back over what went into it
+  (`FRAG_WET`, a third spare buffer `c`; an effect at 0 is skipped entirely). The Inspector's effect card has a *Wet / dry* row.
+  Previously only 11 of the 38 effects had a Mix slider of their own; now all of them can be dialled down, in preview and export
+  alike (e2e renders a wet/dry effect and exports it).
+* **Rolls use it** for effects that have no Mix of their own (alpha shapers such as crop, mask and outline are excluded): within
+  0.35..1, never when `wet` is locked or keyframed. Because the same seed now makes different choices, `mutate.js` exports
+  `ENGINE_VERSION` (2) and a DNA recipe stores it; `reproduceDna` answers `{same:false, reason:'engine'}` for a recipe rolled by
+  another engine version instead of giving a different chain silently.
+* **A/B:** each cell has **A** and **B** buttons. With two cells picked, the Mutate tab shows both at full panel width with a
+  wipe slider (B on the left of the divider, A on the right) — same renderer, same frame.

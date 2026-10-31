@@ -1607,6 +1607,54 @@ await step('safe-zone guide toggles and follows the 9:16 canvas', async () => {
   await page.click('#t-safe'); assert.equal(await ev(() => document.querySelector('.safe-zone').hidden), true);
 });
 
+await step('wet / dry: any effect can be mixed back over its input (preview, keyframes, Inspector row, export), and an effect at 0 costs nothing', async () => {
+  await resetProject();
+  await ev(async (c) => { await window.__app.importPaths([c]); const { store } = window.__app;
+    store.mutate((p) => { p.settings.width = 480; p.settings.height = 270; }); store.select(store.project.clips.find((x) => x.type === 'media').id); store.setPlayhead(1.2); }, clip);
+  await settle(700);
+  const errorsBefore = logs.length;
+  const r = await ev(async () => {
+    const { store, preview } = window.__app; const { createEffect } = await import('/shared/effects-defs.js');
+    const cl = () => store.project.clips.find((x) => x.type === 'media');
+    const gl = preview.comp.gl; gl.getError();
+    const mean = () => { const d = window.__grab(64, 36); let s = 0; for (let i = 0; i < d.length; i++) s += d[i]; return s / d.length; };
+    const grab = () => window.__grab(64, 36);
+    const set = async (fx) => { store.mutate(() => { cl().effects = fx; }); await new Promise((res) => setTimeout(res, 220)); };
+    const dark = (extra = {}) => ({ ...createEffect('color', { brightness: -0.9 }), ...extra });
+    await set([]); const base = mean(), basepx = grab();
+    await set([dark()]); const full = mean();
+    await set([dark({ wet: 0.5 })]); const half = mean();
+    await set([dark({ wet: 0 })]); const none = mean(), nonePx = grab();
+    await set([dark({ keyframes: { wet: [{ t: 0, v: 0 }, { t: 2, v: 1 }] } })]); const anim = mean(); // playhead is 1.2 s into the clip
+    // three effects with a mix in the middle: the buffers rotate and the picture must still be sound
+    await set([createEffect('grain', { amount: 0.2 }), dark({ wet: 0.4 }), createEffect('crt', {}), createEffect('chroma', {})]); const chain3 = mean();
+    return { base, full, half, none, anim, chain3, same: basepx.every((v, i) => v === nonePx[i]), glError: gl.getError(), threw: preview.stats.lastError?.message || null };
+  });
+  assert.ok(r.full < r.base - 25, `the effect alone darkens the picture (${r.base.toFixed(0)} -> ${r.full.toFixed(0)})`);
+  assert.ok(r.half > r.full + 8 && r.half < r.base - 8, `wet 0.5 lands between the two (${r.full.toFixed(0)} < ${r.half.toFixed(0)} < ${r.base.toFixed(0)})`);
+  assert.equal(r.same, true, 'wet 0 is the untouched picture, pixel for pixel');
+  assert.ok(r.anim > r.full + 5 && r.anim < r.base - 5, `a keyframed wet follows its curve (${r.anim.toFixed(0)})`);
+  assert.ok(r.chain3 > 8 && !r.glError && !r.threw, `a mix in the middle of a chain renders cleanly (${r.chain3.toFixed(0)}, GL ${r.glError}, ${r.threw})`);
+
+  // the Inspector row
+  await ev(async () => { const { store } = window.__app; const { createEffect } = await import('/shared/effects-defs.js'); store.mutate((p) => { p.clips.find((x) => x.type === 'media').effects = [createEffect('glitch')]; }); store.select(null); store.select(store.project.clips.find((x) => x.type === 'media').id); });
+  await settle(400);
+  const row = page.locator('.fx-card .row', { hasText: 'Wet / dry' }).first();
+  assert.equal(await row.count(), 1, 'the effect card has a Wet / dry row');
+  await row.locator('input[type=range]').evaluate((i) => { i.value = 0.5; i.dispatchEvent(new Event('input', { bubbles: true })); });
+  assert.equal(await ev(() => window.__app.store.project.clips.find((x) => x.type === 'media').effects[0].wet), 0.5, 'moving it sets the effect\'s wet');
+  await row.locator('input[type=range]').evaluate((i) => { i.value = 1; i.dispatchEvent(new Event('input', { bubbles: true })); });
+  assert.equal(await ev(() => window.__app.store.project.clips.find((x) => x.type === 'media').effects[0].wet), undefined, 'back at 1 it is simply absent again');
+
+  // export goes through the same compositor
+  await ev(async () => { const { store } = window.__app; store.mutate((p) => { const c = p.clips.find((x) => x.type === 'media'); c.duration = 1; c.effects[0].wet = 0.5; }); });
+  const out = path.join(dir, 'wet.mp4');
+  await ev((o) => window.__app.exportTo(o, { width: 320, height: 180, fps: 10, quality: 'draft' }), out);
+  const info = probe(out);
+  assert.ok(Math.abs(Number(info.format.duration) - 1) < 0.3, `the export with a wet/dry effect has the right length (${info.format.duration})`);
+  assert.equal(logs.slice(errorsBefore).filter((l) => /shader|compile|GLSL|WebGL|error/i.test(l)).length, 0, 'no errors in the console');
+});
+
 await step('mutation engine: 100 seeded rolls render through the real compositor with no GL errors and no blank frames, and a saved seed reproduces the picture', async () => {
   await resetProject();
   await ev(async (c) => { await window.__app.importPaths([c]); const { store } = window.__app; // importing places the first clip on the timeline by itself
@@ -1669,6 +1717,18 @@ await step('mutate tab: variations draw on the real frame, a typed seed reproduc
   await shot('35-mutate-top');
   await ev(() => { document.querySelector('#panel-left [data-pane="mutate"]').scrollTop = 330; }); await settle(250); await shot('35-mutate-grid');
   await ev(() => { document.querySelector('#panel-left [data-pane="mutate"]').scrollTop = 0; });
+  // A/B: pick two cells, a wipe divides them
+  await page.click('[data-mut-b="1"]'); await settle(700);
+  const ab = await ev(() => { const box = document.getElementById('mutate-ab'); if (!box) return null; const cvs = [...box.querySelectorAll('canvas')]; return { n: cvs.length, mean: cvs.map((cv) => { const d = window.__readCanvas(cv); let t = 0; for (let i = 0; i < d.length; i += 4) t += d[i] + d[i + 1] + d[i + 2]; return t / (d.length / 4) / 3; }), clip: cvs[1].style.clipPath, cap: box.querySelector('.mut-ab-cap').textContent }; });
+  assert.ok(ab && ab.n === 2 && ab.mean.every((m) => m > 8), `A/B shows two drawn pictures (${JSON.stringify(ab?.mean)})`);
+  assert.match(ab.cap, /B · #1/); assert.match(ab.cap, /A · Current/);
+  await ev(() => { const w = document.getElementById('mutate-wipe'); w.value = 30; w.dispatchEvent(new Event('input')); });
+  assert.match(await ev(() => document.querySelectorAll('#mutate-ab canvas')[1].style.clipPath), /70%/, 'the wipe moves the divider');
+  await ev(() => { document.querySelector('#panel-left [data-pane="mutate"]').scrollTop = 300; }); await settle(250); await shot('35-mutate-ab');
+  await page.click('[data-mut-a="2"]'); await settle(300);
+  assert.match(await ev(() => document.querySelector('#mutate-ab .mut-ab-cap').textContent), /A · #2/, 'slot A follows the click');
+  await page.click('#mutate-ab-close'); await settle(200);
+  assert.equal(await ev(() => !!document.getElementById('mutate-ab')), false, 'Close puts the grid back');
   // a typed seed reproduces the whole grid
   await page.fill('#mutate-seed', '4321'); await page.click('#mutate-roll'); await settle(500);
   const a = await cells();

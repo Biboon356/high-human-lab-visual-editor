@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createProject, validateProject } from '../src/shared/project.js';
 import { newItem, validateChain, effectsToChain } from '../src/shared/mutation/chain.js';
-import { mutate } from '../src/shared/mutation/mutate.js';
+import { mutate, ENGINE_VERSION } from '../src/shared/mutation/mutate.js';
 import {
   createDna, normalizeDna, dnaFromRoll, reproduceDna, diffChains, libraryOf, findDna, addDna, removeDna, renameDna, duplicateDna, lineage,
   builtinDna, isBuiltin, exportDna, parseDnaFile, migrateUserPresets, chainHash, stableStringify, MAX_LIBRARY, FILE_FORMAT,
@@ -188,4 +188,16 @@ test('any look can be turned into DNA and back into the same effect chain', () =
     assert.ok(d, l.name);
     assert.deepEqual(d.chain.map((c) => c.type), l.chain.map((c) => c.type), l.name);
   }
+});
+
+test('wet/dry shows up in a diff, and a recipe from another engine version says so instead of lying', () => {
+  const a = [newItem('glitch')], b = [{ ...newItem('glitch'), wet: 0.6 }];
+  assert.deepEqual(diffChains(a, b).changed, [{ type: 'glitch', key: 'wet', from: 1, to: 0.6 }]);
+  assert.equal(diffChains(a, structuredClone(a)).identical, true);
+  const { dna } = dnaFromRoll({ base: chainOf('vhs'), options: { seed: 4 }, now: T });
+  assert.equal(dna.recipe.engine, ENGINE_VERSION);
+  const old = structuredClone(dna); old.recipe.engine = ENGINE_VERSION - 1;
+  assert.deepEqual(reproduceDna(old), { chain: null, same: false, reason: 'engine' });
+  const none = structuredClone(dna); delete none.recipe.engine;
+  assert.equal(reproduceDna(none).reason, 'engine');
 });
