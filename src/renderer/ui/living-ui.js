@@ -167,6 +167,7 @@ export function mountLiving({ preview, runAnalysis, renderer }) {
     dnaStatus.textContent = `Living layer added over ${dur.toFixed(1)} s${bars ? ': it grows with the energy of the music' : ' (analyse the music, in the Audio-Reactive tab, and it will grow with it)'}. Undo removes it.`;
   }
   function renderDna() {
+    const wasOpen = dnaCard.querySelector('details.liv-adv')?.open; // the card is rebuilt whenever the project changes: keep Advanced the way the artist left it
     dnaCard.replaceChildren();
     const dna = projectDna(), id = dna?.identity;
     if (!id) { dnaCard.append(el('p', { class: 'hint', text: 'No identity yet. Read the project and it gets one: a name, a palette, how it moves, and suggestions for the tools.' })); return; }
@@ -185,6 +186,7 @@ export function mountLiving({ preview, runAnalysis, renderer }) {
         el('button', { id: 'dna-use-trace', text: 'Use for Trace', title: 'Sets Smoothing and the trace mode', onclick: () => applyTrace(id) }),
         el('button', { id: 'dna-save', text: 'Save to library', title: 'Copies it into the DNA library of this project (Mutate tab)', onclick: () => store.mutate((p) => { addDna(p, dna); }) }))),
       el('p', { class: 'hint', text: 'In the Mutate tab, tick “lean toward the project\'s identity” to let rolls follow it.' }));
+    if (wasOpen) dnaCard.querySelectorAll('details.liv-adv').forEach((d) => { d.open = true; });
   }
   function applyMemory(id) {
     Object.assign(mem, { mode: id.memory.mode, length: id.memory.length, intensity: id.memory.intensity, blend: id.memory.blend });
