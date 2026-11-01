@@ -1623,6 +1623,7 @@ await step('living lab (take + trace): a take becomes ordinary keyframes in one 
     await page.mouse.up();
   };
 
+  assert.equal(await ev(() => document.getElementById('living-loop').checked), true, 'looping is on unless switched off');
   await page.uncheck('#living-loop'); // these checks are about one straight pass; looping has its own step below
   // ---- TAKE: pad + an Inspector slider, performed while the timeline plays
   assert.ok(await ev(() => !!document.querySelector('#pad-x option[value="clip.x"]')), 'the pad can steer the clip position');
@@ -1962,7 +1963,6 @@ await step('loop recording: Take and Trace loop over the marked range, the selec
     store.select(store.project.clips.find((x) => x.name === 'A').id); store.setPlayhead(1.5); }, pic);
   await page.click('#panel-left [data-tab="living"]'); await settle(500);
   await ev(() => document.getElementById('living-take')?.scrollIntoView());
-  assert.equal(await ev(() => document.getElementById('living-loop').checked), true, 'looping is on unless switched off');
   await page.check('#living-loop');
   await ev(() => { document.getElementById('pad-x').value = 'clip.x'; document.getElementById('pad-y').value = 'clip.y'; });
   const S = () => ev(() => { const s = window.__app.store; return { depth: s.undoStack.length, playing: s.playing, loop: s.loopRange, head: s.playhead, json: JSON.stringify(s.project, (k, v) => (k === 'stillHere' ? undefined : v)) }; });
