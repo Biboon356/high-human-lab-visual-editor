@@ -1617,6 +1617,7 @@ await step('living lab (take + trace): a take becomes ordinary keyframes in one 
   const media = () => ev(() => { const c = window.__app.store.project.clips.find((x) => x.type === 'media'); return { kf: JSON.parse(JSON.stringify(c.keyframes)), fx: JSON.parse(JSON.stringify(c.effects[0].keyframes)), tracks: window.__app.store.project.tracks.length, clips: window.__app.store.project.clips.length }; });
   const undoDepth = () => ev(() => window.__app.store.undoStack.length);
   const dragPad = async (ms) => {
+    await ev(() => document.getElementById('take-pad').scrollIntoView({ block: 'center' })); await page.waitForTimeout(120); // the pad must be on screen for the mouse to reach it
     const r = await page.locator('#take-pad').boundingBox(); const t0 = Date.now();
     await page.mouse.move(r.x + r.width * 0.1, r.y + r.height * 0.5); await page.mouse.down();
     while (Date.now() - t0 < ms) { const k = (Date.now() - t0) / ms; await page.mouse.move(r.x + r.width * (0.1 + 0.8 * k), r.y + r.height * (0.5 + 0.35 * Math.sin(k * 9))); await page.waitForTimeout(25); }
@@ -1832,6 +1833,7 @@ await step('project dna: the project gets a deterministic identity from its musi
   await read(5);
 
   // it only suggests: the buttons are the user's
+  await ev(() => document.querySelectorAll('details.liv-adv').forEach((d) => { d.open = true; })); // the identity card's extra buttons sit under Advanced
   await page.click('#dna-use-memory'); await settle(150);
   assert.equal(await ev(() => Number(document.getElementById('memory-mode').value)), a.mem.mode, 'Use for Memory fills the MEMORY controls');
   assert.equal(await ev(() => Number(document.getElementById('memory-length').value)), Math.round(a.mem.length * 10) / 10, 'the length, as far as the slider\'s 0.1 s steps allow');
@@ -1966,6 +1968,7 @@ await step('loop recording: Take and Trace loop over the marked range, the selec
   await ev(() => { document.getElementById('pad-x').value = 'clip.x'; document.getElementById('pad-y').value = 'clip.y'; });
   const S = () => ev(() => { const s = window.__app.store; return { depth: s.undoStack.length, playing: s.playing, loop: s.loopRange, head: s.playhead, json: JSON.stringify(s.project, (k, v) => (k === 'stillHere' ? undefined : v)) }; });
   const dragPad = async (ms) => {
+    await ev(() => document.getElementById('take-pad').scrollIntoView({ block: 'center' })); await page.waitForTimeout(120); // the pad must be on screen for the mouse to reach it
     const r = await page.locator('#take-pad').boundingBox(); const t0 = Date.now();
     await page.mouse.move(r.x + r.width * 0.1, r.y + r.height * 0.5); await page.mouse.down();
     while (Date.now() - t0 < ms) { const k = (Date.now() - t0) / ms; await page.mouse.move(r.x + r.width * (0.1 + 0.8 * k), r.y + r.height * (0.5 + 0.3 * Math.sin(k * 7))); await page.waitForTimeout(25); }
