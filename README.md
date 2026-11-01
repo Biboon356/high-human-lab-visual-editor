@@ -209,6 +209,22 @@ without you.
   of it fails, the editor carries on.
 * Tests: 237 unit, and end-to-end steps for Still Here, the Living Timeline and the gate (75+ steps in all).
 
+
+## v0.9.1 — loop, groups, and an easier Living tab
+
+* **Loop while recording** (Living tab): Take and Trace play round and round over the marked In/Out range, else the selected clips, else
+  the whole project, so you keep trying without going back to the start. Take: each pass becomes ordinary keyframes and a later pass
+  replaces an earlier one where they overlap (so you can build a performance up parameter by parameter); Trace keeps the last good pass.
+  REC keeps everything as one Undo step; Esc puts the whole project back.
+* **Accident works where you are**: only at the cuts and overlaps near the playhead (about 1.5 s); nowhere near one, nothing is offered
+  and it says why. **Select two or more clips and it works on them as a group**: one accident across every cut between them (or "unstable"
+  on all of them at once, e.g. several titles), applied with one Undo step.
+* **Groups elsewhere**: TIMELINE chains three or more selected clips (A→B→C); Memory, Add signature look and BRING BACK go onto every
+  selected clip at once.
+* **Easier Living tab**: every section starts with one line saying what to do; the fine controls (Mutate's style and seed, DNA's seed and
+  extra buttons, Memory's blend, length and intensity, Still Here's auto-keep, the quiet-suggestions switch) are folded under
+  **Advanced**; DNA has a single **Make my look** button (reads the project and grows a living layer).
+
 ## HDR phone footage (iPhone HLG / PQ)
 
 A clip shot in HDR is 10-bit BT.2020 with an HLG curve. Decoded as ordinary video it looks washed out. The app now recognises such

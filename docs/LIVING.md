@@ -121,6 +121,16 @@ track above it) — and plans up to three accidents of different kinds, each wit
 * Limits: thumbnails show the frame at the playhead (it is parked by the first accident), so *The cut remembers* and *Unstable* are
   labelled “shows while the timeline plays”; a project with no cuts, overlaps or selection gets no accidents (the button says why).
 
+## v0.9.1 additions
+
+* **Loop** (`living/controller.js`, `store.loopRange`, the preview's frame loop): a session can loop over the marked range, else the selected
+  clips, else the project. The preview wraps and emits `loop`; the controller starts a new pass (the clock restarts at the loop's start).
+  Take: a pass is finished into ordinary keyframes and recording restarts, so later passes replace earlier ones where they overlap and
+  parameters not touched in a pass keep playing back what an earlier pass recorded. Trace: the last pass with enough points is kept. Esc after
+  a finished pass restores the project from the session's undo snapshot.
+* **Accident scope** (`planAccidents`, `at` and the selection): two or more selected clips = a group (all their cuts and overlaps, one
+  combined accident, `combinePlans`); otherwise the relations within `window` seconds (1.5) of the playhead; without `at`, anywhere.
+
 ## What is not built (honestly)
 
 * MIDI input (the take recorder is ready for it: `LabTake.perform(slot, value)`).
