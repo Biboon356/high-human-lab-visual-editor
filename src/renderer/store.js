@@ -26,6 +26,7 @@ class Store {
     this.pendingSnap = null;
     this.clipboard = null; // copied clip (JSON)
     this.relinkedMedia = null;
+    this.loopRange = null; // [start, end] while a Take or Trace loops over a stretch (set by living/controller.js, read by the preview)
     this.recorder = null; // a running Lab Take (see living/lab-take.js); param-row.js reports value changes to it
     this.changeKind = 'load'; // what the last 'project' notification was: 'edit' | 'undo' | 'redo' | 'load' (the Creative Memory Engine reads it)
   }

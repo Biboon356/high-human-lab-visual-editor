@@ -92,8 +92,10 @@ export function mountPreview() {
     if (store.playing) {
       let t = tStart + (performance.now() - wallStart) / 1000;
       const d = duration();
-      if (t >= d) {
-        if (loop.checked && d > 0) { t = 0; tStart = 0; wallStart = performance.now(); }
+      const lr = store.loopRange; // a Take or Trace that loops over a stretch (the marked range, the selected clips, or the project)
+      if (t >= (lr ? Math.min(lr[1], d) : d)) {
+        if (lr) { t = lr[0]; tStart = t; wallStart = performance.now(); store.emit('loop'); }
+        else if (loop.checked && d > 0) { t = 0; tStart = 0; wallStart = performance.now(); }
         else { t = d; store.setPlayhead(t); pause(); draw(); return; }
       }
       store.playhead = t;

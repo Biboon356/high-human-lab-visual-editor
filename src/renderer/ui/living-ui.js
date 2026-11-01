@@ -32,6 +32,8 @@ export function mountLiving({ preview, runAnalysis, renderer }) {
   const smooth = el('input', { type: 'range', min: 0, max: 100, step: 1, value: Math.round(ctrl.settings.smooth * 100), id: 'living-smooth', 'aria-label': 'Smoothing' });
   const smoothOut = el('span', { class: 'mut-out', text: `${smooth.value}%` });
   smooth.addEventListener('input', () => { ctrl.settings.smooth = Number(smooth.value) / 100; smoothOut.textContent = `${smooth.value}%`; });
+  const loopBox = el('input', { type: 'checkbox', id: 'living-loop', checked: ctrl.settings.loop });
+  loopBox.addEventListener('change', () => ctrl.setLoop(loopBox.checked));
   const result = el('p', { class: 'hint liv-result', id: 'living-result' });
   // a take or a trace you like can go straight to Still Here (the same shelf, the same Keep as everywhere else)
   const keepPerf = el('button', { id: 'living-keep', hidden: true, onclick: () => {
@@ -236,7 +238,8 @@ export function mountLiving({ preview, runAnalysis, renderer }) {
   const status = el('p', { class: 'hint liv-status', id: 'living-status' });
 
   root.append(
-    el('div', { class: 'mut-controls' }, el('label', { class: 'mut-row', title: 'How much a performance is simplified: more smoothing, fewer and calmer keyframes. The timing of your hand is kept either way.' }, 'Smoothing', smooth, smoothOut)),
+    el('div', { class: 'mut-controls' }, el('label', { class: 'mut-row', title: 'How much a performance is simplified: more smoothing, fewer and calmer keyframes. The timing of your hand is kept either way.' }, 'Smoothing', smooth, smoothOut),
+      el('label', { class: 'mut-row chk', title: 'Take and Trace play round and round over the marked range, else the selected clips, else the whole project, so you can keep trying without going back to the start. A later pass replaces an earlier one where they overlap (Take) or the last good pass is kept (Trace). REC again keeps it, Esc throws all of it away.' }, loopBox, 'Loop while recording')),
     section('trace', 'TRACE', 'Leave your hand inside the edit.',
       el('div', { class: 'mut-row' }, modeSel, traceRec), modeLine, infl,
       el('label', { class: 'mut-row chk' }, hover, 'follow the cursor without pressing')),
@@ -274,7 +277,7 @@ export function mountLiving({ preview, runAnalysis, renderer }) {
     { const a = ctrl.last?.session && !ctrl.last.noop && !rec ? creative.availability() : null; keepPerf.hidden = !(a && (a.moved.ok || a.looked.ok)); keepPerf.textContent = a?.moved.ok ? 'Keep how it moved' : 'Keep how it looked'; }
     const m = preview.comp.memory;
     memQuality.textContent = `Memory quality ${Math.round(m.scale * 100)}% of the picture${m.scale < 0.5 ? ' (lowered automatically because playback was stuttering)' : ''}. It builds up while the timeline plays; seeking starts it afresh, exactly as an export from that frame would.${m.overflow ? ' More than ' + 8 + ' memories are in view: the extra ones are passed through.' : ''}`;
-    status.textContent = rec ? `Recording ${rec.kind}… ${fmt(Math.max(0, ctrl.clock() - rec.t0))}${rec.kind === 'take' ? ` · ${ctrl.take.rec.touched} parameter${ctrl.take.rec.touched === 1 ? '' : 's'} touched` : ctrl.trace.g ? ` · ${ctrl.trace.g.pts.length} points` : ''} · Esc cancels` : '';
+    status.textContent = rec ? `Recording ${rec.kind}${rec.loop ? ` · pass ${rec.pass + 1} (looping over ${rec.loop.label})` : ''}… ${fmt(Math.max(0, ctrl.clock() - rec.t0))}${rec.kind === 'take' ? ` · ${ctrl.take.rec.touched} parameter${ctrl.take.rec.touched === 1 ? '' : 's'} touched` : ctrl.trace.g ? ` · ${ctrl.trace.g.pts.length} points` : ''} · Esc cancels` : '';
   };
   store.on('living', render);
   store.on('selection', refreshSlots);

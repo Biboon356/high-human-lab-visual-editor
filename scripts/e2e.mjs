@@ -1623,6 +1623,7 @@ await step('living lab (take + trace): a take becomes ordinary keyframes in one 
     await page.mouse.up();
   };
 
+  await page.uncheck('#living-loop'); // these checks are about one straight pass; looping has its own step below
   // ---- TAKE: pad + an Inspector slider, performed while the timeline plays
   assert.ok(await ev(() => !!document.querySelector('#pad-x option[value="clip.x"]')), 'the pad can steer the clip position');
   await ev(() => { document.getElementById('pad-x').value = 'clip.x'; document.getElementById('pad-y').value = 'clip.y'; });
@@ -1946,6 +1947,77 @@ await step('lab accident: three previews from copies, nothing changes until Keep
   }
   assert.equal(logs.slice(errorsBefore).filter((l) => /shader|compile|GLSL|WebGL|error/i.test(l)).length, 0, 'no errors in the console');
   await shot('38-living-accident');
+  await page.click('#panel-left [data-tab="media"]'); await settle(200);
+});
+
+await step('loop recording: Take and Trace loop over the marked range, the selected clips or the project; passes replace each other; Esc puts everything back; REC keeps it as one Undo step', async () => {
+  await resetProject();
+  await ev(async (c) => { await window.__app.importPaths([c]); const { store } = window.__app; const { addMediaClip } = await import('/shared/timeline.js');
+    store.mutate((p) => {
+      p.settings.width = 320; p.settings.height = 180;
+      const v1 = p.tracks.find((t) => t.kind === 'video'), pic = p.media[0].id;
+      const A = addMediaClip(p, pic, v1.id, 0); A.duration = 2; A.name = 'A';
+      const B = addMediaClip(p, pic, v1.id, 2); B.duration = 2; B.name = 'B';
+    });
+    store.select(store.project.clips.find((x) => x.name === 'A').id); store.setPlayhead(1.5); }, pic);
+  await page.click('#panel-left [data-tab="living"]'); await settle(500);
+  await ev(() => document.getElementById('living-take')?.scrollIntoView());
+  assert.equal(await ev(() => document.getElementById('living-loop').checked), true, 'looping is on unless switched off');
+  await page.check('#living-loop');
+  await ev(() => { document.getElementById('pad-x').value = 'clip.x'; document.getElementById('pad-y').value = 'clip.y'; });
+  const S = () => ev(() => { const s = window.__app.store; return { depth: s.undoStack.length, playing: s.playing, loop: s.loopRange, head: s.playhead, json: JSON.stringify(s.project, (k, v) => (k === 'stillHere' ? undefined : v)) }; });
+  const dragPad = async (ms) => {
+    const r = await page.locator('#take-pad').boundingBox(); const t0 = Date.now();
+    await page.mouse.move(r.x + r.width * 0.1, r.y + r.height * 0.5); await page.mouse.down();
+    while (Date.now() - t0 < ms) { const k = (Date.now() - t0) / ms; await page.mouse.move(r.x + r.width * (0.1 + 0.8 * k), r.y + r.height * (0.5 + 0.3 * Math.sin(k * 7))); await page.waitForTimeout(25); }
+    await page.mouse.up();
+  };
+  const pass = () => ev(() => /pass (\d+)/.exec(document.getElementById('living-status').textContent)?.[1] || null);
+  const before = await S();
+
+  // loop over the selected clip (0..2 s): starts at its beginning, wraps, a second pass begins
+  await page.click('#take-rec'); await settle(300);
+  let s = await S();
+  assert.deepEqual(s.loop, [0, 2], 'the loop is the selected clip'); assert.equal(s.playing, true);
+  assert.equal(await pass(), '1'); assert.match(await ev(() => document.getElementById('living-status').textContent), /looping over the selected clip/);
+  await dragPad(1200);
+  await ev(() => new Promise((res) => { const t0 = performance.now(); const tick = () => (/pass 2/.test(document.getElementById('living-status').textContent) || performance.now() - t0 > 4000 ? res() : setTimeout(tick, 50)); tick(); }));
+  assert.equal(await pass(), '2', 'the loop came round');
+  const heads = []; for (let i = 0; i < 6; i++) { heads.push((await S()).head); await page.waitForTimeout(150); }
+  assert.ok(heads.every((h) => h >= 0 && h <= 2.05), `the playhead stays inside the loop (${heads.map((h) => h.toFixed(2))})`);
+  await dragPad(700);
+  await page.click('#take-rec'); await settle(500);
+  s = await S();
+  assert.equal(s.playing, false); assert.equal(s.loop, null, 'REC again ends the loop');
+  assert.equal(s.depth, before.depth + 1, 'all the passes are one Undo step');
+  const kx = await ev(() => window.__app.store.project.clips.find((c) => c.name === 'A').keyframes.x || []);
+  assert.ok(kx.length >= 2 && kx.every((k) => k.t >= 0 && k.t <= 2.05), `the keys sit inside the loop (${kx.map((k) => k.t.toFixed(2))})`);
+  assert.match(await ev(() => document.getElementById('living-result').textContent), /over 2 passes/);
+  await ev(() => window.__app.store.undo()); await settle(200);
+  assert.equal((await S()).json, before.json, 'Undo takes every pass back');
+
+  // Esc after a second pass puts the whole project back and leaves no undo step
+  await page.click('#take-rec'); await settle(200); await dragPad(1000);
+  await ev(() => new Promise((res) => { const t0 = performance.now(); const tick = () => (/pass 2/.test(document.getElementById('living-status').textContent) || performance.now() - t0 > 4000 ? res() : setTimeout(tick, 50)); tick(); }));
+  assert.equal(await pass(), '2');
+  await page.keyboard.press('Escape'); await settle(300);
+  s = await S();
+  assert.equal(s.json, before.json, 'cancelled after a finished pass: the project is exactly as it was'); assert.equal(s.depth, before.depth, 'no undo step left behind');
+  assert.equal(s.playing, false); assert.equal(s.loop, null);
+
+  // the marked range wins; with no selection the whole project loops; switched off, nothing loops
+  await ev(() => { const s = window.__app.store; s.mutate((p) => { p.range = { in: 1, out: 3 }; }); });
+  await page.click('#take-rec'); await settle(300);
+  assert.deepEqual((await S()).loop, [1, 3], 'the marked In/Out range is looped'); await page.keyboard.press('Escape'); await settle(300);
+  await ev(() => { const s = window.__app.store; s.mutate((p) => { delete p.range; }); s.select(null); });
+  await page.click('#take-rec'); await settle(300);
+  assert.deepEqual((await S()).loop, [0, 4], 'with no selection and no range, the whole project'); await page.keyboard.press('Escape'); await settle(300);
+  await page.uncheck('#living-loop');
+  await ev(() => { const s = window.__app.store; s.select(s.project.clips[0].id); });
+  await page.click('#take-rec'); await settle(300);
+  s = await S(); assert.equal(s.loop, null, 'loop off: no loop'); assert.equal(await pass(), null);
+  await page.keyboard.press('Escape'); await settle(300);
+  await page.check('#living-loop');
   await page.click('#panel-left [data-tab="media"]'); await settle(200);
 });
 

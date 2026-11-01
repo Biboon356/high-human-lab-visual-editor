@@ -28,7 +28,7 @@ export class HumanTrace {
     this.mode = 'motion';
     this.hover = false; // follow the cursor without pressing
     this.map = { x: '', y: '', speed: '' }; // slot ids for Influence
-    this.g = null; this.surface = null;
+    this.g = null; this.surface = null; this.passes = [];
   }
 
   get active() { return !!this.g; }
@@ -44,8 +44,8 @@ export class HumanTrace {
     const needsClip = this.mode === 'motion' || this.mode === 'influence';
     if (needsClip && (!clip || (clip.type === 'media' && store.project.media.find((m) => m.id === clip.mediaId)?.kind === 'audio'))) { toast('Select a picture, text or shape clip first — Trace will steer it.', 'error'); return false; }
     if (this.mode === 'influence' && !Object.values(this.map).some(Boolean)) { toast('Choose at least one parameter for Across, Up/down or Speed.', 'error'); return false; }
-    if (!this.ctrl.begin('trace', { finish: (o) => this._finish(o), cancel: () => this._cancel() })) return false;
-    this.g = createGesture();
+    if (!this.ctrl.begin('trace', { finish: (o) => this._finish(o), cancel: () => this._cancel(), pass: () => this._pass() })) return false;
+    this.g = createGesture(); this.passes = [];
     this._showSurface();
     return true;
   }
@@ -79,11 +79,24 @@ export class HumanTrace {
 
   _hideSurface() { clearInterval(this._fade); this.surface?.remove(); this.surface = null; }
 
-  _cancel() { this._hideSurface(); this.g = null; }
+  /** The loop came round: the gesture so far is set aside as a finished pass and a fresh one begins (the last good pass is what gets kept). */
+  _pass() {
+    if (this.g?.pts.length) this.passes.push(this.g);
+    this.g = createGesture(); this.g.strokes = 1; // a pen that is still down keeps drawing into the new pass
+  }
+
+  /** The pass to keep: the current one, unless it is barely started (the artist stopped just after the loop came round). */
+  _pick() {
+    const cur = this.g, prev = this.passes.at(-1);
+    if (!prev) return cur;
+    return cur.pts.length && cur.pts.length >= prev.pts.length * 0.35 ? cur : prev;
+  }
+
+  _cancel() { this._hideSurface(); this.g = null; this.passes = []; }
 
   _finish({ tEnd }) {
     this._hideSurface();
-    const g = this.g; this.g = null;
+    const g = this._pick(); this.g = null; this.passes = [];
     if (!g.pts.length) return { noop: true, text: 'No gesture was drawn.' };
     const clip = store.selectedClip, aspect = this.ctrl.preview.comp.w / this.ctrl.preview.comp.h, curve = this.ctrl.curve();
     const seconds = (g.pts.at(-1)[0] - g.pts[0][0]).toFixed(1);
