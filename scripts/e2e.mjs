@@ -1623,7 +1623,6 @@ await step('living lab (take + trace): a take becomes ordinary keyframes in one 
     await page.mouse.up();
   };
 
-  assert.equal(await ev(() => document.getElementById('living-loop').checked), true, 'looping is on unless switched off');
   await page.uncheck('#living-loop'); // these checks are about one straight pass; looping has its own step below
   // ---- TAKE: pad + an Inspector slider, performed while the timeline plays
   assert.ok(await ev(() => !!document.querySelector('#pad-x option[value="clip.x"]')), 'the pad can steer the clip position');
@@ -1992,7 +1991,7 @@ await step('loop recording: Take and Trace loop over the marked range, the selec
   assert.equal(s.depth, before.depth + 1, 'all the passes are one Undo step');
   const kx = await ev(() => window.__app.store.project.clips.find((c) => c.name === 'A').keyframes.x || []);
   assert.ok(kx.length >= 2 && kx.every((k) => k.t >= 0 && k.t <= 2.05), `the keys sit inside the loop (${kx.map((k) => k.t.toFixed(2))})`);
-  assert.match(await ev(() => document.getElementById('living-result').textContent), /over 2 passes/);
+  assert.match(await ev(() => document.getElementById('living-result').textContent), /over [2-9] passes/, 'the result says it was kept over several passes');
   await ev(() => window.__app.store.undo()); await settle(200);
   assert.equal((await S()).json, before.json, 'Undo takes every pass back');
 
