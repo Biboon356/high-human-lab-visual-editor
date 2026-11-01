@@ -22,8 +22,10 @@ export function mountRelate({ preview, renderer }) {
   quiet.addEventListener('change', () => creative.setSuggestions(quiet.checked));
   const root = el('section', { class: 'liv-sec', id: 'living-timeline' },
     el('h3', {}, 'TIMELINE', el('em', { text: 'Let the clips talk to each other.' })),
+    el('p', { class: 'liv-how', text: 'Select two clips next to each other (or three or more, to chain them) and pick how the first should affect the next. You see it before it is applied.' }),
     row, status, card,
-    el('label', { class: 'mut-row chk', title: 'Now and then, at a quiet moment, a small note may offer one of these for the clips you are working on, or a memory from Still Here. Never during playback or typing, never more than one at a time, and it goes quiet if you dismiss it.' }, quiet, 'Quiet suggestions'));
+    el('details', { class: 'liv-adv' }, el('summary', { text: 'Advanced' }),
+      el('label', { class: 'mut-row chk', title: 'Now and then, at a quiet moment, a small note may offer one of these for the clips you are working on, or a memory from Still Here. Never during playback or typing, never more than one at a time, and it goes quiet if you dismiss it.' }, quiet, 'Quiet suggestions')));
 
   let current = null;
   function clear(text = '') { current = null; card.hidden = true; if (text !== null) status.textContent = text; }

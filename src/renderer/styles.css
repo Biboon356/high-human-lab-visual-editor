@@ -384,3 +384,10 @@ kbd { font: 500 9.5px var(--mono); letter-spacing: .04em; padding: 1px 6px; bord
 .cchip { position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 90; max-width: min(560px, calc(100vw - 32px)); display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 8px 12px; background: var(--bg); border: 1px solid var(--accent2); box-shadow: 0 6px 24px rgba(0,0,0,.45); }
 .cchip[hidden] { display: none; } .cchip-h { font: 500 10px var(--mono); letter-spacing: .14em; color: var(--accent2); } .cchip-l { font: italic 400 13px Georgia, 'Times New Roman', serif; color: var(--text); flex: 1 1 200px; }
 .cchip-a { display: flex; flex-wrap: wrap; gap: 4px; } .cchip-a button { height: 22px; padding: 0 8px; font-size: 10px; }
+
+/* Quick Start: one line of how-to per section, fine controls folded under Advanced */
+.liv-how { margin: 0; font: italic 400 12px/1.4 Georgia, 'Times New Roman', serif; color: var(--dim); }
+.liv-adv { border-top: 1px dashed var(--line); padding-top: 6px; }
+.liv-adv > summary { cursor: pointer; font: 500 9.5px var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--dim); list-style: none; }
+.liv-adv > summary::before { content: '▸ '; } .liv-adv[open] > summary::before { content: '▾ '; } .liv-adv[open] > summary { color: var(--accent2); }
+.liv-adv > *:not(summary) { margin-top: 8px; display: grid; gap: 8px; }

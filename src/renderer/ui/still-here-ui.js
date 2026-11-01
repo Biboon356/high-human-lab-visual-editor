@@ -51,9 +51,11 @@ export function mountStillHere({ preview, renderer }) {
   const list = el('div', { class: 'still-list', id: 'still-list' });
   const root = el('section', { class: 'liv-sec', id: 'living-still' },
     el('h3', {}, 'STILL HERE', el('em', { text: 'Nothing good has to disappear.' })),
+    el('p', { class: 'liv-how', text: 'Select a clip and press Keep to put how it moves, looks or feels on the shelf. Later, select other clips and press BRING BACK to use it on all of them at once.' }),
     keepRow, status,
     el('h3', { class: 'still-sub' }, 'LOOK BACK'), list,
-    el('label', { class: 'mut-row chk', title: 'When you let go of a look or a movement you worked on for a while, a copy may be put on this shelf. It is strict about it, and you can always let it go.' }, auto, 'Keep good leftovers for me'), autoLine);
+    el('details', { class: 'liv-adv' }, el('summary', { text: 'Advanced' }),
+      el('label', { class: 'mut-row chk', title: 'When you let go of a look or a movement you worked on for a while, a copy may be put on this shelf. It is strict about it, and you can always let it go.' }, auto, 'Keep good leftovers for me'), autoLine));
 
   function thumbFor(clip, chain) {
     try {

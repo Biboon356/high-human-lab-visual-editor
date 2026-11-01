@@ -301,7 +301,7 @@ await step('export cancel leaves no file and the app stays usable', async () => 
 
 // ---- UI-level flows (native dialogs are stubbed in the Electron main process; everything else is the real code path)
 const stubDialog = (method, value) => app.evaluate(({ dialog }, { method, value }) => { dialog[method] = async () => value; }, { method, value });
-const resetProject = () => ev(async () => { const { createProject } = await import('/shared/project.js'); window.__app.store.loadProject(createProject()); });
+const resetProject = () => ev(async () => { const { createProject } = await import('/shared/project.js'); window.__app.store.loadProject(createProject()); document.querySelectorAll('details.liv-adv').forEach((d) => { d.open = true; }); }); // the fine controls live under Advanced; the checks need them reachable
 
 await step('transport: Play advances the playhead in real time, video element follows, pause holds', async () => {
   await ev(() => window.__app.store.setPlayhead(0));
@@ -2289,6 +2289,88 @@ await step('decision gate: one quiet suggestion at a time; silent while playing,
   });
   assert.equal(muted.mutedUntil, true); assert.equal(muted.suggestion, null, 'dismissed almost every time: it goes quiet');
   await ev(() => { const s = window.__app.store; s.multi = new Set(); s.selection = null; s.emit('selection', 'render'); });
+});
+
+await step('quick start and groups: Advanced folds the fine controls, Make my look is one button, Accident works only at the playhead or on a selected group, and BRING BACK reaches every selected clip', async () => {
+  await resetProject();
+  await ev(async ([c, k, pic]) => { await window.__app.importPaths([c, k, pic]); const { store } = window.__app; const { addMediaClip } = await import('/shared/timeline.js');
+    store.mutate((p) => {
+      p.settings.width = 320; p.settings.height = 180;
+      const v1 = p.tracks.find((t) => t.kind === 'video'), img = p.media.find((m) => m.kind === 'image').id;
+      p.clips = [];
+      const mk = (name, start) => { const x = addMediaClip(p, img, v1.id, start); x.duration = 2; x.name = name; return x; };
+      const A = mk('A', 0); mk('B', 2); mk('C', 4); mk('D', 20);
+      A.keyframes.x = [{ t: 0, v: -0.3 }, { t: 2, v: 0.3 }];
+      addMediaClip(p, p.media.find((m) => m.kind === 'audio').id, p.tracks.find((t) => t.kind === 'audio').id, 0);
+    }); }, [clip, kick, pic]);
+  await page.click('#panel-left [data-tab="living"]'); await settle(500);
+  const errorsBefore = logs.length;
+  const S = () => ev(() => { const s = window.__app.store; return { depth: s.undoStack.length, json: JSON.stringify(s.project, (k, v) => (k === 'stillHere' ? undefined : v)), clips: Object.fromEntries(s.project.clips.map((c) => [c.name, c])) }; });
+  const select = (...names) => ev((names) => { const s = window.__app.store; const ids = names.map((n) => s.project.clips.find((c) => c.name === n).id); s.multi = new Set(ids); s.selection = ids[0]; s.emit('selection', 'render'); }, names);
+
+  // Quick Start: with Advanced folded the main button is there and the fine controls are not
+  await ev(() => document.querySelectorAll('details.liv-adv').forEach((d) => { d.open = false; }));
+  await ev(() => document.getElementById('living-dna').scrollIntoView()); await settle(200);
+  assert.equal(await page.locator('#dna-make').isVisible(), true, 'Make my look is on show');
+  assert.equal(await page.locator('#dna-seed').isVisible(), false, 'the seed is folded away'); assert.equal(await page.locator('#memory-length').isVisible(), false);
+  assert.ok((await ev(() => document.querySelectorAll('.liv-how').length)) >= 6, 'each section says in one line what to do');
+  await shot('42-quick-start');
+  await ev(() => document.querySelectorAll('details.liv-adv').forEach((d) => { d.open = true; }));
+  assert.equal(await page.locator('#dna-seed').isVisible(), true, 'Advanced opens them');
+
+  // Make my look: one press reads the project and grows the living layer (one Undo step)
+  await select('A', 'B');
+  const d0 = (await S()).depth;
+  await page.click('#dna-make');
+  await page.waitForFunction(() => !document.getElementById('dna-read').disabled && /Living layer added/.test(document.getElementById('dna-status').textContent), null, { timeout: 90000 });
+  let s = await S();
+  assert.ok(s.json.includes('Living layer'), 'the living layer is there'); assert.equal(s.depth, d0 + 2, 'reading the identity and growing the layer are two Undo steps (each can be undone alone)');
+  await ev(() => { window.__app.store.undo(); window.__app.store.undo(); }); await settle(200);
+
+  // Accident at the playhead: only the cut near it; nowhere near a cut, nothing happens (and it says why)
+  await ev(() => { const s = window.__app.store; s.select(s.project.clips.find((c) => c.name === 'B').id); s.setPlayhead(2.2); });
+  await ev(() => document.getElementById('living-accident').scrollIntoView()); await settle(200);
+  await page.click('#acc-cause'); await settle(700);
+  const near = await ev(() => [...document.querySelectorAll('#acc-list [data-acc]')].map((n) => n.dataset.kind));
+  assert.ok(near.length >= 1, `accidents appear at a cut (${near})`);
+  assert.match(await ev(() => document.getElementById('acc-status').textContent), /at the playhead/);
+  const atTimes = await ev(async () => (await import('./creative/engine.js')) && window.__app.living.accident.items.map((a) => a.at));
+  assert.ok(atTimes.every((t) => t < 6), `none of them is at the far clip (${atTimes})`);
+  await ev(() => { const s = window.__app.store; s.select(s.project.clips.find((c) => c.name === 'D').id); s.setPlayhead(11); });
+  await page.click('#acc-cause'); await settle(500);
+  assert.equal(await ev(() => document.querySelectorAll('#acc-list [data-acc]').length), 0, 'far from any cut, nothing is offered');
+  assert.match(await ev(() => document.getElementById('acc-status').textContent), /Move the playhead onto a cut/);
+
+  // Accident on a group: A, B, C selected: one accident that reaches every cut between them
+  await select('A', 'B', 'C');
+  await page.click('#acc-cause'); await settle(800);
+  assert.match(await ev(() => document.getElementById('acc-status').textContent), /on the 3 selected clips together/);
+  const grp = await ev(() => window.__app.living.accident.items.map((a) => ({ kind: a.kind, title: a.title, ids: [...new Set(a.clipIds)].length })));
+  assert.ok(grp.some((g) => /×2/.test(g.title) && g.ids === 3), `one accident spans both cuts (${JSON.stringify(grp)})`);
+  const before = await S();
+  const idx = await ev(() => window.__app.living.accident.items.findIndex((a) => /×2/.test(a.title)));
+  await page.click(`[data-acc-keep="${idx}"]`); await settle(500);
+  s = await S();
+  assert.equal(s.depth, before.depth + 1, 'the whole group is one Undo step'); assert.notEqual(s.json, before.json);
+  await ev(() => window.__app.store.undo()); await settle(200);
+  assert.equal((await S()).json, before.json, 'Undo restores exactly');
+
+  // a chain in TIMELINE and BRING BACK on the whole selection
+  await select('A', 'B', 'C');
+  await ev(() => document.getElementById('living-timeline').scrollIntoView()); await settle(200);
+  assert.equal(await ev(() => document.getElementById('rel-grow').disabled), false, 'three clips can be chained');
+  await page.click('#rel-grow'); await settle(500);
+  assert.match(await ev(() => document.querySelector('#rel-card .rel-sum').textContent), /3 clips in a chain/);
+  await page.click('#rel-cancel');
+  await select('A'); await page.click('#still-keep-moved'); await settle(200);
+  await select('B', 'C', 'D');
+  const dd = (await S()).depth;
+  await page.click('#still-list [data-kind="moved"] .still-back'); await settle(300);
+  s = await S();
+  assert.equal(s.depth, dd + 1, 'one Undo step for the whole selection'); assert.ok(['B', 'C', 'D'].every((n) => (s.clips[n].keyframes.x || []).length >= 2), 'all three now move');
+  assert.match(await ev(() => document.getElementById('still-status').textContent), /3 clips/);
+  assert.equal(logs.slice(errorsBefore).filter((l) => /shader|compile|GLSL|WebGL|error/i.test(l)).length, 0, 'no errors in the console');
+  await page.click('#panel-left [data-tab="media"]'); await settle(200);
 });
 
 await step('hdr phone footage: an HLG clip is detected, plays through a tone-mapped SDR copy, and the preview and the export both look like the phone did', async () => {

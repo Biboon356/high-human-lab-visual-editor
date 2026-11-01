@@ -26,6 +26,8 @@ export function mountLiving({ preview, runAnalysis, renderer }) {
   creative.busyProbe = () => ctrl.busy; // a take or a trace is running: nothing may be suggested
   const root = document.getElementById('living-root');
   const pane = root.closest('.pane');
+  const howto = (text) => el('p', { class: 'liv-how', text });
+  const adv = (...kids) => el('details', { class: 'liv-adv' }, el('summary', { text: 'Advanced' }), ...kids);
   const section = (id, title, line, ...kids) => el('section', { class: 'liv-sec', id: `living-${id}` }, el('h3', {}, title, el('em', { text: line })), ...kids);
 
   // ---- shared: smoothing, last result ----
@@ -131,7 +133,7 @@ export function mountLiving({ preview, runAnalysis, renderer }) {
   const dnaSeed = el('input', { type: 'number', min: 0, step: 1, value: 1, id: 'dna-seed', 'aria-label': 'Identity seed', title: 'The same project and the same seed always give the same identity' });
   const dnaStatus = el('p', { class: 'hint', id: 'dna-status' });
   const dnaCard = el('div', { class: 'liv-dna', id: 'dna-card' });
-  const dnaRead = el('button', { class: 'primary', id: 'dna-read', text: 'Read the project', title: 'Listens to the music on the timeline and looks at the footage you use, then names the identity. Nothing in your edit changes.', onclick: async () => {
+  const readProject = async () => {
     dnaRead.disabled = true;
     try {
       dnaStatus.textContent = 'Listening…';
@@ -149,10 +151,21 @@ export function mountLiving({ preview, runAnalysis, renderer }) {
       store.mutate((p) => { p.living = { ...(p.living || {}), dna }; });
       dnaStatus.textContent = `Identity read${note}. It only suggests: nothing is applied until you press a button.`;
     } catch (e) { dnaStatus.textContent = `Could not read the project: ${e.message}`; } finally { dnaRead.disabled = false; }
+  };
+  const dnaRead = el('button', { id: 'dna-read', text: 'Read the project', title: 'Listens to the music on the timeline and looks at the footage you use, then names the identity. Nothing in your edit changes.', onclick: readProject });
+  const dnaMake = el('button', { class: 'primary', id: 'dna-make', text: 'Make my look', title: 'Reads the music and the footage, then grows a living layer over the whole project (one Undo step). Nothing else changes.', onclick: async () => {
+    await readProject();
+    const dna = projectDna();
+    if (dna?.identity && projectDuration(store.project) > 0) growLayer(dna.identity, dna);
   } });
   const libSeeds = () => (store.project.dna || []).map((d) => d.seed).filter(Number.isFinite);
   const dnaClear = el('button', { id: 'dna-clear', text: 'Clear', title: 'Forget the project identity', onclick: () => store.mutate((p) => { if (p.living) delete p.living.dna; }) });
   const bar = (v) => el('i', { class: 'liv-bar' }, el('b', { style: `width:${Math.round(v * 100)}%` }));
+  function growLayer(id, dna) {
+    const dur = projectDuration(store.project), bars = store.analysis ? musicStructure(store.analysis).bars : null;
+    store.mutate((p) => { const c = createLivingLayerClip(id, { start: 0, duration: dur, bars, seed: dna.seed ?? 1 }); c.trackId = addTrack(p, 'video').id; addClipRaw(p, c); store.select(c.id); });
+    dnaStatus.textContent = `Living layer added over ${dur.toFixed(1)} s${bars ? ': it grows with the energy of the music' : ' (analyse the music, in the Audio-Reactive tab, and it will grow with it)'}. Undo removes it.`;
+  }
   function renderDna() {
     dnaCard.replaceChildren();
     const dna = projectDna(), id = dna?.identity;
@@ -165,15 +178,12 @@ export function mountLiving({ preview, runAnalysis, renderer }) {
       el('ul', { class: 'liv-lines' }, describeIdentity(id).map((l) => el('li', { text: l }))),
       el('p', { class: 'hint', text: `Signature look: ${dna.chain.map((c) => c.type).join(' · ')}. Seed ${dna.seed}.` }),
       el('div', { class: 'liv-acts' },
+        el('button', { id: 'dna-apply-sig', text: 'Add signature look', disabled: !clip, title: "Adds the signature look's effects to the end of the selected clip's chain (one Undo step)", onclick: () => { const clips = selectedClips(); store.mutate(() => { for (const c of clips) c.effects.push(...chainToEffects(dna.chain)); }); dnaStatus.textContent = `Signature look added to ${clips.length === 1 ? 'the clip' : `${clips.length} clips`}. Undo takes it back.`; } }),
+        el('button', { id: 'dna-layer', text: 'Grow a living layer', disabled: projectDuration(store.project) <= 0, title: 'An adjustment layer over the whole project: veins that grow faster in loud bars, glow with the bass, leave a fading stain', onclick: () => growLayer(id, dna) })),
+      adv(el('div', { class: 'liv-acts' },
         el('button', { id: 'dna-use-memory', text: 'Use for Memory', title: 'Sets the MEMORY controls above from the identity', onclick: () => applyMemory(id) }),
         el('button', { id: 'dna-use-trace', text: 'Use for Trace', title: 'Sets Smoothing and the trace mode', onclick: () => applyTrace(id) }),
-        el('button', { id: 'dna-apply-sig', text: 'Add signature look', disabled: !clip, title: "Adds the signature look's effects to the end of the selected clip's chain (one Undo step)", onclick: () => { const clips = selectedClips(); store.mutate(() => { for (const c of clips) c.effects.push(...chainToEffects(dna.chain)); }); dnaStatus.textContent = `Signature look added to ${clips.length === 1 ? 'the clip' : `${clips.length} clips`}. Undo takes it back.`; } }),
-        el('button', { id: 'dna-layer', text: 'Grow a living layer', disabled: projectDuration(store.project) <= 0, title: 'An adjustment layer over the whole project: veins that grow faster in loud bars, glow with the bass, leave a stain behind. Built from existing effects; edit it like any layer.', onclick: () => {
-          const dur = projectDuration(store.project), bars = store.analysis ? musicStructure(store.analysis).bars : null;
-          store.mutate((p) => { const c = createLivingLayerClip(id, { start: 0, duration: dur, bars, seed: dna.seed ?? 1 }); c.trackId = addTrack(p, 'video').id; addClipRaw(p, c); store.select(c.id); });
-          dnaStatus.textContent = `Living layer added over ${dur.toFixed(1)} s${bars ? ': it grows with the energy of the music' : ' (analyse the music, in the Audio-Reactive tab, and it will grow with it)'}. Undo removes it.`;
-        } }),
-        el('button', { id: 'dna-save', text: 'Save to library', title: 'Copies it into the DNA library of this project (Mutate tab)', onclick: () => store.mutate((p) => { addDna(p, dna); }) })),
+        el('button', { id: 'dna-save', text: 'Save to library', title: 'Copies it into the DNA library of this project (Mutate tab)', onclick: () => store.mutate((p) => { addDna(p, dna); }) }))),
       el('p', { class: 'hint', text: 'In the Mutate tab, tick “lean toward the project\'s identity” to let rolls follow it.' }));
   }
   function applyMemory(id) {
@@ -240,6 +250,7 @@ export function mountLiving({ preview, runAnalysis, renderer }) {
   const status = el('p', { class: 'hint liv-status', id: 'living-status' });
 
   root.append(
+    howto('Pick a clip (or several), press one button, then press play. Everything can be undone with Undo. The little Advanced triangles hide the fine controls.'),
     el('div', { class: 'mut-controls' }, el('label', { class: 'mut-row', title: 'How much a performance is simplified: more smoothing, fewer and calmer keyframes. The timing of your hand is kept either way.' }, 'Smoothing', smooth, smoothOut),
       el('label', { class: 'mut-row chk', title: 'Take and Trace play round and round over the marked range, else the selected clips, else the whole project, so you can keep trying without going back to the start. A later pass replaces an earlier one where they overlap (Take) or the last good pass is kept (Trace). REC again keeps it, Esc throws all of it away.' }, loopBox, 'Loop while recording')),
     section('trace', 'TRACE', 'Leave your hand inside the edit.',
@@ -250,12 +261,17 @@ export function mountLiving({ preview, runAnalysis, renderer }) {
       pad,
       el('div', { class: 'liv-padsel' }, el('label', {}, 'Across', padSel.x), el('label', {}, 'Up / down', padSel.y))),
     section('memory', 'MEMORY', 'Let the image remember.',
-      el('div', { class: 'mut-row' }, memMode, memBlend), memLine,
-      slider('memory-length', 'Length', 0.3, 6, 0.1, 'length', ' s'), slider('memory-intensity', 'Intensity', 0, 1.5, 0.05, 'intensity'),
-      el('div', { class: 'mut-row' }, memClip, memLayer), memStatus, memQuality),
+      howto('Pick a mode, press Add to clip (select several clips to do them all at once), then press play: the picture remembers its past.'),
+      el('div', { class: 'mut-row' }, memMode), memLine,
+      el('div', { class: 'mut-row' }, memClip, memLayer), memStatus,
+      adv(el('label', { class: 'mut-row' }, el('span', { class: 'liv-axis', text: 'Blend' }), memBlend),
+        slider('memory-length', 'Length', 0.3, 6, 0.1, 'length', ' s'), slider('memory-intensity', 'Intensity', 0, 1.5, 0.05, 'intensity'), memQuality)),
     section('dna', 'DNA', 'Give the project a shared identity.',
-      el('div', { class: 'mut-row' }, dnaSeed, dnaRead, dnaClear), dnaStatus, dnaCard),
+      howto("Press Make my look: it listens to your music and looks at your footage, names the project's character and colours, and grows a living layer over everything. Undo takes it back."),
+      el('div', { class: 'mut-row' }, dnaMake), dnaStatus, dnaCard,
+      adv(el('div', { class: 'mut-row' }, dnaSeed, dnaRead, dnaClear), el('p', { class: 'hint', text: 'Read the project only names the character (nothing changes). A different seed gives a different character.' }))),
     section('accident', 'ACCIDENT', 'Break the rules carefully.',
+      howto('Put the playhead on a cut (or where two clips overlap) and press Cause accident: it only works there. Select several clips to do them all together. Keep the surprise you like.'),
       el('div', { class: 'mut-row' }, accGo, accUndo), accStatus, accList),
     mountRelate({ preview, renderer }).el,
     mountStillHere({ preview, renderer }).el,

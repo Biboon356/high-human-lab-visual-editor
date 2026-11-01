@@ -81,12 +81,15 @@ export function mountMutate({ preview }) {
   const library = el('div', { class: 'mut-lib', id: 'mutate-lib' });
 
   root.append(
+    el('p', { class: 'liv-how', text: '1 Select a clip. 2 Put the playhead on it. 3 Press Roll: pick the look you like and press Use. Undo takes it back.' }),
     status,
     el('div', { class: 'mut-controls' },
       el('label', { class: 'mut-row' }, 'Strength', strength, strengthOut),
-      el('div', { class: 'mut-row' }, count, style),
-      el('label', { class: 'mut-row chk' }, heavy, 'allow one heavy effect (pattern, 3D)'), leanRow,
-      el('div', { class: 'mut-row' }, seedInput, rollBtn)),
+      el('div', { class: 'mut-row' }, seedInput, rollBtn),
+      el('details', { class: 'liv-adv' }, el('summary', { text: 'Advanced' }),
+        el('div', { class: 'mut-row' }, count, style),
+        el('label', { class: 'mut-row chk' }, heavy, 'allow one heavy effect (pattern, 3D)'), leanRow,
+        el('p', { class: 'hint', text: 'The number next to Roll is the seed: type one in and press Roll to get the same variations again. Lock effects you like under “Keep” below.' }))),
     baseBar, lookSel, grid, keep, library);
 
   // ---- rolling ----
