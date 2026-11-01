@@ -113,31 +113,49 @@ export function applyMemory(project, memory, { clipIds = [] } = {}) {
   const d = memory?.data;
   if (!d) return none('This memory is empty.');
 
+  // movement, look and colours go onto EVERY selected clip at once (a group); each clip is judged on its own
+  const each = (verb, one) => {
+    let done = 0, changed = 0, reason = null;
+    for (const c of clips) { const r = one(c); if (r.ok) { done++; changed += r.n; } else reason ||= r.reason; }
+    if (!done) return none(reason || 'Nothing to bring back.');
+    const where = `${done} clip${done === 1 ? "" : "s"}`;
+    return { ok: true, changed, text: done === 1 && clips.length === 1 ? undefined : `Brought back ${verb} onto ${where}${done < clips.length ? ` (${clips.length - done} could not take it)` : ''}.` };
+  };
+
   if (memory.kind === 'moved') {
-    if (clip.type === 'adjust' || clip.type === 'audio') return none('An adjustment layer cannot move. Select a picture, text or shape.');
-    let n = 0;
-    clip.keyframes ||= {};
-    for (const [k, keys] of Object.entries(d.tracks || {})) {
-      const def = propDef(k);
-      if (!def || !keys?.length) continue;
-      const base = clip.props?.[k] ?? def.def;
-      clip.keyframes[k] = keys.map((q) => ({ t: r3(q.u * clip.duration), v: clamp(def, base + q.d) }));
-      n += keys.length;
-    }
-    return n ? { ok: true, changed: n, text: `Brought back how it moved onto “${clip.name || clip.type}”.` } : none('Nothing to bring back.');
+    const r = each('how it moved', (c) => {
+      if (c.type === 'adjust' || c.type === 'audio') return { ok: false, reason: 'An adjustment layer cannot move. Select a picture, text or shape.' };
+      let n = 0;
+      c.keyframes ||= {};
+      for (const [k, keys] of Object.entries(d.tracks || {})) {
+        const def = propDef(k);
+        if (!def || !keys?.length) continue;
+        const base = c.props?.[k] ?? def.def;
+        c.keyframes[k] = keys.map((q) => ({ t: r3(q.u * c.duration), v: clamp(def, base + q.d) }));
+        n += keys.length;
+      }
+      return n ? { ok: true, n } : { ok: false, reason: 'Nothing to bring back.' };
+    });
+    return r.ok && !r.text ? { ...r, text: `Brought back how it moved onto “${clip.name || clip.type}”.` } : r;
   }
   if (memory.kind === 'looked') {
     const chain = validateChain(d.chain || []).chain;
     if (!chain.length) return none('Nothing to bring back.');
-    if ((clip.effects || []).length + chain.length > MAX_CHAIN) return none(`That would make more than ${MAX_CHAIN} effects on one clip. Remove one first.`);
-    clip.effects = [...(clip.effects || []), ...chainToEffects(chain)];
-    return { ok: true, changed: chain.length, text: `Brought back how it looked onto “${clip.name || clip.type}” (${chain.length} effect${chain.length === 1 ? '' : 's'} added).` };
+    const r = each('how it looked', (c) => {
+      if ((c.effects || []).length + chain.length > MAX_CHAIN) return { ok: false, reason: `That would make more than ${MAX_CHAIN} effects on one clip. Remove one first.` };
+      c.effects = [...(c.effects || []), ...chainToEffects(chain)];
+      return { ok: true, n: chain.length };
+    });
+    return r.ok && !r.text ? { ...r, text: `Brought back how it looked onto “${clip.name || clip.type}” (${chain.length} effect${chain.length === 1 ? '' : 's'} added).` } : r;
   }
   if (memory.kind === 'felt') {
     const colors = d.colors || [];
-    let i = 0, n = 0;
-    for (const fx of clip.effects || []) for (const p of EFFECTS[fx.type]?.params || []) if (p.kind === 'color' && colors.length) { fx.params[p.key] = colors[i++ % colors.length]; n++; }
-    return n ? { ok: true, changed: n, text: `Recoloured ${n} setting${n === 1 ? '' : 's'} on “${clip.name || clip.type}”.` } : none('This clip has no colour settings to change. Add an effect with colours first.');
+    const r = each('its colours', (c) => {
+      let i = 0, n = 0;
+      for (const fx of c.effects || []) for (const p of EFFECTS[fx.type]?.params || []) if (p.kind === 'color' && colors.length) { fx.params[p.key] = colors[i++ % colors.length]; n++; }
+      return n ? { ok: true, n } : { ok: false, reason: 'This clip has no colour settings to change. Add an effect with colours first.' };
+    });
+    return r.ok && !r.text ? { ...r, text: `Recoloured ${r.changed} setting${r.changed === 1 ? '' : 's'} on “${clip.name || clip.type}”.` } : r;
   }
   if (memory.kind === 'rhythm') {
     const sorted = [...clips].sort((a, b) => a.start - b.start);

@@ -109,12 +109,13 @@ export function mountLiving({ preview, runAnalysis, renderer }) {
   };
   const memBlend = el('select', { id: 'memory-blend', 'aria-label': 'Memory blend' }, ['Behind (normal)', 'Screen', 'Add', 'Difference'].map((l, i) => el('option', { value: i, text: l, ...(i === mem.blend ? { selected: true } : {}) })));
   memBlend.addEventListener('change', () => { mem.blend = Number(memBlend.value); });
+  const selectedClips = () => [...store.multi].map((id) => store.project.clips.find((c) => c.id === id)).filter(Boolean);
   const memEffect = () => createEffect('memory', { mode: mem.mode, length: mem.length, intensity: mem.intensity, blend: mem.blend });
   const memClip = el('button', { id: 'memory-add-clip', text: 'Add to clip', title: "Adds a Memory Bleed effect to the selected clip's chain (edit it in the Inspector like any effect)", onclick: () => {
-    const clip = store.selectedClip;
-    if (!clip) { memStatus.textContent = 'Select a clip first.'; return; }
-    store.mutate(() => { clip.effects.push(memEffect()); });
-    memStatus.textContent = `Memory Bleed added to "${clip.name || clip.type}". Press play: it remembers while the timeline runs.`;
+    const clips = selectedClips();
+    if (!clips.length) { memStatus.textContent = 'Select a clip first.'; return; }
+    store.mutate(() => { for (const c of clips) c.effects.push(memEffect()); });
+    memStatus.textContent = `Memory Bleed added to ${clips.length === 1 ? `"${clips[0].name || clips[0].type}"` : `${clips.length} clips`}. Press play: it remembers while the timeline runs.`;
   } });
   const memLayer = el('button', { id: 'memory-add-layer', text: 'Add as layer', title: 'An adjustment layer over the whole project: everything underneath remembers', onclick: () => {
     const dur = projectDuration(store.project);
@@ -166,7 +167,7 @@ export function mountLiving({ preview, runAnalysis, renderer }) {
       el('div', { class: 'liv-acts' },
         el('button', { id: 'dna-use-memory', text: 'Use for Memory', title: 'Sets the MEMORY controls above from the identity', onclick: () => applyMemory(id) }),
         el('button', { id: 'dna-use-trace', text: 'Use for Trace', title: 'Sets Smoothing and the trace mode', onclick: () => applyTrace(id) }),
-        el('button', { id: 'dna-apply-sig', text: 'Add signature look', disabled: !clip, title: "Adds the signature look's effects to the end of the selected clip's chain (one Undo step)", onclick: () => { store.mutate(() => { clip.effects.push(...chainToEffects(dna.chain)); }); } }),
+        el('button', { id: 'dna-apply-sig', text: 'Add signature look', disabled: !clip, title: "Adds the signature look's effects to the end of the selected clip's chain (one Undo step)", onclick: () => { const clips = selectedClips(); store.mutate(() => { for (const c of clips) c.effects.push(...chainToEffects(dna.chain)); }); dnaStatus.textContent = `Signature look added to ${clips.length === 1 ? 'the clip' : `${clips.length} clips`}. Undo takes it back.`; } }),
         el('button', { id: 'dna-layer', text: 'Grow a living layer', disabled: projectDuration(store.project) <= 0, title: 'An adjustment layer over the whole project: veins that grow faster in loud bars, glow with the bass, leave a stain behind. Built from existing effects; edit it like any layer.', onclick: () => {
           const dur = projectDuration(store.project), bars = store.analysis ? musicStructure(store.analysis).bars : null;
           store.mutate((p) => { const c = createLivingLayerClip(id, { start: 0, duration: dur, bars, seed: dna.seed ?? 1 }); c.trackId = addTrack(p, 'video').id; addClipRaw(p, c); store.select(c.id); });
@@ -225,8 +226,9 @@ export function mountLiving({ preview, runAnalysis, renderer }) {
   }
   const accGo = el('button', { id: 'acc-cause', class: 'primary', text: 'Cause accident', title: 'Plans up to three accidents between clips you have and shows each one. Nothing is applied until you press Keep.', onclick: () => {
     const items = acc.cause();
-    if (!items.length) { accStatus.textContent = 'Nothing to break yet: put two clips next to each other (a cut) or one on top of another, or select a clip.'; renderAccidents(); return; }
-    accStatus.textContent = `${items.length} accident${items.length === 1 ? '' : 's'}, planned from seed ${items[0].seed}. Keep one, reroll one, or cause new ones.`;
+    const grouped = store.multi.size >= 2;
+    if (!items.length) { accStatus.textContent = grouped ? 'Nothing to relate between the selected clips. Put them next to each other (a cut) or on top of one another.' : 'Nothing here. Move the playhead onto a cut or onto where two clips overlap (within about 1.5 s), or select two or more clips to work on them as a group.'; renderAccidents(); return; }
+    accStatus.textContent = `${items.length} accident${items.length === 1 ? '' : 's'}${grouped ? ` on the ${store.multi.size} selected clips together` : ' at the playhead'}, planned from seed ${items[0].seed}. Keep one, reroll one, or cause new ones.`;
     renderAccidents();
     // the thumbnails show the frame at the playhead: park it by the first accident so they have something to show
     const at = items[0].at;

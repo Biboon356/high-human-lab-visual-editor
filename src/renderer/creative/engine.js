@@ -12,6 +12,7 @@ import { inferContext } from '/shared/creative/context.js';
 import { captureMemory, applyMemory, addMemory, removeMemory, renameMemory, attachThumb, shelfOf, curate, knownHashes } from '/shared/creative/still-here.js';
 import { builtinDna, chainHash, normalizeDna } from '/shared/mutation/dna.js';
 import { newSeed } from '/shared/mutation/rng.js';
+import { planRelationChain } from '/shared/creative/relate.js';
 import { planRelation } from '/shared/creative/relate.js';
 import { suggestFor } from '/shared/creative/suggest.js';
 import { evaluate, GATE, cleanStats, recordShown, recordApplied, recordDismissed } from '/shared/creative/gate.js';
@@ -113,8 +114,8 @@ export class CreativeMemoryEngine {
 
   /** Plans FOLLOW / GROW FROM / REMEMBER / BECOME between two selected clips. Changes nothing. */
   planRelation(kind, ids = [...store.multi], seed = newSeed()) {
-    if (ids.length !== 2) return { reason: 'Select two clips.' };
-    return planRelation(store.project, kind, ids[0], ids[1], { seed, identity: this.identity() });
+    if (ids.length < 2) return { reason: 'Select two clips, or more to chain them.' };
+    return planRelationChain(store.project, kind, ids, { seed, identity: this.identity() });
   }
 
   /** Applies a plan as ONE undo step; nothing changes (and no empty step is left) when it no longer applies. */

@@ -134,23 +134,53 @@ function unstable(project, rel, r) {
     } };
 }
 
+/** Several plans of one kind become ONE plan that applies them all (a group: the same accident at every place at once). */
+export function combinePlans(plans) {
+  if (plans.length === 1) return plans[0];
+  const [first] = plans;
+  return { ...first, title: `${first.title} ×${plans.length}`,
+    summary: `${first.summary} The same happens at ${plans.length - 1} more place${plans.length === 2 ? '' : 's'}.`,
+    clipIds: [...new Set(plans.flatMap((a) => a.clipIds))], at: Math.min(...plans.map((a) => a.at)),
+    preview: plans.some((a) => a.preview === 'playback') ? 'playback' : 'static',
+    apply(p) { let n = 0; for (const a of plans) if (a.apply(p)) n++; return n > 0; } };
+}
+
+const GROUP_MAX = 12;
+
 /**
  * Plans up to `count` accidents of different kinds for the project as it is.
- * @param o {seed (required), selection: clip ids, count=3, kinds: limit to these kinds, identity: a Project DNA identity (colours)}
+ *
+ * WHERE: with two or more clips selected, the accidents work on the selection as a GROUP (every cut and overlap between the selected
+ * clips, and "unstable" on all of them at once, as one accident). Otherwise, when `at` (the playhead, in seconds) is given, only on the
+ * cuts and overlaps within `window` seconds of it, so nothing happens somewhere else; without `at`, anywhere in the project.
+ * @param o {seed (required), selection: clip ids, count=3, kinds: limit to these kinds, identity: a Project DNA identity (colours), at, window=1.5}
  * @returns [{id, kind, seed, title, summary, at, clipIds, preview: 'static'|'playback', apply(project) → boolean}]
  */
-export function planAccidents(project, { seed, selection = [], count = 3, kinds = ACCIDENT_KINDS, identity = null } = {}) {
+export function planAccidents(project, { seed, selection = [], count = 3, kinds = ACCIDENT_KINDS, identity = null, at = null, window: win = 1.5 } = {}) {
   if (seed === undefined || seed === null) throw new Error('planAccidents needs a seed');
-  const rel = relations(project), sel = new Set(selection), ctx = { palette: identity?.palette, organic: identity?.organic };
+  const all = relations(project), sel = new Set(selection), ctx = { palette: identity?.palette, organic: identity?.organic };
+  const group = selection.length >= 2;
+  let rel = all;
+  if (group) rel = { clips: all.clips, cuts: all.cuts.filter((x) => sel.has(x.a) && sel.has(x.b)), overlaps: all.overlaps.filter((x) => sel.has(x.upper) && sel.has(x.lower)) };
+  else if (Number.isFinite(at)) rel = { clips: all.clips, cuts: all.cuts.filter((x) => Math.abs(x.at - at) <= win), overlaps: all.overlaps.filter((x) => at >= x.at - win && at <= x.at + x.len + win) };
   const prefer = (list, ids) => { const hit = list.filter((x) => ids(x).some((i) => sel.has(i))); return hit.length ? hit : list; };
   const r0 = rng(seed);
   const order = [...kinds].filter((k) => ACCIDENT_KINDS.includes(k)).map((k) => [k, r0()]).sort((x, y) => x[1] - y[1]).map(([k]) => k);
+  const many = (list, make) => list.slice(0, GROUP_MAX).map(make).filter(Boolean);
   const out = [];
   for (const kind of order) {
     if (out.length >= count) break;
     const r = rng(childSeed(seed, kind));
     let acc = null;
-    if (kind === 'memory-cut' || kind === 'spread') {
+    if (group) {
+      let list = [];
+      if (kind === 'memory-cut') list = many(rel.cuts, (x) => memoryCut(project, x, r));
+      else if (kind === 'spread') list = many(rel.cuts, (x) => spread(project, x, r, ctx));
+      else if (kind === 'borrow-motion') list = many([...rel.cuts.map((x) => ({ from: x.a, to: x.b })), ...rel.overlaps.map((x) => ({ from: x.lower, to: x.upper }))], (x) => borrowMotion(project, x, r));
+      else if (kind === 'mask-leak') list = many(rel.overlaps.filter((x) => !byId(project, x.upper).mask), (x) => maskLeak(project, x, r));
+      else if (kind === 'unstable') { const ids = selection.filter((i) => rel.clips.some((c) => c.id === i)); const u = ids.length ? unstable(project, { ids }, r) : null; if (u) list = [u]; }
+      if (list.length) acc = combinePlans(list);
+    } else if (kind === 'memory-cut' || kind === 'spread') {
       const list = prefer(rel.cuts, (x) => [x.a, x.b]);
       if (list.length) acc = (kind === 'memory-cut' ? memoryCut : spread)(project, pick(r, list), r, ctx);
     } else if (kind === 'borrow-motion') {
@@ -162,7 +192,9 @@ export function planAccidents(project, { seed, selection = [], count = 3, kinds 
       if (list.length) acc = maskLeak(project, pick(r, list), r);
     } else if (kind === 'unstable') {
       const pairs = [...rel.cuts.map((x) => [x.a, x.b]), ...rel.overlaps.map((x) => [x.upper, x.lower])];
-      const ids = pairs.length ? pick(r, prefer(pairs, (x) => x)) : (selection.filter((i) => rel.clips.some((c) => c.id === i)).slice(0, 1) || []);
+      // one selected clip is enough; with a cursor it must be on screen there
+      const here = (i) => { const c = byId(project, i); return rel.clips.some((q) => q.id === i) && (!Number.isFinite(at) || (c.start - win <= at && at <= c.start + c.duration + win)); };
+      const ids = pairs.length ? pick(r, prefer(pairs, (x) => x)) : selection.filter(here).slice(0, 1);
       if (ids.length) acc = unstable(project, { ids }, r);
     }
     if (acc) out.push({ id: `${kind}:${toSeed(`${seed}/${acc.clipIds.join('/')}`).toString(36)}`, seed, ...acc });

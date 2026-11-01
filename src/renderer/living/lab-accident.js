@@ -9,7 +9,7 @@ export class LabAccident {
   constructor() { this.items = []; this.lastKept = null; }
 
   _opts(extra = {}) {
-    return { selection: [...store.multi], identity: normalizeDna(store.project.living?.dna).dna?.identity || null, ...extra };
+    return { selection: [...store.multi], at: store.playhead, identity: normalizeDna(store.project.living?.dna).dna?.identity || null, ...extra };
   }
 
   /** New accidents for the project as it is now. Returns them (also kept in `items`). Changes nothing. */

@@ -14,7 +14,7 @@ import { CLIP_PROPS } from '../params.js';
 import { effectsToChain, MAX_CHAIN } from '../mutation/chain.js';
 import { supportsWet } from '../mutation/effect-meta.js';
 import { rng, childSeed, toSeed } from '../mutation/rng.js';
-import { memoryCut, spread, borrowMotion } from '../living/accident.js';
+import { memoryCut, spread, borrowMotion, combinePlans } from '../living/accident.js';
 import { MOTION_KEYS } from './observe.js';
 
 export const RELATIONS = [
@@ -130,6 +130,27 @@ export function planRelation(project, kind, aId, bId, { seed = 1, identity = nul
   else plan = become(project, A, B);
   if (!plan) return { reason: WORDS[kind][1] };
   return { id: `${kind}:${toSeed(`${seed}/${A.id}/${B.id}`).toString(36)}`, relation: kind, seed, from: A.id, to: B.id, ...plan, kind, title: rel.title, line: WORDS[kind][0], summary: plan.summary };
+}
+
+/**
+ * A group: three or more clips relate in a chain, each to the next in time (A→B, B→C, …), as ONE plan. Two clips give the plain relation.
+ * @returns the same as planRelation
+ */
+export function planRelationChain(project, kind, ids, { seed = 1, identity = null } = {}) {
+  const rank = new Map(project.tracks.map((t, i) => [t.id, i]));
+  const clips = [...new Set(ids)].map((id) => byId(project, id)).filter(Boolean).sort((a, b) => a.start - b.start || rank.get(b.trackId) - rank.get(a.trackId));
+  if (clips.length < 2) return { reason: 'Select two or more clips.' };
+  if (clips.length === 2) return planRelation(project, kind, clips[0].id, clips[1].id, { seed, identity });
+  const plans = [];
+  let firstReason = null;
+  for (let i = 0; i < clips.length - 1; i++) {
+    const p = planRelation(project, kind, clips[i].id, clips[i + 1].id, { seed: childSeed(seed, i), identity });
+    if (p.reason) firstReason ||= p.reason; else plans.push(p);
+  }
+  if (!plans.length) return { reason: firstReason };
+  const one = combinePlans(plans);
+  return { ...one, id: `${kind}:chain:${toSeed(`${seed}/${clips.map((c) => c.id).join('/')}`).toString(36)}`, relation: kind, seed, from: clips[0].id, to: clips.at(-1).id, kind, title: relationOf(kind).title, line: WORDS[kind][0],
+    summary: `${clips.length} clips in a chain (${plans.length} link${plans.length === 1 ? '' : 's'}). ${plans[0].summary}${plans.length > 1 ? ` The same kind of thing happens at the other ${plans.length - 1}.` : ''}` };
 }
 
 /** The same clip chains are compared by suggestions: do two clips already carry the same look? (re-exported for the suggestion rules) */

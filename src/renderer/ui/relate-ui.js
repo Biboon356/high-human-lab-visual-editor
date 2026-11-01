@@ -63,14 +63,14 @@ export function mountRelate({ preview, renderer }) {
   function refresh() {
     const ids = [...store.multi];
     for (const r of RELATIONS) {
-      if (ids.length !== 2) { btns[r.key].disabled = true; btns[r.key].title = 'Select two clips: the story of the first continues into the second.'; continue; }
+      if (ids.length < 2) { btns[r.key].disabled = true; btns[r.key].title = 'Select two clips (or more, to chain them): the story of the first continues into the next.'; continue; }
       const p = creative.planRelation(r.key, ids, 1);
       btns[r.key].disabled = !!p.reason;
       btns[r.key].title = p.reason || `${r.line} ${p.summary}`;
     }
-    if (current && (ids.length !== 2 || !ids.every((id) => [current.from, current.to].includes(id)))) clear('');
-    if (!current && !status.textContent) status.textContent = ids.length === 2 ? 'Pick how the first clip should relate to the second.' : 'Select two clips on the timeline.';
-    if (ids.length !== 2 && !current) status.textContent = 'Select two clips on the timeline.';
+    if (current && (ids.length < 2 || !ids.every((id) => current.clipIds.includes(id)))) clear('');
+    if (!current && !status.textContent) status.textContent = ids.length >= 2 ? (ids.length === 2 ? 'Pick how the first clip should relate to the second.' : `Pick how the ${ids.length} clips should relate, each to the next.`) : 'Select two clips on the timeline (or more, to chain them).';
+    if (ids.length < 2 && !current) status.textContent = 'Select two clips on the timeline (or more, to chain them).';
   }
   store.on('selection', refresh);
   store.on('project', () => { if (current) clear('The project changed, so that plan is out of date. Plan it again.'); refresh(); });
