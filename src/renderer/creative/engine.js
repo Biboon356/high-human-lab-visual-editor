@@ -152,7 +152,7 @@ export class CreativeMemoryEngine {
       const now = this.clock();
       for (const c of suggestFor({ project: store.project, context: this.context, shelf: this.shelf, identity: this.identity() })) {
         if (!evaluate(c, this._gateState(now)).pass) continue;
-        this.suggestion = { ...c, shownAt: now };
+        this.suggestion = { ...c, shownAt: now, seed: newSeed() }; // one seed: what the preview shows is what Apply makes
         this.lastShownAt = now;
         this.stats = recordShown(this.stats); this._saveStats();
         store.emit('suggestion');
@@ -179,12 +179,29 @@ export class CreativeMemoryEngine {
     if (!s) return { ok: false, reason: 'That suggestion is gone.' };
     let r;
     if (s.kind === 'relate') {
-      const plan = planRelation(store.project, s.relation, s.clipIds[0], s.clipIds[1], { seed: newSeed(), identity: this.identity() });
+      const plan = planRelation(store.project, s.relation, s.clipIds[0], s.clipIds[1], { seed: s.seed, identity: this.identity() });
       r = plan.reason ? { ok: false, reason: plan.reason } : this.applyPlan(plan) ? { ok: true, text: plan.summary } : { ok: false, reason: 'It no longer applies.' };
     } else r = this.bringBack(itemId || s.items[0].id, s.clipIds);
     if (r.ok) { this.stats = recordApplied(this.stats); this._saveStats(); this.cooldowns[s.key] = Infinity; }
     this._withdraw();
     return r;
+  }
+
+  /** Shows what Apply would do, in the monitor (press Space to play it). The suggestion counts as applied only if the artist applies the preview. */
+  previewSuggestion(itemId = null) {
+    const s = this.suggestion;
+    if (!s) return false;
+    const after = () => { this.stats = recordApplied(this.stats); this._saveStats(); this.cooldowns[s.key] = Infinity; };
+    if (s.kind === 'relate') {
+      const plan = planRelation(store.project, s.relation, s.clipIds[0], s.clipIds[1], { seed: s.seed, identity: this.identity() });
+      if (plan.reason) return false;
+      const ok = store.showGhost({ label: s.heading, apply: (p) => plan.apply(p), done: `${plan.summary} Undo takes it back.`, after });
+      if (ok) store.setPlayhead(Math.max(0, plan.at - 0.5));
+      return ok;
+    }
+    const m = this.shelf.find((x) => x.id === (itemId || s.items[0].id));
+    if (!m) return false;
+    return store.showGhost({ label: `${s.heading} · ${m.name}`, apply: (p) => applyMemory(p, m, { clipIds: s.clipIds }).ok, done: 'Brought back. Undo takes it back.', after });
   }
 
   /** The artist says no. The same thing is not offered again for a while, and the bar rises if this keeps happening. */

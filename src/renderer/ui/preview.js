@@ -38,9 +38,10 @@ export function mountPreview() {
   const features = () => (store.project.reactive?.enabled ? sampleFeatures(store.analysis, store.playhead) : null);
 
   function draw() {
-    sources.sync(store.project, store.playhead, store.playing);
+    const proj = store.ghost || store.project; // a previewed "what if" is drawn instead of the real project (same renderer, nothing extra)
+    sources.sync(proj, store.playhead, store.playing);
     try {
-      const r = comp.render({ project: store.project, t: store.playhead, sources, features: features() });
+      const r = comp.render({ project: proj, t: store.playhead, sources, features: features() });
       stats.frames++;
       const errs = [...sources.errors.values()];
       if (errs.length) show(errs[0]); else if (r.missing.length && !store.playing) show(`Loading ${r.missing[0]}…`); else show('');
@@ -64,6 +65,7 @@ export function mountPreview() {
     if (playBtn.dataset.icon !== icon) { playBtn.dataset.icon = icon; playBtn.querySelector('use').setAttribute('href', icon); }
   }
 
+  let playFrom = 0; // where the last play started (the place the artist had put the playhead): Enter comes back here
   /** The marked In/Out range, when "loop" is on: playback goes round inside it, like a video editor's loop playback. */
   const rangeLoop = () => { if (!loop.checked) return null; const r = activeRange(store.project); return r ? [r.in, r.out] : null; };
 
@@ -74,6 +76,7 @@ export function mountPreview() {
     const rl = rangeLoop();
     if (rl && (fromMark || store.playhead < rl[0] || store.playhead >= rl[1] - 0.01)) store.setPlayhead(rl[0]);
     else if (store.playhead >= d - 0.01) store.setPlayhead(0);
+    playFrom = store.playhead;
     store.playing = true;
     wallStart = performance.now(); tStart = store.playhead;
     updateUI();
@@ -85,10 +88,10 @@ export function mountPreview() {
     updateUI(); dirty = true;
   }
   const toggle = () => (store.playing ? pause() : play({ fromMark: true }));
-  /** Enter: go back to the start (the In point of a looping range, else the beginning) and play from there, whether or not it was playing. */
+  /** Enter: go back to where playing started (the In point of a looping range, else the place the playhead was put) and play from there. */
   function restart() {
     const rl = rangeLoop();
-    store.setPlayhead(rl ? rl[0] : 0);
+    store.setPlayhead(rl ? rl[0] : Math.min(playFrom, duration()));
     if (store.playing) { wallStart = performance.now(); tStart = store.playhead; } else play();
   }
 

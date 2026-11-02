@@ -119,6 +119,12 @@ export function mountLiving({ preview, runAnalysis, renderer }) {
     store.mutate(() => { for (const c of clips) c.effects.push(memEffect()); });
     memStatus.textContent = `Memory Bleed added to ${clips.length === 1 ? `"${clips[0].name || clips[0].type}"` : `${clips.length} clips`}. Press play: it remembers while the timeline runs.`;
   } });
+  const memPreview = el('button', { id: 'memory-preview', text: 'Preview', title: 'See it on the selected clips first (press Space to play it). Nothing is applied until you press Apply on the preview bar.', onclick: () => {
+    const ids = selectedClips().map((c) => c.id);
+    if (!ids.length) { memStatus.textContent = 'Select a clip first.'; return; }
+    const ok = store.showGhost({ label: `Memory Bleed · ${MEM_MODES[mem.mode][0]}`, apply: (p) => { let n = 0; for (const id of ids) { const c = p.clips.find((x) => x.id === id); if (c) { c.effects.push(memEffect()); n++; } } return n > 0; }, done: `Memory Bleed added to ${ids.length === 1 ? 'the clip' : `${ids.length} clips`}. Undo takes it back.` });
+    memStatus.textContent = ok ? 'Previewing: press Space to play it. Apply keeps it, Cancel forgets it.' : 'That cannot be previewed.';
+  } });
   const memLayer = el('button', { id: 'memory-add-layer', text: 'Add as layer', title: 'An adjustment layer over the whole project: everything underneath remembers', onclick: () => {
     const dur = projectDuration(store.project);
     if (dur <= 0) { memStatus.textContent = 'Put something on the timeline first.'; return; }
@@ -153,10 +159,13 @@ export function mountLiving({ preview, runAnalysis, renderer }) {
     } catch (e) { dnaStatus.textContent = `Could not read the project: ${e.message}`; } finally { dnaRead.disabled = false; }
   };
   const dnaRead = el('button', { id: 'dna-read', text: 'Read the project', title: 'Listens to the music on the timeline and looks at the footage you use, then names the identity. Nothing in your edit changes.', onclick: readProject });
-  const dnaMake = el('button', { class: 'primary', id: 'dna-make', text: 'Make my look', title: 'Reads the music and the footage, then grows a living layer over the whole project (one Undo step). Nothing else changes.', onclick: async () => {
+  const dnaMake = el('button', { class: 'primary', id: 'dna-make', text: 'Make my look', title: 'Reads the music and the footage, then PREVIEWS a living layer over the whole project. Apply keeps it (one Undo step); Cancel forgets it.', onclick: async () => {
     await readProject();
     const dna = projectDna();
-    if (dna?.identity && projectDuration(store.project) > 0) growLayer(dna.identity, dna);
+    if (!dna?.identity || projectDuration(store.project) <= 0) return;
+    const id = dna.identity;
+    const ok = store.showGhost({ label: 'Living layer', apply: (p) => { const dur = projectDuration(p), bars = store.analysis ? musicStructure(store.analysis).bars : null; const c = createLivingLayerClip(id, { start: 0, duration: dur, bars, seed: dna.seed ?? 1 }); c.trackId = addTrack(p, 'video').id; addClipRaw(p, c); return true; }, done: 'Living layer added. Undo takes it back.' });
+    dnaStatus.textContent = ok ? 'Here is your look. Press Space to play it, then Apply to keep it or Cancel.' : 'Could not preview the living layer.';
   } });
   const libSeeds = () => (store.project.dna || []).map((d) => d.seed).filter(Number.isFinite);
   const dnaClear = el('button', { id: 'dna-clear', text: 'Clear', title: 'Forget the project identity', onclick: () => store.mutate((p) => { if (p.living) delete p.living.dna; }) });
@@ -179,6 +188,7 @@ export function mountLiving({ preview, runAnalysis, renderer }) {
       el('ul', { class: 'liv-lines' }, describeIdentity(id).map((l) => el('li', { text: l }))),
       el('p', { class: 'hint', text: `Signature look: ${dna.chain.map((c) => c.type).join(' · ')}. Seed ${dna.seed}.` }),
       el('div', { class: 'liv-acts' },
+        el('button', { id: 'dna-sig-preview', text: 'Preview look', disabled: !clip, title: 'See the signature look on the selected clips first', onclick: () => { const ids = selectedClips().map((c) => c.id); const ok = store.showGhost({ label: 'Signature look', apply: (p) => { let n = 0; for (const cid of ids) { const c = p.clips.find((x) => x.id === cid); if (c) { c.effects.push(...chainToEffects(dna.chain)); n++; } } return n > 0; }, done: 'Signature look added. Undo takes it back.' }); dnaStatus.textContent = ok ? 'Previewing: press Space to play it. Apply keeps it.' : 'Select a clip first.'; } }),
         el('button', { id: 'dna-apply-sig', text: 'Add signature look', disabled: !clip, title: "Adds the signature look's effects to the end of the selected clip's chain (one Undo step)", onclick: () => { const clips = selectedClips(); store.mutate(() => { for (const c of clips) c.effects.push(...chainToEffects(dna.chain)); }); dnaStatus.textContent = `Signature look added to ${clips.length === 1 ? 'the clip' : `${clips.length} clips`}. Undo takes it back.`; } }),
         el('button', { id: 'dna-layer', text: 'Grow a living layer', disabled: projectDuration(store.project) <= 0, title: 'An adjustment layer over the whole project: veins that grow faster in loud bars, glow with the bass, leave a fading stain', onclick: () => growLayer(id, dna) })),
       adv(el('div', { class: 'liv-acts' },
@@ -215,6 +225,7 @@ export function mountLiving({ preview, runAnalysis, renderer }) {
           a.preview === 'playback' ? el('p', { class: 'hint liv-dim', text: 'Shows while the timeline plays.' }) : null,
           el('div', { class: 'liv-acts' },
             el('button', { class: 'primary', text: 'Keep', title: 'Applies it to the project (one Undo step)', 'data-acc-keep': i, onclick: () => keepAccident(i) }),
+            el('button', { text: 'Preview', title: 'See it in the monitor, at the place it happens (press Space to play it). Nothing is applied until you press Apply.', 'data-acc-preview': i, onclick: () => { const ok = store.showGhost({ label: a.title, apply: (p) => a.apply(p), done: 'Accident kept. Undo takes it back.' }); if (ok) store.setPlayhead(Math.max(0, a.at - 0.5)); else accStatus.textContent = 'That accident no longer applies.'; } }),
             el('button', { text: 'Reroll', title: 'Another accident of this kind', 'data-acc-reroll': i, onclick: () => { acc.reroll(i); renderAccidents(); paintAccidents(); } })))));
     });
     accUndo.disabled = !acc.lastKept;
@@ -265,7 +276,7 @@ export function mountLiving({ preview, runAnalysis, renderer }) {
     section('memory', 'MEMORY', 'Let the image remember.',
       howto('Pick a mode, press Add to clip (select several clips to do them all at once), then press play: the picture remembers its past.'),
       el('div', { class: 'mut-row' }, memMode), memLine,
-      el('div', { class: 'mut-row' }, memClip, memLayer), memStatus,
+      el('div', { class: 'mut-row' }, memPreview, memClip, memLayer), memStatus,
       adv(el('label', { class: 'mut-row' }, el('span', { class: 'liv-axis', text: 'Blend' }), memBlend),
         slider('memory-length', 'Length', 0.3, 6, 0.1, 'length', ' s'), slider('memory-intensity', 'Intensity', 0, 1.5, 0.05, 'intensity'), memQuality)),
     section('dna', 'DNA', 'Give the project a shared identity.',

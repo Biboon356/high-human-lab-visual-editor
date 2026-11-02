@@ -391,3 +391,9 @@ kbd { font: 500 9.5px var(--mono); letter-spacing: .04em; padding: 1px 6px; bord
 .liv-adv > summary { cursor: pointer; font: 500 9.5px var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--dim); list-style: none; }
 .liv-adv > summary::before { content: '▸ '; } .liv-adv[open] > summary::before { content: '▾ '; } .liv-adv[open] > summary { color: var(--accent2); }
 .liv-adv > *:not(summary) { margin-top: 8px; display: grid; gap: 8px; }
+
+/* PREVIEW bar over the monitor */
+.ghost-bar { position: absolute; left: 50%; top: 8px; transform: translateX(-50%); z-index: 30; display: flex; align-items: center; gap: 10px; padding: 6px 10px; background: color-mix(in srgb, var(--bg) 88%, transparent); border: 1px solid var(--accent2); max-width: calc(100% - 24px); flex-wrap: wrap; }
+.ghost-bar[hidden] { display: none; } .ghost-tag { font: 600 10px var(--mono); letter-spacing: .16em; color: var(--accent2); } .ghost-label { font: 500 11px var(--mono); color: var(--text); }
+.ghost-hint { font: italic 400 12px Georgia, 'Times New Roman', serif; color: var(--dim); } .ghost-bar button { height: 22px; padding: 0 9px; font-size: 10px; }
+.btn-preview { }

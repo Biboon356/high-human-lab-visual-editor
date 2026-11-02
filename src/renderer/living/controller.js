@@ -45,6 +45,7 @@ export class LivingLabController {
     if (dur <= 0) { toast('Put something on the timeline first.', 'error'); return false; }
     const span = this.settings.loop ? this.loopSpan() : null;
     const loop = span && span.b - span.a >= 0.3 ? span : null;
+    store.clearGhost(); // a session works on the real project
     store.snapshot(); // one undo step for the whole session
     const t0 = loop ? loop.a : store.playhead >= dur - 0.05 ? 0 : store.playhead; // a loop always starts at its beginning
     store.setPlayhead(t0);

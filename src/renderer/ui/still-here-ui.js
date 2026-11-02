@@ -4,7 +4,7 @@
 import { store } from '../store.js';
 import { el } from './dom.js';
 import { creative } from '../creative/engine.js';
-import { KINDS } from '/shared/creative/still-here.js';
+import { KINDS, applyMemory } from '/shared/creative/still-here.js';
 import { EFFECTS } from '/shared/effects-defs.js';
 import { sampleFeatures } from '/shared/audio-analysis.js';
 import { activeVisualClips } from '/shared/timeline.js';
@@ -94,6 +94,12 @@ export function mountStillHere({ preview, renderer }) {
         el('b', { class: 'still-title', text: KINDS[m.kind].title }), name,
         el('em', { class: 'still-why', text: m.source === 'curated' ? `kept for you — ${m.why || 'you worked on it for a while'}` : 'kept by you' }),
         el('div', { class: 'liv-acts' },
+          el('button', { class: 'still-preview', text: 'PREVIEW', title: 'See it on the selected clips first (press Space to play it)', onclick: () => {
+            const ids = [...store.multi], probe = applyMemory(structuredClone(store.project), m, { clipIds: ids });
+            if (!probe.ok) { status.textContent = probe.reason; return; }
+            store.showGhost({ label: KINDS[m.kind].title.toLowerCase(), apply: (p) => applyMemory(p, m, { clipIds: ids }).ok, done: `${probe.text || 'Brought back.'} Undo takes it back.` });
+            status.textContent = 'Previewing: press Space to play it. Apply keeps it, Cancel forgets it.';
+          } }),
           el('button', { class: 'still-back', text: 'BRING BACK', title: `Bring back the ${KINDS[m.kind].verb} onto the selected ${m.kind === 'rhythm' ? 'clips' : 'clip'}. One Undo takes it back.`, onclick: () => onBack(m) }),
           el('button', { class: 'still-go', text: 'LET GO', title: 'Remove it from the shelf', onclick: () => { creative.letGo(m.id); } }))));
   }

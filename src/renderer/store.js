@@ -26,6 +26,8 @@ class Store {
     this.pendingSnap = null;
     this.clipboard = null; // copied clip (JSON)
     this.relinkedMedia = null;
+    this.ghost = null; // a "what if": a copy of the project the monitor draws instead of the real one (see showGhost); the real project is never touched by it
+    this.ghostSpec = null;
     this.loopRange = null; // [start, end] while a Take or Trace loops over a stretch (set by living/controller.js, read by the preview)
     this.recorder = null; // a running Lab Take (see living/lab-take.js); param-row.js reports value changes to it
     this.changeKind = 'load'; // what the last 'project' notification was: 'edit' | 'undo' | 'redo' | 'load' (the Creative Memory Engine reads it)
@@ -52,6 +54,40 @@ class Store {
   /** Takes back the undo point made by the last snapshot() (a recording session that ended with nothing to keep). */
   dropSnapshot() { this.undoStack.pop(); }
 
+  /**
+   * PREVIEW: shows what an action WOULD do, without doing it. `spec.apply(project)` is run on a copy (it must return false when it does
+   * not apply); the monitor draws the copy, so it can be played and judged like the real thing. Nothing is saved, nothing is added to
+   * Undo, and exports ignore it. commitGhost() makes it real as one Undo step; clearGhost() forgets it.
+   * @param spec {label, apply(project) → boolean, done?: string}
+   */
+  showGhost(spec) {
+    const copy = structuredClone(this.project);
+    let ok = false;
+    try { ok = spec.apply(copy) !== false; } catch (e) { console.error(e); }
+    if (!ok) return false;
+    this.ghost = copy; this.ghostSpec = spec;
+    this.emit('ghost', 'render');
+    return true;
+  }
+  clearGhost() {
+    if (!this.ghost) return;
+    this.ghost = null; this.ghostSpec = null;
+    this.emit('ghost', 'render');
+  }
+  /** Makes the previewed change real, as ONE undo step. Returns the spec's `done` text (or true), or false when it no longer applies. */
+  commitGhost() {
+    const spec = this.ghostSpec;
+    if (!spec) return false;
+    this.clearGhost();
+    this.snapshot();
+    let ok = false;
+    try { ok = spec.apply(this.project) !== false; } catch (e) { console.error(e); }
+    if (!ok) { this.dropSnapshot(); return false; }
+    this.touch('project', 'keyframes');
+    try { spec.after?.(); } catch (e) { console.error(e); }
+    return spec.done || true;
+  }
+
   /** Discrete edit: snapshot, mutate, notify. */
   mutate(fn, ...topics) {
     this.snapshot();
@@ -62,6 +98,7 @@ class Store {
 
   /** Notify after an in-place change (used inside gestures). Marks the project dirty and the audio analysis stale. */
   touch(...topics) {
+    if (topics.includes('project') && this.ghost) this.clearGhost(); // the project moved on: the "what if" is out of date
     this.changeKind = 'edit';
     this.setDirty(true);
     if (topics.includes('project')) this.analysisStale = this.audioSignature() !== this.analysisSig;
@@ -78,6 +115,7 @@ class Store {
   }
 
   _restore(json, kind) {
+    this.clearGhost();
     const shelf = this.project.stillHere;
     this.project = JSON.parse(json);
     this.project.stillHere = Array.isArray(shelf) ? shelf : [];
@@ -101,6 +139,7 @@ class Store {
   }
 
   loadProject(project, filePath = null) {
+    this.clearGhost();
     this.project = validateProject(project);
     this.filePath = filePath;
     this.selection = null;

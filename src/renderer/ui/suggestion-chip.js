@@ -12,8 +12,8 @@ export function mountSuggestionChip() {
     const s = creative.suggestion;
     if (!s) { root.hidden = true; root.replaceChildren(); return; }
     const acts = s.kind === 'relate'
-      ? [el('button', { class: 'primary', 'data-act': 'apply', text: 'APPLY', onclick: () => done(creative.applySuggestion()) })]
-      : s.items.map((it) => el('button', { 'data-act': 'bring', 'data-id': it.id, text: `BRING BACK · ${it.name}`.slice(0, 34), title: `Bring back ${it.name}`, onclick: () => done(creative.applySuggestion(it.id)) }));
+      ? [el('button', { 'data-act': 'preview', text: 'PREVIEW', title: 'See it in the monitor first', onclick: () => creative.previewSuggestion() }), el('button', { class: 'primary', 'data-act': 'apply', text: 'APPLY', onclick: () => done(creative.applySuggestion()) })]
+      : s.items.flatMap((it) => [el('button', { 'data-act': 'preview', 'data-id': it.id, text: 'PREVIEW', title: `See ${it.name} first`, onclick: () => creative.previewSuggestion(it.id) }), el('button', { 'data-act': 'bring', 'data-id': it.id, text: `BRING BACK · ${it.name}`.slice(0, 34), title: `Bring back ${it.name}`, onclick: () => done(creative.applySuggestion(it.id)) })]);
     root.replaceChildren(el('b', { class: 'cchip-h', text: s.heading }), el('span', { class: 'cchip-l', text: s.line }),
       el('div', { class: 'cchip-a' }, ...acts, el('button', { 'data-act': 'dismiss', text: 'DISMISS', onclick: () => creative.dismissSuggestion() })));
     root.hidden = false;

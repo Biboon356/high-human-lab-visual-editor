@@ -2060,8 +2060,10 @@ await step('loop playback: with a marked range and loop on, Space and Enter play
   await page.check('#loop'); await ev(() => document.activeElement?.blur?.());
   await page.keyboard.press('Alt+x'); await settle(150);
   assert.equal((await st()).range, null, 'Alt+X clears the range');
-  await ev(() => window.__app.store.setPlayhead(4)); await page.keyboard.press('Enter'); await page.waitForTimeout(150);
-  s = await st(); assert.ok(s.playing && s.head < 0.6, `with no range Enter starts from the beginning (${s.head.toFixed(2)})`);
+  await ev(() => window.__app.store.setPlayhead(3.2)); await page.keyboard.press(' '); await page.waitForTimeout(700);
+  s = await st(); assert.ok(s.playing && s.head > 3.6, `plays on from where the playhead was put (${s.head.toFixed(2)})`);
+  await page.keyboard.press('Enter'); await page.waitForTimeout(120);
+  s = await st(); assert.ok(s.playing && s.head >= 3.15 && s.head < 3.6, `with no range Enter comes back to where the playhead was put (${s.head.toFixed(2)})`);
   await page.keyboard.press(' '); await page.uncheck('#loop'); await settle(100);
 });
 
@@ -2367,9 +2369,14 @@ await step('quick start and groups: Advanced folds the fine controls, Make my lo
   await select('A', 'B');
   const d0 = (await S()).depth;
   await page.click('#dna-make');
-  await page.waitForFunction(() => !document.getElementById('dna-read').disabled && /Living layer added/.test(document.getElementById('dna-status').textContent), null, { timeout: 90000 });
+  await page.waitForFunction(() => !document.getElementById('dna-read').disabled && /Here is your look/.test(document.getElementById('dna-status').textContent), null, { timeout: 90000 });
   let s = await S();
-  assert.ok(s.json.includes('Living layer'), 'the living layer is there'); assert.equal(s.depth, d0 + 2, 'reading the identity and growing the layer are two Undo steps (each can be undone alone)');
+  assert.equal(s.json.includes('Living layer'), false, 'it is only a preview: nothing was added to the project'); assert.equal(s.depth, d0 + 1, 'only reading the identity made an Undo step so far');
+  assert.equal(await page.locator('#ghost-bar').isVisible(), true, 'the preview bar is showing');
+  assert.ok(await ev(() => window.__app.store.ghost.clips.some((c) => /Living layer/.test(c.name))), 'the monitor is drawing the project with the living layer in it');
+  await page.click('#ghost-apply'); await settle(300);
+  s = await S();
+  assert.ok(s.json.includes('Living layer'), 'Apply makes the living layer real'); assert.equal(s.depth, d0 + 2, 'reading the identity and applying the layer are two Undo steps (each can be undone alone)');
   await ev(() => { window.__app.store.undo(); window.__app.store.undo(); }); await settle(200);
 
   // Accident at the playhead: only the cut near it; nowhere near a cut, nothing happens (and it says why)
@@ -2414,6 +2421,72 @@ await step('quick start and groups: Advanced folds the fine controls, Make my lo
   s = await S();
   assert.equal(s.depth, dd + 1, 'one Undo step for the whole selection'); assert.ok(['B', 'C', 'D'].every((n) => (s.clips[n].keyframes.x || []).length >= 2), 'all three now move');
   assert.match(await ev(() => document.getElementById('still-status').textContent), /3 clips/);
+  assert.equal(logs.slice(errorsBefore).filter((l) => /shader|compile|GLSL|WebGL|error/i.test(l)).length, 0, 'no errors in the console');
+  await page.click('#panel-left [data-tab="media"]'); await settle(200);
+});
+
+await step('preview: Memory, TIMELINE, Accident and BRING BACK can be previewed in the monitor first; nothing is applied until Apply, Cancel and Esc leave no trace, a real edit drops it, Apply is one Undo step', async () => {
+  await resetProject();
+  await ev(async (c) => { await window.__app.importPaths([c]); const { store } = window.__app; const { addMediaClip } = await import('/shared/timeline.js');
+    store.mutate((p) => {
+      p.settings.width = 320; p.settings.height = 180;
+      const v1 = p.tracks.find((t) => t.kind === 'video'), img = p.media[0].id; p.clips = [];
+      const A = addMediaClip(p, img, v1.id, 0); A.duration = 2; A.name = 'A'; A.keyframes.x = [{ t: 0, v: -0.3 }, { t: 2, v: 0.3 }];
+      const B = addMediaClip(p, img, v1.id, 2); B.duration = 2; B.name = 'B';
+    }); }, pic);
+  await page.click('#panel-left [data-tab="living"]'); await settle(500);
+  const errorsBefore = logs.length;
+  const S = () => ev(() => { const s = window.__app.store; const fx = (p, n) => (p.clips.find((c) => c.name === n)?.effects || []).length; return { depth: s.undoStack.length, json: JSON.stringify(s.project, (k, v) => (k === 'stillHere' ? undefined : v)), ghost: !!s.ghost, ghostFx: s.ghost ? { A: fx(s.ghost, 'A'), B: fx(s.ghost, 'B') } : null, fx: { A: fx(s.project, 'A'), B: fx(s.project, 'B') }, bar: !document.getElementById('ghost-bar').hidden, head: s.playhead }; });
+  const select = (...names) => ev((names) => { const s = window.__app.store; const ids = names.map((n) => s.project.clips.find((c) => c.name === n).id); s.multi = new Set(ids); s.selection = ids[0]; s.emit('selection', 'render'); }, names);
+  const before = await S();
+
+  // TIMELINE: GROW FROM, previewed
+  await select('A', 'B'); await ev(() => document.getElementById('living-timeline').scrollIntoView()); await settle(200);
+  await page.click('#rel-grow'); await settle(400);
+  await page.click('#rel-preview'); await settle(500);
+  let s = await S();
+  assert.equal(s.ghost, true); assert.equal(s.bar, true, 'the preview bar shows'); assert.ok(s.ghostFx.A >= 1, 'the monitor draws the project with growth in it');
+  assert.equal(s.json, before.json, 'the real project has not changed'); assert.equal(s.depth, before.depth, 'and nothing was added to Undo');
+  assert.ok(s.head <= 2, `the playhead went to where it happens (${s.head.toFixed(2)})`);
+  const drawn = await ev(() => { const d = window.__grab(40, 22); let t = 0; for (const v of d) t += v; return t / d.length; });
+  assert.ok(drawn > 8, 'the monitor shows a picture while previewing');
+  await page.click('#ghost-apply'); await settle(300);
+  s = await S();
+  assert.equal(s.ghost, false); assert.equal(s.bar, false); assert.ok(s.fx.A >= 1, 'Apply made it real'); assert.equal(s.depth, before.depth + 1, 'as one Undo step');
+  await ev(() => window.__app.store.undo()); await settle(200);
+  assert.equal((await S()).json, before.json, 'Undo restores exactly');
+
+  // Memory: preview, then Cancel leaves no trace
+  await select('A'); await ev(() => document.getElementById('living-memory').scrollIntoView()); await settle(200);
+  await page.click('#memory-preview'); await settle(400);
+  s = await S(); assert.ok(s.ghost && s.ghostFx.A === 1 && s.fx.A === 0, 'previewed on the clip, not applied'); assert.equal(s.json, before.json);
+  await page.click('#ghost-cancel'); await settle(200);
+  s = await S(); assert.equal(s.ghost, false); assert.equal(s.json, before.json); assert.equal(s.depth, before.depth, 'Cancel leaves no trace');
+
+  // Accident: preview and leave with Esc
+  await select('A', 'B'); await ev(() => { window.__app.store.setPlayhead(2.1); document.getElementById('living-accident').scrollIntoView(); }); await settle(200);
+  await page.click('#acc-cause'); await settle(700);
+  assert.ok(await ev(() => document.querySelectorAll('[data-acc-preview]').length) >= 1, 'each accident has a Preview');
+  await page.click('[data-acc-preview="0"]'); await settle(400);
+  s = await S(); assert.equal(s.ghost, true); assert.equal(s.json, before.json, 'the accident is not applied by previewing it');
+  await ev(() => document.activeElement?.blur?.()); await page.keyboard.press('Escape'); await settle(200);
+  s = await S(); assert.equal(s.ghost, false, 'Esc leaves the preview'); assert.equal(s.json, before.json);
+
+  // BRING BACK: preview on another clip, Apply
+  await select('A'); await ev(() => document.getElementById('living-still').scrollIntoView()); await settle(200);
+  await page.click('#still-keep-moved'); await settle(200);
+  await select('B');
+  const d1 = (await S()).depth;
+  await page.click('#still-list [data-kind="moved"] .still-preview'); await settle(400);
+  s = await S(); assert.ok(s.ghost, 'previewed'); assert.equal(await ev(() => (window.__app.store.project.clips.find((c) => c.name === 'B').keyframes.x || []).length), 0, 'B has not changed yet');
+  assert.ok(await ev(() => (window.__app.store.ghost.clips.find((c) => c.name === 'B').keyframes.x || []).length >= 2), 'but the monitor shows it moving');
+  // a real edit drops the preview: it would be out of date
+  await ev(() => { const st = window.__app.store; st.mutate((p) => { p.name = 'edited'; }); });
+  s = await S(); assert.equal(s.ghost, false, 'a real edit drops the preview');
+  await page.click('#still-list [data-kind="moved"] .still-preview'); await settle(300);
+  await page.click('#ghost-apply'); await settle(300);
+  s = await S(); assert.equal(s.depth, d1 + 2, 'the edit and the applied preview: two Undo steps');
+  assert.ok(await ev(() => (window.__app.store.project.clips.find((c) => c.name === 'B').keyframes.x || []).length >= 2), 'Apply made it real');
   assert.equal(logs.slice(errorsBefore).filter((l) => /shader|compile|GLSL|WebGL|error/i.test(l)).length, 0, 'no errors in the console');
   await page.click('#panel-left [data-tab="media"]'); await settle(200);
 });
