@@ -2729,6 +2729,29 @@ await step('light theme + collapsible panels', async () => {
   await ev(() => { document.getElementById('toggle-theme').click(); document.getElementById('toggle-left').click(); });
 });
 
+await step('Tell it: a typed sentence is understood, previewed, applied as one Undo step, and a sentence it cannot understand changes nothing', async () => {
+  await resetProject(); await ev((p) => window.__app.importPaths([p]), clip); await settle(800);
+  await ev(() => { const s = window.__app.store; const c = s.project.clips.find((x) => x.type === 'media'); s.multi = new Set([c.id]); s.selection = c.id; s.emit('selection', 'render'); });
+  await ev(() => document.querySelector('[data-tab="reactive"]').click()); await settle(300);
+  const depth = () => ev(() => window.__app.store.undoStack.length);
+  const fxOf = () => ev(() => window.__app.store.project.clips.find((x) => x.type === 'media').effects.map((e) => ({ t: e.type, b: e.bindings })));
+  const d0 = await depth();
+  await page.fill('#cmd-input', 'make it beautiful'); await page.click('#cmd-go'); await settle(300);
+  assert.match(await ev(() => document.getElementById('cmd-status').textContent), /did not understand/);
+  assert.equal(await ev(() => !!window.__app.store.ghost), false, 'not understood: no preview');
+  await page.fill('#cmd-input', 'ให้ glitch ตามเบสแรงๆ'); await page.click('#cmd-go');
+  await page.waitForFunction(() => !!window.__app.store.ghost, null, { timeout: 30000 });
+  assert.match(await ev(() => document.getElementById('cmd-list').textContent), /Glitch › Intensity ← bass/);
+  assert.deepEqual(await fxOf(), [], 'previewing changes nothing real'); { const dp = await depth(); assert.equal(dp, d0, `previewing adds no Undo step (before ${d0}, now ${dp})`); }
+  assert.equal(await page.locator('#ghost-bar').isVisible(), true);
+  await page.click('#ghost-apply'); await settle(300);
+  const fx = await fxOf();
+  assert.equal(fx.length, 1, `effects after Apply: ${JSON.stringify(fx)}`); assert.deepEqual(fx[0].b.amount, { source: 'bass', amount: 0.85 });
+  { const dn = await depth(); assert.equal(dn, d0 + 1, `one Undo step (before ${d0}, after ${dn})`); }
+  await ev(() => window.__app.store.undo()); await settle(200);
+  assert.deepEqual(await fxOf(), [], 'Undo takes it back');
+});
+
 const bad = logs.filter((l) => !/GPU stall|swiftshader|GL Driver Message|Automatic fallback/i.test(l));
 await step('no unexpected console errors during the whole run', async () => { assert.deepEqual(bad, []); });
 // Quitting mid-export must not leave ffmpeg processes behind (they would burn CPU forever).

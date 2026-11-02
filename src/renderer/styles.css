@@ -397,3 +397,6 @@ kbd { font: 500 9.5px var(--mono); letter-spacing: .04em; padding: 1px 6px; bord
 .ghost-bar[hidden] { display: none; } .ghost-tag { font: 600 10px var(--mono); letter-spacing: .16em; color: var(--accent2); } .ghost-label { font: 500 11px var(--mono); color: var(--text); }
 .ghost-hint { font: italic 400 12px Georgia, 'Times New Roman', serif; color: var(--dim); } .ghost-bar button { height: 22px; padding: 0 9px; font-size: 10px; }
 .btn-preview { }
+
+.cmd-row { display: flex; gap: 6px; margin: 8px 0; } .cmd-input { flex: 1; min-width: 0; }
+.cmd-list { margin: 6px 0 0; padding: 0; list-style: none; font-size: 12px; line-height: 1.5; } .cmd-list li { color: var(--text); }

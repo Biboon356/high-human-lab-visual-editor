@@ -15,6 +15,7 @@ import { creative } from './creative/engine.js';
 import { mountSuggestionChip } from './ui/suggestion-chip.js';
 import { mountGhostBar } from './ui/ghost-bar.js';
 import { mountReactive, runAnalysis } from './ui/reactive-ui.js';
+import { mountCommand } from './ui/command-ui.js';
 import { mountProjectSettings } from './ui/project-settings.js';
 import { openExportDialog, isExporting } from './ui/export-dialog.js';
 import { openAutoEdit } from './ui/autoedit-panel.js';
@@ -146,6 +147,7 @@ const mutateUi = mountMutate({ preview });
 const living = mountLiving({ preview, runAnalysis, renderer: mutateUi.renderer });
 try { mountGhostBar(); mountSuggestionChip(); creative.start(); } catch (e) { console.error('[creative]', e); } // the intelligence layer is an extra: if it cannot start, the editor still works
 mountReactive($('reactive'));
+try { mountCommand($('reactive'), { runAnalysis }); } catch (e) { console.error('[command]', e); } // an extra: if it cannot start the editor still works
 mountProjectSettings($('project-settings'));
 startRoots($('bg-roots'), () => store.playing || isExporting());
 syncChrome();
