@@ -17,7 +17,7 @@ export function mountRelate({ preview, renderer }) {
   const title = el('b', { class: 'rel-title' }), summary = el('p', { class: 'rel-sum' }), note = el('p', { class: 'hint rel-note' });
   const card = el('div', { class: 'rel-card', id: 'rel-card', hidden: true }, canvas,
     el('div', { class: 'rel-body' }, title, summary, note,
-      el('div', { class: 'liv-acts' }, el('button', { id: 'rel-preview', text: 'PREVIEW', title: 'See it in the monitor, at the place it happens (press Space to play it)', onclick: preview }), el('button', { id: 'rel-apply', class: 'primary', text: 'APPLY', onclick: apply }), el('button', { id: 'rel-cancel', text: 'CANCEL', onclick: () => clear() }))));
+      el('div', { class: 'liv-acts' }, el('button', { id: 'rel-preview', text: 'PREVIEW', title: 'See it in the monitor, at the place it happens (press Space to play it)', onclick: showPreview }), el('button', { id: 'rel-apply', class: 'primary', text: 'APPLY', onclick: apply }), el('button', { id: 'rel-cancel', text: 'CANCEL', onclick: () => clear() }))));
   const quiet = el('input', { type: 'checkbox', id: 'creative-suggest', checked: creative.suggestOn });
   quiet.addEventListener('change', () => creative.setSuggestions(quiet.checked));
   const root = el('section', { class: 'liv-sec', id: 'living-timeline' },
@@ -55,7 +55,7 @@ export function mountRelate({ preview, renderer }) {
     } catch (e) { console.error(e); }
   }
 
-  function preview() {
+  function showPreview() { // (not called `preview`: that name is the monitor's preview passed to mountRelate)
     if (!current) return;
     const p = current;
     if (store.showGhost({ label: p.title, apply: (x) => p.apply(x), done: `${p.title}: ${p.summary} Undo takes it back.` })) { store.setPlayhead(Math.max(0, p.at - 0.5)); status.textContent = 'Previewing: press Space to play it. Apply keeps it, Cancel forgets it.'; }

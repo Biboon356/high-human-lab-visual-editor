@@ -225,6 +225,17 @@ without you.
   extra buttons, Memory's blend, length and intensity, Still Here's auto-keep, the quiet-suggestions switch) are folded under
   **Advanced**; DNA has a single **Make my look** button (reads the project and grows a living layer).
 
+
+## v0.9.2 — loop playback, Enter, and PREVIEW before you apply
+
+* **Loop like a video editor**: mark an In/Out range (**I** / **O**) and **loop** switches on; **Space** or **Enter** plays the range again
+  from its In point and playback goes round inside it. With no range, **Enter** goes back to where the playhead was put when you started
+  playing. (Take and Trace keep their own loop while recording.)
+* **PREVIEW** (the monitor itself): Memory, Add signature look, Make my look, Accident, TIMELINE, BRING BACK and the quiet suggestions
+  can each show what they WOULD do on the real timeline: press **Space** to play it, then **Apply** (one Undo step) or **Cancel**
+  (Esc too). Nothing is applied, saved or added to Undo by looking, and a real edit drops the preview. It costs one copy of the project
+  data and no second renderer: the monitor draws the copy instead of the project.
+
 ## HDR phone footage (iPhone HLG / PQ)
 
 A clip shot in HDR is 10-bit BT.2020 with an HLG curve. Decoded as ordinary video it looks washed out. The app now recognises such

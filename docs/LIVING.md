@@ -131,6 +131,15 @@ track above it) — and plans up to three accidents of different kinds, each wit
 * **Accident scope** (`planAccidents`, `at` and the selection): two or more selected clips = a group (all their cuts and overlaps, one
   combined accident, `combinePlans`); otherwise the relations within `window` seconds (1.5) of the playhead; without `at`, anywhere.
 
+## v0.9.2 additions
+
+* **Preview** (`store.showGhost / commitGhost / clearGhost`, `ui/ghost-bar.js`): an action hands the store a function that applies it to a
+  project; the store runs it on a copy and the monitor's `draw()` renders the copy instead of the project (same compositor, same frame
+  sources). `commitGhost` runs the function on the real project as one Undo step. Any real project change drops the preview, exports and
+  autosave never see it. Memory history textures exist only while a preview with a Memory effect is on screen.
+* **Loop playback** (`ui/preview.js`): with "loop" on and a marked range, the frame loop wraps at Out to In; Space and the play button start at
+  In; Enter returns to the In point (or to where the last play started).
+
 ## What is not built (honestly)
 
 * MIDI input (the take recorder is ready for it: `LabTake.perform(slot, value)`).
