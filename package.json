@@ -49,7 +49,10 @@
       "target": [
         "dmg"
       ],
-      "identity": null
+      "identity": null,
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "HIGH HUMAN LAB listens only while you hold the speak button, to turn a spoken command into text. The sound is processed on this computer and never sent anywhere."
+      }
     },
     "win": {
       "target": [

@@ -31,6 +31,8 @@ contextBridge.exposeInMainWorld('hh', {
   asrCancel: () => invoke('asr:cancel'),
   asrExtract: (o) => invoke('asr:extract', o),
   asrTranscribe: (o) => invoke('asr:transcribe', o),
+  micEnsure: () => invoke('mic:ensure'),
+  asrDictate: (o) => invoke('asr:dictate', o),
   appInfo: () => invoke('app:info'),
   updateStatus: () => invoke('update:status'),
   updateCheck: () => invoke('update:check'),

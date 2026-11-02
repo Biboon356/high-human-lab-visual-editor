@@ -147,7 +147,8 @@ const mutateUi = mountMutate({ preview });
 const living = mountLiving({ preview, runAnalysis, renderer: mutateUi.renderer });
 try { mountGhostBar(); mountSuggestionChip(); creative.start(); } catch (e) { console.error('[creative]', e); } // the intelligence layer is an extra: if it cannot start, the editor still works
 mountReactive($('reactive'));
-try { mountCommand($('reactive'), { runAnalysis }); } catch (e) { console.error('[command]', e); } // an extra: if it cannot start the editor still works
+let commandUi = null;
+try { commandUi = mountCommand($('reactive'), { runAnalysis, preview }); } catch (e) { console.error('[command]', e); } // an extra: if it cannot start the editor still works
 mountProjectSettings($('project-settings'));
 startRoots($('bg-roots'), () => store.playing || isExporting());
 syncChrome();
@@ -196,7 +197,7 @@ document.addEventListener('paste', (e) => { if (!inTextField() && store.clipboar
 
 // ---- automation hook (used by scripts/e2e.mjs; harmless in normal use)
 window.__app = {
-  mutateUi, living, reverseSelected, freezeAtPlayhead, placeAdlibs, stutterAtPlayhead, previewEdit, maskEditor, maskEdit, store, preview, timeline, autoEdit: autoEditEngine, captionEdit: { applyCaptionEdits }, smartMontage, autosave: { writeNow, offerRecovery }, runAnalysis, cutOnBeats, autoMontage, importPaths: async (paths) => importResults(await hh.probePaths(paths)),
+  command: commandUi, mutateUi, living, reverseSelected, freezeAtPlayhead, placeAdlibs, stutterAtPlayhead, previewEdit, maskEditor, maskEdit, store, preview, timeline, autoEdit: autoEditEngine, captionEdit: { applyCaptionEdits }, smartMontage, autosave: { writeNow, offerRecovery }, runAnalysis, cutOnBeats, autoMontage, importPaths: async (paths) => importResults(await hh.probePaths(paths)),
   exportTo: async (outPath, overrides = {}) => {
     const s = store.project.settings;
     const { range: _r, ...ov } = overrides; const settings = { width: s.width, height: s.height, fps: s.fps, quality: "draft", format: outPath.endsWith(".webm") ? "webm" : "mp4", ...ov, outPath };

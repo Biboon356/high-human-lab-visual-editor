@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu, dialog, ipcMain, protocol, net, shell, session as electronSession } from 'electron';
+import { app, BrowserWindow, Menu, dialog, ipcMain, protocol, net, shell, systemPreferences, session as electronSession } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
@@ -6,10 +6,11 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { Readable } from 'node:stream';
 import { probeMedia, toneMapChain, makeProxy, decodePcm, ExportSession, ClipDecoder, makeThumbs, makePeaks, extractPcm16k, reverseRange, extractFrame, FFMPEG } from './ffmpeg.js';
 import { validateProject } from '../shared/project.js';
-import { MODELS, DEFAULT_MODEL, modelStatus, ensureModel, transcribePcm, transcribeChunks, releaseEngine } from './asr.js';
+import { MODELS, DEFAULT_MODEL, modelStatus, ensureModel, transcribePcm, transcribeChunks, transcribeDictation, releaseEngine } from './asr.js';
 import { rmsEnvelope } from '../shared/audio-analysis.js';
 import { analyzeFile, killFootage } from './footage.js';
 import { mountUpdates } from './update.js';
+import { allowPermission } from './permissions.js';
 import { buildAnalysisArgs, buildExportArgs, validateExportSettings, FORMATS } from '../shared/export-plan.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -269,6 +270,24 @@ function registerIpc() {
       return await transcribePcm({ pcm, modelPath, language, prompt, signal: asrJob, onProgress });
     } finally { asrJob = null; }
   });
+  // ---- Dictation: hold a button, speak a command, get one line of text (the artist reads and edits it before anything runs) ----------
+  ipcMain.handle('mic:ensure', async () => {
+    if (process.platform !== 'darwin') return { ok: true }; // Windows asks (or not) by itself when capture starts; denial shows up as a capture error in the page
+    const st = systemPreferences.getMediaAccessStatus('microphone');
+    if (st === 'granted') return { ok: true };
+    if (st === 'not-determined') return { ok: await systemPreferences.askForMediaAccess('microphone'), reason: 'Microphone access was not allowed.' };
+    return { ok: false, reason: 'Microphone access is turned off for this app: System Settings › Privacy & Security › Microphone.' };
+  });
+  ipcMain.handle('asr:dictate', async (_e, { pcm, model = DEFAULT_MODEL, language = 'th', prompt }) => {
+    const m = MODELS[model];
+    if (!m) throw new Error(`Unknown speech model "${model}".`);
+    const modelPath = path.join(modelsDir(), m.file);
+    if (!modelStatus(modelsDir())[model]?.installed) return { ok: false, reason: `The speech model is not downloaded yet: open the Auto-Edit panel and download "${m.label}" once.`, needModel: true };
+    if (asrJob) return { ok: false, reason: 'Another speech task is running: try again when it is done.' };
+    asrJob = { aborted: false };
+    try { return await transcribeDictation({ pcm: new Int16Array(pcm), modelPath, language: language === 'en' ? 'en' : 'th', prompt: typeof prompt === 'string' ? prompt.slice(0, 400) : undefined, signal: asrJob }); }
+    finally { asrJob = null; }
+  });
   // ---- Footage analysis for the smart montage ---------------------------------------------------------------
   let montageJob = null;
   ipcMain.handle('montage:analyze', async (_e, items) => {
@@ -421,9 +440,9 @@ function registerIpc() {
 }
 
 app.whenReady().then(() => {
-  // The only permission the app ever needs is listing installed fonts for the Typography Lab.
-  electronSession.defaultSession.setPermissionRequestHandler((_wc, permission, cb) => cb(permission === 'local-fonts'));
-  electronSession.defaultSession.setPermissionCheckHandler((_wc, permission) => permission === 'local-fonts');
+  // The only permissions the app ever needs: listing installed fonts (Typography Lab) and the microphone, audio only, for spoken commands.
+  electronSession.defaultSession.setPermissionRequestHandler((_wc, permission, cb, details) => cb(allowPermission(permission, details)));
+  electronSession.defaultSession.setPermissionCheckHandler((_wc, permission, _origin, details) => allowPermission(permission, details));
   handleProtocol();
   registerIpc();
   mountUpdates({ getWindow: () => win });

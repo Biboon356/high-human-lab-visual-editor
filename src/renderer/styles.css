@@ -400,3 +400,5 @@ kbd { font: 500 9.5px var(--mono); letter-spacing: .04em; padding: 1px 6px; bord
 
 .cmd-row { display: flex; gap: 6px; margin: 8px 0; } .cmd-input { flex: 1; min-width: 0; }
 .cmd-list { margin: 6px 0 0; padding: 0; list-style: none; font-size: 12px; line-height: 1.5; } .cmd-list li { color: var(--text); }
+.cmd-mic { flex: 0 0 auto; user-select: none; touch-action: none; } .cmd-mic.rec { background: var(--accent, #3a5); color: #000; }
+#cmd-card .cmd-row { align-items: center; flex-wrap: wrap; }

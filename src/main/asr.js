@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { downloadFile } from './model-download.js';
 import { composePrompt } from '../shared/asr-plan.js';
+import { prepareDictation, joinSegments } from '../shared/command/dictation.js';
 import { pathToFileURL } from 'node:url';
 import { appRequire } from './app-root.js';
 
@@ -105,4 +106,13 @@ export async function transcribeChunks({ pcm, chunks, modelPath, language = 'th'
     onProgress?.(Math.round((done / total) * 100));
   }
   return { segments: segments.filter((s) => s.end > s.start), language };
+}
+
+/** One short spoken command → one line of text. Refuses silence/too-short takes before any model runs (whisper makes words up from silence). */
+export async function transcribeDictation({ pcm, modelPath, language = 'th', prompt, signal, loader, threads }) {
+  const prep = prepareDictation(pcm);
+  if (!prep.ok) return { ok: false, reason: prep.reason };
+  const r = await transcribePcm({ pcm: prep.pcm, modelPath, language, prompt, signal, loader, threads });
+  const text = joinSegments(r.segments);
+  return text ? { ok: true, text, seconds: prep.seconds } : { ok: false, reason: 'I could not make out any words. Try again, a little slower.' };
 }

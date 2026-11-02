@@ -2752,6 +2752,41 @@ await step('Tell it: a typed sentence is understood, previewed, applied as one U
   assert.deepEqual(await fxOf(), [], 'Undo takes it back');
 });
 
+await step('Speak: hold the button, the words land in the box (not run), a silent or refused microphone is explained', async () => {
+  await resetProject(); await ev((p) => window.__app.importPaths([p]), clip); await settle(800);
+  await ev(() => { const s = window.__app.store; const c = s.project.clips.find((x) => x.type === 'media'); s.multi = new Set([c.id]); s.selection = c.id; s.emit('selection', 'render'); });
+  await ev(() => document.querySelector('[data-tab="reactive"]').click()); await settle(300);
+  assert.equal(await page.locator('#cmd-mic').isVisible(), true, 'the speak button is on show');
+  // the real wiring: a take of silence through the real IPC is refused (or the model is missing): either way ok:false with a reason, never made-up words
+  const silent = await ev(async () => window.hh.asrDictate({ pcm: new Int16Array(16000 * 2).buffer, language: 'th' }));
+  assert.equal(silent.ok, false, JSON.stringify(silent)); assert.ok(typeof silent.reason === 'string' && silent.reason.length > 5);
+  // a pretend microphone: a tone through the real capture code
+  await ev(() => {
+    navigator.mediaDevices.getUserMedia = async () => { const ac = new AudioContext(); const o = ac.createOscillator(), g = ac.createGain(), d = ac.createMediaStreamDestination(); g.gain.value = 0.3; o.frequency.value = 220; o.connect(g); g.connect(d); o.start(); return d.stream; };
+    window.__dict = []; window.__app.command.dictate = async (o) => { window.__dict.push({ bytes: o.pcm.byteLength, language: o.language, prompt: o.prompt }); return { ok: true, text: 'glitch ตามเบส', seconds: 1.5 }; };
+    document.getElementById('cmd-input').value = '';
+  });
+  const d0 = await ev(() => window.__app.store.undoStack.length);
+  await page.dispatchEvent('#cmd-mic', 'pointerdown', { pointerId: 1 }); await page.waitForTimeout(1500);
+  assert.equal(await ev(() => document.getElementById('cmd-mic').classList.contains('rec')), true, 'it shows it is listening');
+  await page.dispatchEvent('#cmd-mic', 'pointerup', { pointerId: 1 });
+  await page.waitForFunction(() => document.getElementById('cmd-input').value !== '', null, { timeout: 15000 });
+  assert.equal(await ev(() => document.getElementById('cmd-input').value), 'glitch ตามเบส');
+  const sent = await ev(() => window.__dict);
+  assert.equal(sent.length, 1); assert.ok(sent[0].bytes / 2 >= 16000 * 0.9, `about 1.5 s of 16 kHz audio was captured (${sent[0].bytes / 2} samples)`); assert.match(sent[0].prompt, /Glitch/);
+  assert.equal(await ev(() => !!window.__app.store.ghost), false, 'speaking does not run anything');
+  assert.equal(await ev(() => window.__app.store.undoStack.length), d0, 'no Undo step from speaking');
+  assert.match(await ev(() => document.getElementById('cmd-status').textContent), /Fix any word/);
+  await page.click('#cmd-go'); await page.waitForFunction(() => !!window.__app.store.ghost, null, { timeout: 30000 });
+  assert.match(await ev(() => document.getElementById('cmd-list').textContent), /Glitch › Intensity ← bass/);
+  await ev(() => window.__app.store.clearGhost());
+  // refused microphone: a plain sentence, nothing else happens
+  await ev(() => { navigator.mediaDevices.getUserMedia = async () => { const e = new Error('no'); e.name = 'NotAllowedError'; throw e; }; });
+  await page.dispatchEvent('#cmd-mic', 'pointerdown', { pointerId: 1 }); await page.waitForTimeout(300); await page.dispatchEvent('#cmd-mic', 'pointerup', { pointerId: 1 }); await settle(300);
+  assert.match(await ev(() => document.getElementById('cmd-status').textContent), /not allowed/);
+  assert.equal(await ev(() => document.getElementById('cmd-mic').classList.contains('rec')), false);
+});
+
 const bad = logs.filter((l) => !/GPU stall|swiftshader|GL Driver Message|Automatic fallback/i.test(l));
 await step('no unexpected console errors during the whole run', async () => { assert.deepEqual(bad, []); });
 // Quitting mid-export must not leave ffmpeg processes behind (they would burn CPU forever).
