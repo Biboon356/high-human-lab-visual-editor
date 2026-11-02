@@ -2023,6 +2023,48 @@ await step('loop recording: Take and Trace loop over the marked range, the selec
   await page.click('#panel-left [data-tab="media"]'); await settle(200);
 });
 
+await step('loop playback: with a marked range and loop on, Space and Enter play the range again from its In point, and playback goes round inside it', async () => {
+  await resetProject();
+  await ev(async (c) => { await window.__app.importPaths([c]); const { store } = window.__app; const { addMediaClip } = await import('/shared/timeline.js');
+    store.mutate((p) => { p.settings.width = 320; p.settings.height = 180; const A = addMediaClip(p, p.media[0].id, p.tracks.find((t) => t.kind === 'video').id, 0); A.duration = 6; }); }, pic);
+  await page.click('#panel-left [data-tab="media"]'); await settle(200);
+  await ev(() => document.activeElement?.blur?.());
+  const st = () => ev(() => { const s = window.__app.store; return { head: s.playhead, playing: s.playing, range: s.project.range || null, loop: document.getElementById('loop').checked }; });
+  // marking a range turns loop on
+  await ev(() => window.__app.store.setPlayhead(1)); await page.keyboard.press('i');
+  await ev(() => window.__app.store.setPlayhead(2.5)); await page.keyboard.press('o'); await settle(150);
+  let s = await st();
+  assert.deepEqual([s.range?.in, s.range?.out], [1, 2.5]); assert.equal(s.loop, true, 'marking a range switches loop on');
+  // Space from somewhere else starts at the In point and goes round inside the range
+  await ev(() => window.__app.store.setPlayhead(5)); await page.keyboard.press(' '); await page.waitForTimeout(200);
+  s = await st(); assert.equal(s.playing, true); assert.ok(s.head >= 0.95 && s.head <= 1.5, `Space starts at the In point (${s.head.toFixed(2)})`);
+  const heads = []; for (let i = 0; i < 34; i++) { heads.push((await st()).head); await page.waitForTimeout(100); }
+  assert.ok(heads.every((h) => h >= 0.95 && h <= 2.65), `playback stays inside the range (${Math.min(...heads).toFixed(2)}–${Math.max(...heads).toFixed(2)})`);
+  const wraps = heads.filter((h, i) => i && h < heads[i - 1] - 0.5).length;
+  assert.ok(wraps >= 1, `it went round (${wraps} times in 3.4 s of a 1.5 s range)`);
+  // Enter while playing: back to the In point, still playing
+  await ev(() => new Promise((res) => { const t0 = performance.now(); const tick = () => (window.__app.store.playhead > 1.9 || performance.now() - t0 > 3000 ? res() : setTimeout(tick, 30)); tick(); }));
+  await page.keyboard.press('Enter'); await page.waitForTimeout(120);
+  s = await st(); assert.equal(s.playing, true); assert.ok(s.head < 1.5, `Enter goes back to the In point (${s.head.toFixed(2)})`);
+  // Space stops; Space again begins from the In point once more
+  await page.keyboard.press(' '); await page.waitForTimeout(150); assert.equal((await st()).playing, false);
+  await ev(() => window.__app.store.setPlayhead(2.2)); await page.keyboard.press(' '); await page.waitForTimeout(150);
+  s = await st(); assert.ok(s.playing && s.head < 1.5, `Space from the middle also restarts at the In point (${s.head.toFixed(2)})`);
+  await page.keyboard.press(' '); await page.waitForTimeout(100);
+  // loop off: plays on past the Out point
+  await page.uncheck('#loop'); await ev(() => document.activeElement?.blur?.());
+  await ev(() => window.__app.store.setPlayhead(2.0)); await page.keyboard.press(' '); await page.waitForTimeout(900);
+  s = await st(); assert.ok(s.playing && s.head > 2.6, `with loop off the range does not hold it (${s.head.toFixed(2)})`);
+  await page.keyboard.press(' '); await page.waitForTimeout(100);
+  // no range: Enter starts from the beginning
+  await page.check('#loop'); await ev(() => document.activeElement?.blur?.());
+  await page.keyboard.press('Alt+x'); await settle(150);
+  assert.equal((await st()).range, null, 'Alt+X clears the range');
+  await ev(() => window.__app.store.setPlayhead(4)); await page.keyboard.press('Enter'); await page.waitForTimeout(150);
+  s = await st(); assert.ok(s.playing && s.head < 0.6, `with no range Enter starts from the beginning (${s.head.toFixed(2)})`);
+  await page.keyboard.press(' '); await page.uncheck('#loop'); await settle(100);
+});
+
 await step('still here: keep what you made, it survives Undo and the file, bring it back as one Undo step, and the curator keeps only what was worked on', async () => {
   await resetProject();
   await ev(async (c) => { await window.__app.importPaths([c]); const { store } = window.__app; const { addMediaClip } = await import('/shared/timeline.js'); const { createEffect } = await import('/shared/effects-defs.js');

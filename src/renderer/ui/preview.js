@@ -3,7 +3,7 @@ import { store } from '../store.js';
 import { Compositor } from '../engine/compositor.js';
 import { Sources } from '../engine/sources.js';
 import { sampleFeatures } from '/shared/audio-analysis.js';
-import { projectDuration } from '/shared/timeline.js';
+import { projectDuration, activeRange } from '/shared/timeline.js';
 import { fmtTime } from './dom.js';
 import { MemoryAdapt } from '/shared/living/memory-plan.js';
 
@@ -64,10 +64,16 @@ export function mountPreview() {
     if (playBtn.dataset.icon !== icon) { playBtn.dataset.icon = icon; playBtn.querySelector('use').setAttribute('href', icon); }
   }
 
-  function play() {
+  /** The marked In/Out range, when "loop" is on: playback goes round inside it, like a video editor's loop playback. */
+  const rangeLoop = () => { if (!loop.checked) return null; const r = activeRange(store.project); return r ? [r.in, r.out] : null; };
+
+  /** @param o {fromMark: with a looping range, always start at its In point (Space and the play button do; a Take or Trace starts where it says)} */
+  function play({ fromMark = false } = {}) {
     const d = duration();
     if (d <= 0) return;
-    if (store.playhead >= d - 0.01) store.setPlayhead(0);
+    const rl = rangeLoop();
+    if (rl && (fromMark || store.playhead < rl[0] || store.playhead >= rl[1] - 0.01)) store.setPlayhead(rl[0]);
+    else if (store.playhead >= d - 0.01) store.setPlayhead(0);
     store.playing = true;
     wallStart = performance.now(); tStart = store.playhead;
     updateUI();
@@ -78,7 +84,13 @@ export function mountPreview() {
     sources.pauseAll();
     updateUI(); dirty = true;
   }
-  const toggle = () => (store.playing ? pause() : play());
+  const toggle = () => (store.playing ? pause() : play({ fromMark: true }));
+  /** Enter: go back to the start (the In point of a looping range, else the beginning) and play from there, whether or not it was playing. */
+  function restart() {
+    const rl = rangeLoop();
+    store.setPlayhead(rl ? rl[0] : 0);
+    if (store.playing) { wallStart = performance.now(); tStart = store.playhead; } else play();
+  }
 
   // Memory Bleed keeps its history at a fraction of the picture size; if playback stutters while one is on screen, that fraction drops
   // (the export never does this: it always uses the full-quality setting, and the memory itself is the same either way)
@@ -92,9 +104,9 @@ export function mountPreview() {
     if (store.playing) {
       let t = tStart + (performance.now() - wallStart) / 1000;
       const d = duration();
-      const lr = store.loopRange; // a Take or Trace that loops over a stretch (the marked range, the selected clips, or the project)
+      const lr = store.loopRange || rangeLoop(); // a Take or Trace looping over a stretch, else the marked range when "loop" is on
       if (t >= (lr ? Math.min(lr[1], d) : d)) {
-        if (lr) { t = lr[0]; tStart = t; wallStart = performance.now(); store.emit('loop'); }
+        if (lr) { t = lr[0]; tStart = t; wallStart = performance.now(); if (store.loopRange) store.emit('loop'); }
         else if (loop.checked && d > 0) { t = 0; tStart = 0; wallStart = performance.now(); }
         else { t = d; store.setPlayhead(t); pause(); draw(); return; }
       }
@@ -143,5 +155,5 @@ export function mountPreview() {
 
   fitSize(); updateUI();
   requestAnimationFrame(frame);
-  return { play, pause, toggle, sources, comp, stats, forceDraw: draw, memoryAdapt };
+  return { play, pause, toggle, restart, sources, comp, stats, forceDraw: draw, memoryAdapt };
 }

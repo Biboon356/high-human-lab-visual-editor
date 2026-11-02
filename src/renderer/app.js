@@ -169,6 +169,7 @@ addEventListener('keydown', (e) => {
   const fps = store.project.settings.fps;
   switch (e.key) {
     case ' ': e.preventDefault(); preview.toggle(); break;
+    case 'Enter': e.preventDefault(); preview.restart(); break;
     case 's': case 'S': splitSelected(); break;
     case 'Delete': case 'Backspace': e.preventDefault(); deleteSelected({ ripple: e.shiftKey }); break;
     case 'ArrowLeft': e.preventDefault(); preview.pause(); store.setPlayhead(store.playhead - (e.shiftKey ? 1 : 1 / fps)); break;

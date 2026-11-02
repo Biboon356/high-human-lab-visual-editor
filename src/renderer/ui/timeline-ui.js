@@ -407,7 +407,9 @@ const fmtT = (t) => `${Math.floor(t / 60)}:${(t % 60).toFixed(2).padStart(5, '0'
 /** I / O: mark where rendering starts / ends at the playhead. One undo step. */
 export function setMark(which) {
   store.mutate((p) => { markRange(p, which, store.playhead); });
-  toast(`${which === 'in' ? 'In' : 'Out'} point set at ${fmtT(store.playhead)}.`);
+  const loop = document.getElementById('loop');
+  if (loop && store.project.range && !loop.checked) loop.checked = true; // a marked range loops: Space or Enter starts again from the In point
+  toast(`${which === 'in' ? 'In' : 'Out'} point set at ${fmtT(store.playhead)}.${loop?.checked && store.project.range ? ' Loop is on: Space or Enter plays the range again from its In point.' : ''}`);
 }
 export function clearRange() {
   if (!store.project.range) return;
