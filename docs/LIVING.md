@@ -146,3 +146,9 @@ track above it) — and plans up to three accidents of different kinds, each wit
 * Live feedback while tracing: the clip moves / roots grow after you stop, not while you draw.
 * The Scar mode reads like a long trail rather than isolated scars on busy footage; tuned by eye on Linux only.
 * Everything was verified on Linux with software GL; macOS and Windows have not been run.
+
+## v0.9.3 additions
+
+Not part of the Living Lab itself, but it sits beside it: **Tell it** and **Hold to speak** (Audio-Reactive tab). `shared/command/parse.js` turns a
+sentence into `{source, amount}` bindings on the selected clips (effects or clip properties), `shared/command/dictation.js` prepares
+microphone audio for Whisper, and both reuse `store.showGhost` so nothing is applied without a preview and one Undo step.

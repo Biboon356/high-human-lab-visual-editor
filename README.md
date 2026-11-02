@@ -236,6 +236,21 @@ without you.
   (Esc too). Nothing is applied, saved or added to Undo by looking, and a real edit drops the preview. It costs one copy of the project
   data and no second renderer: the monitor draws the copy instead of the project.
 
+## v0.9.3 — Tell it: say what should follow the sound
+
+* **Tell it** (Audio-Reactive tab): type a sentence in Thai or English, for example `glitch react to bass`, `ให้ grain ตามความดัง`,
+  `glitch ยึดโยงกับเสียงเบส`, `bloom follow bass subtle`, `ปิดการตอบสนองของ glitch`. It shows what it understood (and what it had to
+  guess, such as which sound), then **PREVIEW**s it in the monitor; **Apply** is one Undo step, **Cancel** changes nothing. A sentence it
+  does not understand is explained and changes nothing. It knows a fixed vocabulary (the effects, their numeric parameters, clip
+  zoom/opacity/rotation and the five signals: loudness, bass, mids, highs, beats); it is not free-form language.
+* **Hold to speak**: hold the 🎙 button, say it, let go; local Whisper writes the words into the box for you to check and fix. Nothing
+  runs from speech alone: you still press **Show me**. Silence and very short takes are refused before Whisper runs (it invents words
+  from silence). Playback pauses while you hold the button (optional) because the microphone also hears the song. The sound stays on this
+  computer and is never stored. Needs the Whisper model from the Auto-Edit panel. The app now asks for the microphone (audio only; the
+  camera stays refused); on macOS it asks the first time.
+* Never tried on a real Mac or Windows machine: how well Whisper hears short Thai commands mixed with English words ("glitch", "bass")
+  and the macOS microphone prompt are unverified. The strong/subtle amounts (0.85 / 0.25) are guesses.
+
 ## HDR phone footage (iPhone HLG / PQ)
 
 A clip shot in HDR is 10-bit BT.2020 with an HLG curve. Decoded as ordinary video it looks washed out. The app now recognises such
@@ -312,7 +327,7 @@ Legend: ✅ works and is covered by the automated tests · 🧪 prototype (works
 
 ## Testing
 
-`npm test` runs 143 unit tests. `scripts/e2e.mjs` (66 checks) is a real end-to-end run of the Electron app (see table above): it
+`npm test` runs 263 unit tests. `scripts/e2e.mjs` (83 checks) is a real end-to-end run of the Electron app (see table above): it
 generates test media with ffmpeg, drives the app, reads pixels out of the compositor, and probes exported files.
 Native file dialogs are stubbed at the Electron main-process level; every other path is the production code.
 

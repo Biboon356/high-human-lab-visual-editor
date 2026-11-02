@@ -46,9 +46,11 @@ suggestions/curation are guesses, not tuned by real use.
 
 ## Where things stand
 
-* Released: v0.9.1 (loop while recording, Accident at the playhead and on groups, Quick Start layout). **v0.9.2 in progress**
-  (branch `feat/v0.9.2`): loop playback of the marked In/Out range (Space/Enter restart at the In point; Enter otherwise returns to where
-  play started) and PREVIEW in the monitor for Memory, signature look, Make my look, Accident, TIMELINE, BRING BACK and suggestions.
+* Released: v0.9.2 (loop playback of the In/Out range, PREVIEW in the monitor). **v0.9.3 pending release** (branch `feat/v0.9.3`): **Tell it**
+  (Audio-Reactive tab: a Thai/English sentence → audio-reactive bindings, shown and previewed first; `shared/command/parse.js`, a fixed
+  vocabulary, not free-form) and **Hold to speak** (mic → local Whisper → text in the box; `shared/command/dictation.js`, `asr:dictate`,
+  `main/permissions.js`: audio-only mic). Mic/Whisper on real Mac/Windows never tried. Next ideas: Taste Brain (learn from Apply/Cancel/Undo),
+  user glossary for dictation, then the "known to tune" items below.
 * Known to tune: Ghost/Stain default `screen` blend washes out bright footage; a suggestion can pop up while a TIMELINE plan card is open;
   Take/Trace work on one clip only (no group); curator/gate thresholds untested on real use; clips imported before the HDR fix keep a flat proxy.
 * Ideas not built: Root-Letters (roots out of letters), Living Score, per-section looks, palette lock from album art, Look Card, Human Groove,
