@@ -127,3 +127,11 @@ test('binding does not leave the project invalid and reactive stays on', () => {
   r.apply(p);
   assert.equal(p.reactive.enabled, true);
 });
+
+test('Thai "ยึดโยงกับ" counts as binding, with or without a named sound', () => {
+  let { p, r } = run('อยากให้ effect glitch ยึดโยงกับเสียงเบส');
+  assert.ok(r.ok); r.apply(p);
+  assert.deepEqual(p.clips[0].effects[0].bindings.amount, { source: 'bass', amount: 0.5 });
+  r = run('glitch ยึดโยง').r;
+  assert.ok(r.ok); assert.match(r.understood[0], /Glitch › Intensity ← bass/); assert.ok(r.notes.some((n) => /my guess/.test(n)));
+});

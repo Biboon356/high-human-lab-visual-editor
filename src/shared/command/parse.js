@@ -34,7 +34,7 @@ const DEFAULT_SOURCE = { // when the sentence names no signal: the one that usua
 };
 const DEFAULT_PARAM = ['amount', 'intensity', 'strength', 'growth', 'density', 'radius', 'size'];
 const SIGNAL_NAMES = { rms: 'loudness', bass: 'bass', mid: 'mids', high: 'highs', beat: 'beats' };
-const BIND_WORDS = ['ตอบสนอง', 'ตาม', 'ผูก', 'ลิงก์', 'ลิ้งค์', 'เต้น', 'ขยับ', 'react', 'bind', 'link', 'sync', 'follow', 'pulse', 'driven', 'to the'];
+const BIND_WORDS = ['ยึดโยง', 'โยงกับ', 'เชื่อมกับ', 'สัมพันธ์กับ', 'สอดคล้องกับ', 'เข้ากับ', 'connect', 'tie', 'couple', 'ตอบสนอง', 'ตาม', 'ผูก', 'ลิงก์', 'ลิ้งค์', 'เต้น', 'ขยับ', 'react', 'bind', 'link', 'sync', 'follow', 'pulse', 'driven', 'to the'];
 const UNBIND_WORDS = ['ปิดการตอบสนอง', 'เลิกตอบสนอง', 'เลิกผูก', 'ยกเลิกการผูก', 'ลบการผูก', 'ไม่ต้องตาม', 'unbind', 'stop reacting', 'remove binding', 'remove the binding', 'unlink', 'ปิดการผูก'];
 const STRONG = ['แรงๆ', 'มากๆ', 'เยอะๆ', 'แรงมาก', 'จัดๆ', 'จัด', 'strong', 'hard', 'heavy', 'extreme', 'แรง', 'มาก', 'เยอะ'];
 const SUBTLE = ['เบาๆ', 'นิดๆ', 'นิดหน่อย', 'เบา', 'นุ่มๆ', 'subtle', 'soft', 'light', 'gentle', 'slight', 'little'];
