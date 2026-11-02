@@ -1712,7 +1712,7 @@ await step('living lab (take + trace): a take becomes ordinary keyframes in one 
     await ev(() => { const { store } = window.__app; store.undo(); store.undo(); store.undo(); }); await settle(300); // un-hide, hide, then the trace itself
     assert.equal((await media()).clips, before.clips, `Undo removes the ${mode} clip`);
   }
-  assert.equal(logs.slice(errorsBefore).filter((l) => /shader|compile|GLSL|WebGL|error/i.test(l)).length, 0, 'no errors in the console');
+  assert.deepEqual(logs.slice(errorsBefore).filter((l) => /shader|compile|GLSL|WebGL|error/i.test(l)), [], 'no errors in the console');
   await page.click('#panel-left [data-tab="media"]'); await settle(200);
 });
 
@@ -1804,7 +1804,7 @@ await step('memory bleed: all four modes render cleanly, a seek or a repaint nev
   assert.equal(mem.after.states, 0, 'removing the effects forgets every memory');
   assert.ok(mem.churn.states === 0 && mem.churn.live <= 24, `60 seeks in a row do not leak textures (${mem.churn.live} alive, all of them pooled)`);
   assert.ok(mem.c2.liveBefore > 0 && mem.c2.liveAfter === 0, `dispose gives every texture back (${mem.c2.liveBefore} -> ${mem.c2.liveAfter})`);
-  assert.equal(logs.slice(errorsBefore).filter((l) => /shader|compile|GLSL|WebGL|error/i.test(l)).length, 0, 'no errors in the console');
+  assert.deepEqual(logs.slice(errorsBefore).filter((l) => /shader|compile|GLSL|WebGL|error/i.test(l)), [], 'no errors in the console');
 });
 
 await step('project dna: the project gets a deterministic identity from its music and footage; it only suggests, saves with the project, and rolls can lean toward it', async () => {
@@ -1947,7 +1947,7 @@ await step('lab accident: three previews from copies, nothing changes until Keep
     assert.ok(r.mean > 8 && !r.gl && !r.threw, `${kind} renders cleanly (mean ${r.mean?.toFixed(0)}, GL ${r.gl}, ${r.threw})`);
     assert.equal(r.restored, true, `${kind}: Undo restores the project exactly`);
   }
-  assert.equal(logs.slice(errorsBefore).filter((l) => /shader|compile|GLSL|WebGL|error/i.test(l)).length, 0, 'no errors in the console');
+  assert.deepEqual(logs.slice(errorsBefore).filter((l) => /shader|compile|GLSL|WebGL|error/i.test(l)), [], 'no errors in the console');
   await shot('38-living-accident');
   await page.click('#panel-left [data-tab="media"]'); await settle(200);
 });
@@ -2182,7 +2182,7 @@ await step('still here: keep what you made, it survives Undo and the file, bring
   assert.equal(out.afterBlip, 1, 'a moment of work was not kept'); assert.equal(out.afterUndo, 1, 'an undone deletion was not abandoned work'); assert.equal(out.afterOff, 1, 'with “keep for me” off nothing is kept by itself');
   await settle(300);
   assert.equal(await ev(() => document.querySelectorAll('#still-list .still-card .still-why')[0]?.textContent.startsWith('kept for you') || [...document.querySelectorAll('#still-list .still-why')].some((n) => n.textContent.startsWith('kept for you'))), true, 'the shelf says it was kept for them');
-  assert.equal(logs.slice(errorsBefore).filter((l) => /shader|compile|GLSL|WebGL|error/i.test(l)).length, 0, 'no errors in the console');
+  assert.deepEqual(logs.slice(errorsBefore).filter((l) => /shader|compile|GLSL|WebGL|error/i.test(l)), [], 'no errors in the console');
   await ev(() => document.getElementById('living-still').scrollIntoView()); await settle(200); await shot('39-still-here-shelf');
   await page.click('#panel-left [data-tab="media"]'); await settle(200);
 });
@@ -2248,7 +2248,7 @@ await step('living timeline: FOLLOW / GROW FROM / REMEMBER / BECOME plan from co
     assert.ok(r.mean > 8 && !r.gl && !r.threw, `${kind} renders cleanly (mean ${r.mean?.toFixed(0)}, GL ${r.gl}, ${r.threw})`);
     assert.equal(r.restored, true, `${kind}: Undo restores the project exactly`);
   }
-  assert.equal(logs.slice(errorsBefore).filter((l) => /shader|compile|GLSL|WebGL|error/i.test(l)).length, 0, 'no errors in the console');
+  assert.deepEqual(logs.slice(errorsBefore).filter((l) => /shader|compile|GLSL|WebGL|error/i.test(l)), [], 'no errors in the console');
   await page.click('#panel-left [data-tab="media"]'); await settle(200);
 });
 
@@ -2421,7 +2421,7 @@ await step('quick start and groups: Advanced folds the fine controls, Make my lo
   s = await S();
   assert.equal(s.depth, dd + 1, 'one Undo step for the whole selection'); assert.ok(['B', 'C', 'D'].every((n) => (s.clips[n].keyframes.x || []).length >= 2), 'all three now move');
   assert.match(await ev(() => document.getElementById('still-status').textContent), /3 clips/);
-  assert.equal(logs.slice(errorsBefore).filter((l) => /shader|compile|GLSL|WebGL|error/i.test(l)).length, 0, 'no errors in the console');
+  assert.deepEqual(logs.slice(errorsBefore).filter((l) => /shader|compile|GLSL|WebGL|error/i.test(l)), [], 'no errors in the console');
   await page.click('#panel-left [data-tab="media"]'); await settle(200);
 });
 
@@ -2487,7 +2487,7 @@ await step('preview: Memory, TIMELINE, Accident and BRING BACK can be previewed 
   await page.click('#ghost-apply'); await settle(300);
   s = await S(); assert.equal(s.depth, d1 + 2, 'the edit and the applied preview: two Undo steps');
   assert.ok(await ev(() => (window.__app.store.project.clips.find((c) => c.name === 'B').keyframes.x || []).length >= 2), 'Apply made it real');
-  assert.equal(logs.slice(errorsBefore).filter((l) => /shader|compile|GLSL|WebGL|error/i.test(l)).length, 0, 'no errors in the console');
+  assert.deepEqual(logs.slice(errorsBefore).filter((l) => /shader|compile|GLSL|WebGL|error/i.test(l)), [], 'no errors in the console');
   await page.click('#panel-left [data-tab="media"]'); await settle(200);
 });
 
@@ -2565,7 +2565,7 @@ await step('wet / dry: any effect can be mixed back over its input (preview, key
   await ev((o) => window.__app.exportTo(o, { width: 320, height: 180, fps: 10, quality: 'draft' }), out);
   const info = probe(out);
   assert.ok(Math.abs(Number(info.format.duration) - 1) < 0.3, `the export with a wet/dry effect has the right length (${info.format.duration})`);
-  assert.equal(logs.slice(errorsBefore).filter((l) => /shader|compile|GLSL|WebGL|error/i.test(l)).length, 0, 'no errors in the console');
+  assert.deepEqual(logs.slice(errorsBefore).filter((l) => /shader|compile|GLSL|WebGL|error/i.test(l)), [], 'no errors in the console');
 });
 
 await step('mutation engine: 100 seeded rolls render through the real compositor with no GL errors and no blank frames, and a saved seed reproduces the picture', async () => {
