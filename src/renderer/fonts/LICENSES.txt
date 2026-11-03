@@ -1,0 +1,630 @@
+Bundled fonts (all licensed under the SIL Open Font License 1.1, via @fontsource):
+
+=== instrument-serif ===
+Copyright 2022 The Instrument Serif Project Authors (https://github.com/Instrument/instrument-serif) InstrumentSerif-Italic.ttf: Copyright 2022 The Instrument Serif Project Authors (https://github.com/Instrument/instrument-serif)
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+This license is copied below, and is also available with a FAQ at:
+http://scripts.sil.org/OFL
+
+
+-----------------------------------------------------------
+SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007
+-----------------------------------------------------------
+
+PREAMBLE
+The goals of the Open Font License (OFL) are to stimulate worldwide
+development of collaborative font projects, to support the font creation
+efforts of academic and linguistic communities, and to provide a free and
+open framework in which fonts may be shared and improved in partnership
+with others.
+
+The OFL allows the licensed fonts to be used, studied, modified and
+redistributed freely as long as they are not sold by themselves. The
+fonts, including any derivative works, can be bundled, embedded,
+redistributed and/or sold with any software provided that any reserved
+names are not used by derivative works. The fonts and derivatives,
+however, cannot be released under any other type of license. The
+requirement for fonts to remain under this license does not apply
+to any document created using the fonts or their derivatives.
+
+DEFINITIONS
+"Font Software" refers to the set of files released by the Copyright
+Holder(s) under this license and clearly marked as such. This may
+include source files, build scripts and documentation.
+
+"Reserved Font Name" refers to any names specified as such after the
+copyright statement(s).
+
+"Original Version" refers to the collection of Font Software components as
+distributed by the Copyright Holder(s).
+
+"Modified Version" refers to any derivative made by adding to, deleting,
+or substituting -- in part or in whole -- any of the components of the
+Original Version, by changing formats or by porting the Font Software to a
+new environment.
+
+"Author" refers to any designer, engineer, programmer, technical
+writer or other person who contributed to the Font Software.
+
+PERMISSION & CONDITIONS
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of the Font Software, to use, study, copy, merge, embed, modify,
+redistribute, and sell modified and unmodified copies of the Font
+Software, subject to the following conditions:
+
+1) Neither the Font Software nor any of its individual components,
+in Original or Modified Versions, may be sold by itself.
+
+2) Original or Modified Versions of the Font Software may be bundled,
+redistributed and/or sold with any software, provided that each copy
+contains the above copyright notice and this license. These can be
+included either as stand-alone text files, human-readable headers or
+in the appropriate machine-readable metadata fields within text or
+binary files as long as those fields can be easily viewed by the user.
+
+3) No Modified Version of the Font Software may use the Reserved Font
+Name(s) unless explicit written permission is granted by the corresponding
+Copyright Holder. This restriction only applies to the primary font name as
+presented to the users.
+
+4) The name(s) of the Copyright Holder(s) or the Author(s) of the Font
+Software shall not be used to promote, endorse or advertise any
+Modified Version, except to acknowledge the contribution(s) of the
+Copyright Holder(s) and the Author(s) or with their explicit written
+permission.
+
+5) The Font Software, modified or unmodified, in part or in whole,
+must be distributed entirely under this license, and must not be
+distributed under any other license. The requirement for fonts to
+remain under this license does not apply to any document created
+using the Font Software.
+
+TERMINATION
+This license becomes null and void if any of the above conditions are
+not met.
+
+DISCLAIMER
+THE FONT SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO ANY WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT
+OF COPYRIGHT, PATENT, TRADEMARK, OR OTHER RIGHT. IN NO EVENT SHALL THE
+COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+INCLUDING ANY GENERAL, SPECIAL, INDIRECT, INCIDENTAL, OR CONSEQUENTIAL
+DAMAGES, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM
+OTHER DEALINGS IN THE FONT SOFTWARE.
+
+=== inter-tight ===
+Copyright 2022 The Inter Project Authors (https://github.com/rsms/inter-tight) InterTight-Italic[wght].ttf: Copyright 2022 The Inter Project Authors (https://github.com/rsms/inter-tight)
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+This license is copied below, and is also available with a FAQ at:
+http://scripts.sil.org/OFL
+
+
+-----------------------------------------------------------
+SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007
+-----------------------------------------------------------
+
+PREAMBLE
+The goals of the Open Font License (OFL) are to stimulate worldwide
+development of collaborative font projects, to support the font creation
+efforts of academic and linguistic communities, and to provide a free and
+open framework in which fonts may be shared and improved in partnership
+with others.
+
+The OFL allows the licensed fonts to be used, studied, modified and
+redistributed freely as long as they are not sold by themselves. The
+fonts, including any derivative works, can be bundled, embedded,
+redistributed and/or sold with any software provided that any reserved
+names are not used by derivative works. The fonts and derivatives,
+however, cannot be released under any other type of license. The
+requirement for fonts to remain under this license does not apply
+to any document created using the fonts or their derivatives.
+
+DEFINITIONS
+"Font Software" refers to the set of files released by the Copyright
+Holder(s) under this license and clearly marked as such. This may
+include source files, build scripts and documentation.
+
+"Reserved Font Name" refers to any names specified as such after the
+copyright statement(s).
+
+"Original Version" refers to the collection of Font Software components as
+distributed by the Copyright Holder(s).
+
+"Modified Version" refers to any derivative made by adding to, deleting,
+or substituting -- in part or in whole -- any of the components of the
+Original Version, by changing formats or by porting the Font Software to a
+new environment.
+
+"Author" refers to any designer, engineer, programmer, technical
+writer or other person who contributed to the Font Software.
+
+PERMISSION & CONDITIONS
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of the Font Software, to use, study, copy, merge, embed, modify,
+redistribute, and sell modified and unmodified copies of the Font
+Software, subject to the following conditions:
+
+1) Neither the Font Software nor any of its individual components,
+in Original or Modified Versions, may be sold by itself.
+
+2) Original or Modified Versions of the Font Software may be bundled,
+redistributed and/or sold with any software, provided that each copy
+contains the above copyright notice and this license. These can be
+included either as stand-alone text files, human-readable headers or
+in the appropriate machine-readable metadata fields within text or
+binary files as long as those fields can be easily viewed by the user.
+
+3) No Modified Version of the Font Software may use the Reserved Font
+Name(s) unless explicit written permission is granted by the corresponding
+Copyright Holder. This restriction only applies to the primary font name as
+presented to the users.
+
+4) The name(s) of the Copyright Holder(s) or the Author(s) of the Font
+Software shall not be used to promote, endorse or advertise any
+Modified Version, except to acknowledge the contribution(s) of the
+Copyright Holder(s) and the Author(s) or with their explicit written
+permission.
+
+5) The Font Software, modified or unmodified, in part or in whole,
+must be distributed entirely under this license, and must not be
+distributed under any other license. The requirement for fonts to
+remain under this license does not apply to any document created
+using the Font Software.
+
+TERMINATION
+This license becomes null and void if any of the above conditions are
+not met.
+
+DISCLAIMER
+THE FONT SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO ANY WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT
+OF COPYRIGHT, PATENT, TRADEMARK, OR OTHER RIGHT. IN NO EVENT SHALL THE
+COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+INCLUDING ANY GENERAL, SPECIAL, INDIRECT, INCIDENTAL, OR CONSEQUENTIAL
+DAMAGES, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM
+OTHER DEALINGS IN THE FONT SOFTWARE.
+
+=== dm-mono ===
+Copyright 2020 The DM Mono Project Authors (https://www.github.com/googlefonts/dm-mono) DMMono-LightItalic.ttf: Copyright 2020 The DM Mono Project Authors (https://www.github.com/googlefonts/dm-mono) DMMono-Regular.ttf: Copyright 2020 The DM Mono Project Authors (https://www.github.com/googlefonts/dm-mono) DMMono-Italic.ttf: Copyright 2020 The DM Mono Project Authors (https://www.github.com/googlefonts/dm-mono) DMMono-Medium.ttf: Copyright 2020 The DM Mono Project Authors (https://www.github.com/googlefonts/dm-mono) DMMono-MediumItalic.ttf: Copyright 2020 The DM Mono Project Authors (https://www.github.com/googlefonts/dm-mono)
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+This license is copied below, and is also available with a FAQ at:
+http://scripts.sil.org/OFL
+
+
+-----------------------------------------------------------
+SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007
+-----------------------------------------------------------
+
+PREAMBLE
+The goals of the Open Font License (OFL) are to stimulate worldwide
+development of collaborative font projects, to support the font creation
+efforts of academic and linguistic communities, and to provide a free and
+open framework in which fonts may be shared and improved in partnership
+with others.
+
+The OFL allows the licensed fonts to be used, studied, modified and
+redistributed freely as long as they are not sold by themselves. The
+fonts, including any derivative works, can be bundled, embedded,
+redistributed and/or sold with any software provided that any reserved
+names are not used by derivative works. The fonts and derivatives,
+however, cannot be released under any other type of license. The
+requirement for fonts to remain under this license does not apply
+to any document created using the fonts or their derivatives.
+
+DEFINITIONS
+"Font Software" refers to the set of files released by the Copyright
+Holder(s) under this license and clearly marked as such. This may
+include source files, build scripts and documentation.
+
+"Reserved Font Name" refers to any names specified as such after the
+copyright statement(s).
+
+"Original Version" refers to the collection of Font Software components as
+distributed by the Copyright Holder(s).
+
+"Modified Version" refers to any derivative made by adding to, deleting,
+or substituting -- in part or in whole -- any of the components of the
+Original Version, by changing formats or by porting the Font Software to a
+new environment.
+
+"Author" refers to any designer, engineer, programmer, technical
+writer or other person who contributed to the Font Software.
+
+PERMISSION & CONDITIONS
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of the Font Software, to use, study, copy, merge, embed, modify,
+redistribute, and sell modified and unmodified copies of the Font
+Software, subject to the following conditions:
+
+1) Neither the Font Software nor any of its individual components,
+in Original or Modified Versions, may be sold by itself.
+
+2) Original or Modified Versions of the Font Software may be bundled,
+redistributed and/or sold with any software, provided that each copy
+contains the above copyright notice and this license. These can be
+included either as stand-alone text files, human-readable headers or
+in the appropriate machine-readable metadata fields within text or
+binary files as long as those fields can be easily viewed by the user.
+
+3) No Modified Version of the Font Software may use the Reserved Font
+Name(s) unless explicit written permission is granted by the corresponding
+Copyright Holder. This restriction only applies to the primary font name as
+presented to the users.
+
+4) The name(s) of the Copyright Holder(s) or the Author(s) of the Font
+Software shall not be used to promote, endorse or advertise any
+Modified Version, except to acknowledge the contribution(s) of the
+Copyright Holder(s) and the Author(s) or with their explicit written
+permission.
+
+5) The Font Software, modified or unmodified, in part or in whole,
+must be distributed entirely under this license, and must not be
+distributed under any other license. The requirement for fonts to
+remain under this license does not apply to any document created
+using the Font Software.
+
+TERMINATION
+This license becomes null and void if any of the above conditions are
+not met.
+
+DISCLAIMER
+THE FONT SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO ANY WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT
+OF COPYRIGHT, PATENT, TRADEMARK, OR OTHER RIGHT. IN NO EVENT SHALL THE
+COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+INCLUDING ANY GENERAL, SPECIAL, INDIRECT, INCIDENTAL, OR CONSEQUENTIAL
+DAMAGES, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM
+OTHER DEALINGS IN THE FONT SOFTWARE.
+
+=== pinyon-script ===
+Copyright 2022 The PinyonScript Project Authors (https://github.com/SorkinType/Pinyon)
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+This license is copied below, and is also available with a FAQ at:
+http://scripts.sil.org/OFL
+
+
+-----------------------------------------------------------
+SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007
+-----------------------------------------------------------
+
+PREAMBLE
+The goals of the Open Font License (OFL) are to stimulate worldwide
+development of collaborative font projects, to support the font creation
+efforts of academic and linguistic communities, and to provide a free and
+open framework in which fonts may be shared and improved in partnership
+with others.
+
+The OFL allows the licensed fonts to be used, studied, modified and
+redistributed freely as long as they are not sold by themselves. The
+fonts, including any derivative works, can be bundled, embedded,
+redistributed and/or sold with any software provided that any reserved
+names are not used by derivative works. The fonts and derivatives,
+however, cannot be released under any other type of license. The
+requirement for fonts to remain under this license does not apply
+to any document created using the fonts or their derivatives.
+
+DEFINITIONS
+"Font Software" refers to the set of files released by the Copyright
+Holder(s) under this license and clearly marked as such. This may
+include source files, build scripts and documentation.
+
+"Reserved Font Name" refers to any names specified as such after the
+copyright statement(s).
+
+"Original Version" refers to the collection of Font Software components as
+distributed by the Copyright Holder(s).
+
+"Modified Version" refers to any derivative made by adding to, deleting,
+or substituting -- in part or in whole -- any of the components of the
+Original Version, by changing formats or by porting the Font Software to a
+new environment.
+
+"Author" refers to any designer, engineer, programmer, technical
+writer or other person who contributed to the Font Software.
+
+PERMISSION & CONDITIONS
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of the Font Software, to use, study, copy, merge, embed, modify,
+redistribute, and sell modified and unmodified copies of the Font
+Software, subject to the following conditions:
+
+1) Neither the Font Software nor any of its individual components,
+in Original or Modified Versions, may be sold by itself.
+
+2) Original or Modified Versions of the Font Software may be bundled,
+redistributed and/or sold with any software, provided that each copy
+contains the above copyright notice and this license. These can be
+included either as stand-alone text files, human-readable headers or
+in the appropriate machine-readable metadata fields within text or
+binary files as long as those fields can be easily viewed by the user.
+
+3) No Modified Version of the Font Software may use the Reserved Font
+Name(s) unless explicit written permission is granted by the corresponding
+Copyright Holder. This restriction only applies to the primary font name as
+presented to the users.
+
+4) The name(s) of the Copyright Holder(s) or the Author(s) of the Font
+Software shall not be used to promote, endorse or advertise any
+Modified Version, except to acknowledge the contribution(s) of the
+Copyright Holder(s) and the Author(s) or with their explicit written
+permission.
+
+5) The Font Software, modified or unmodified, in part or in whole,
+must be distributed entirely under this license, and must not be
+distributed under any other license. The requirement for fonts to
+remain under this license does not apply to any document created
+using the Font Software.
+
+TERMINATION
+This license becomes null and void if any of the above conditions are
+not met.
+
+DISCLAIMER
+THE FONT SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO ANY WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT
+OF COPYRIGHT, PATENT, TRADEMARK, OR OTHER RIGHT. IN NO EVENT SHALL THE
+COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+INCLUDING ANY GENERAL, SPECIAL, INDIRECT, INCIDENTAL, OR CONSEQUENTIAL
+DAMAGES, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM
+OTHER DEALINGS IN THE FONT SOFTWARE.
+
+=== michroma ===
+Copyright 2011 The Michroma Project Authors (https://github.com/googlefonts/Michroma-font)
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+This license is copied below, and is also available with a FAQ at:
+https://scripts.sil.org/OFL
+
+
+-----------------------------------------------------------
+SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007
+-----------------------------------------------------------
+
+PREAMBLE
+The goals of the Open Font License (OFL) are to stimulate worldwide
+development of collaborative font projects, to support the font creation
+efforts of
+=== orbitron ===
+Copyright 2018 The Orbitron Project Authors (https://github.com/theleagueof/orbitron), with Reserved Font Name: "Orbitron"
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+This license is copied below, and is also available with a FAQ at:
+http://scripts.sil.org/OFL
+
+
+-----------------------------------------------------------
+SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007
+-----------------------------------------------------------
+
+PREAMBLE
+The goals of the Open Font License (OFL) are to stimulate worldwide
+development of collaborative font projects, to suppo
+=== press-start-2p ===
+Copyright 2012 The Press Start 2P Project Authors (cody@zone38.net), with Reserved Font Name "Press Start 2P".
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+This license is copied below, and is also available with a FAQ at:
+http://scripts.sil.org/OFL
+
+
+-----------------------------------------------------------
+SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007
+-----------------------------------------------------------
+
+PREAMBLE
+The goals of the Open Font License (OFL) are to stimulate worldwide
+development of collaborative font projects, to support the font 
+=== unifrakturcook ===
+Copyright (c) 2010, j. 'mach' wust, with Reserved Font Name UnifrakturCook.
+Copyright (c) 2009, Peter Wiegel.
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+This license is copied below, and is also available with a FAQ at:
+http://scripts.sil.org/OFL
+
+
+-----------------------------------------------------------
+SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007
+-----------------------------------------------------------
+
+PREAMBLE
+The goals of the Open Font License (OFL) are to stimulate worldwide
+development of collaborative font projects, to support the font c
+=== pirata-one ===
+Copyright (c) 2012, Rodrigo Fuenzalida, Nicolas Massi (www.taip.com.ar / abc.taip.com.ar), with Reserved Font Name 'Pirata'
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+This license is copied below, and is also available with a FAQ at:
+http://scripts.sil.org/OFL
+
+
+-----------------------------------------------------------
+SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007
+-----------------------------------------------------------
+
+PREAMBLE
+The goals of the Open Font License (OFL) are to stimulate worldwide
+development of collaborative font projects, to supp
+=== dotgothic16 ===
+Copyright 2020 The DotGothic16 Project Authors (https://github.com/fontworks-fonts/DotGothic16)
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+This license is copied below, and is also available with a FAQ at:
+http://scripts.sil.org/OFL
+
+
+-----------------------------------------------------------
+SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007
+-----------------------------------------------------------
+
+PREAMBLE
+The goals of the Open Font License (OFL) are to stimulate worldwide
+development of collaborative font projects, to support the font cr
+=== zen-antique ===
+Copyright 2021 The Zen Antique Project Authors (https://github.com/googlefonts/zen-antique)
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+This license is copied below, and is also available with a FAQ at:
+http://scripts.sil.org/OFL
+
+
+-----------------------------------------------------------
+SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007
+-----------------------------------------------------------
+
+PREAMBLE
+The goals of the Open Font License (OFL) are to stimulate worldwide
+development of collaborative font projects, to support the font creation
+efforts of
+=== dela-gothic-one ===
+Copyright 2020 The Dela Gothic Project Authors (https://github.com/syakuzen/DelaGothic)
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+This license is copied below, and is also available with a FAQ at:
+https://openfontlicense.org
+
+
+-----------------------------------------------------------
+SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007
+-----------------------------------------------------------
+
+PREAMBLE
+The goals of the Open Font License (OFL) are to stimulate worldwide
+development of collaborative font projects, to support the font creation
+efforts of ac
+
+=== Devanagari pack (v0.4.0): Rozha One, Yatra One, Modak, Tiro Devanagari Hindi, Eczar, Teko, Khand, Kalam, Amita, Martel ===
+--- Rozha One ---
+Copyright (c) 2014 Indian Type Foundry (info@indiantypefoundry.com)
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+--- Yatra One ---
+Copyright 2014 The Yatra Project Authors.
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+--- Modak ---
+Copyright (c) 2015 Ek Type (www.ektype.in)
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+--- Tiro Devanagari Hindi ---
+Copyright 2020 The Indigo Project Authors (https://github.com/TiroTypeworks/Indigo) TiroDevanagariHindi-Italic.ttf: Copyright 2020 The Indigo Project Authors (https://github.com/TiroTypeworks/Indigo)
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+--- Eczar ---
+Copyright 2014 The Eczar Project Authors (https://github.com/rosettatype/eczar)
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+--- Teko ---
+Copyright 2023 The Teko Project Authors (https://www.github.com/googlefonts/teko)
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+--- Khand ---
+Copyright (c) 2014 Indian Type Foundry (info@indiantypefoundry.com) Khand-Regular.ttf: Copyright (c) 2014 Indian Type Foundry (info@indiantypefoundry.com) Khand-Medium.ttf: Copyright (c) 2014 Indian Type Foundry (info@indiantypefoundry.com) Khand-SemiBold.ttf: Copyright (c) 2014 Indian Type Foundry (info@indiantypefoundry.com) Khand-Bold.ttf: Copyright (c) 2014 Indian Type Foundry (info@indiantypefoundry.com)
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+--- Kalam ---
+Copyright (c) 2014 Indian Type Foundry (info@indiantypefoundry.com) Kalam-Regular.ttf: Copyright (c) 2014 Indian Type Foundry (info@indiantypefoundry.com) Kalam-Bold.ttf: Copyright (c) 2014 Indian Type Foundry (info@indiantypefoundry.com)
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+--- Amita ---
+Copyright (c) 2014, Eduardo Rodriguez Tunni. Copyright (c) 2000, Modular Infotech, Pune, INDIA. All rights reserved. Copyright (c) 2011 by Brian J. Bonislawsky DBA Astigmatic (AOETI) (astigma@astigmatic.com). All rights reserved. Amita-Bold.ttf: Copyright (c) 2014, Eduardo Rodriguez Tunni. Copyright (c) 2000, Modular Infotech, Pune, INDIA. All rights reserved. Copyright (c) 2011 by Brian J. Bonislawsky DBA Astigmatic (AOETI) (astigma@astigmatic.com). All rights reserved.
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+--- Martel ---
+Copyright (c) 2015 Dan Reynolds. Copyright (c) 2010-2015, Sorkin Type Co (www.sorkintype.com) with Reserved Font Name 'Merriweather' Martel-Light.ttf: Copyright (c) 2015 Dan Reynolds. Copyright (c) 2010-2015, Sorkin Type Co (www.sorkintype.com) with Reserved Font Name 'Merriweather' Martel-Regular.ttf: Copyright (c) 2015 Dan Reynolds. Copyright (c) 2010-2015, Sorkin Type Co (www.sorkintype.com) with Reserved Font Name 'Merriweather' Martel-DemiBold.ttf: Copyright (c) 2015 Dan Reynolds. Copyright (c) 2010-2015, Sorkin Type Co (www.sorkintype.com) with Reserved Font Name 'Merriweather' Martel-Bold.ttf: Copyright (c) 2015 Dan Reynolds. Copyright (c) 2010-2015, Sorkin Type Co (www.sorkintype.com) with Reserved Font Name 'Merriweather' Martel-ExtraBold.ttf: Copyright (c) 2015 Dan Reynolds. Copyright (c) 2010-2015, Sorkin Type Co (www.sorkintype.com) with Reserved Font Name 'Merriweather' Martel-Heavy.ttf: Copyright (c) 2015 Dan Reynolds. Copyright (c) 2010-2015, Sorkin Type Co (www.sorkintype.com) with Reserved Font Name 'Merriweather'
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+(Each is licensed under the SIL Open Font License 1.1, reproduced above.)
+
+=== Street pack (v0.4.0): Anton, Permanent Marker, Special Elite, Rubik Spray Paint, Black Ops One, Rubik Glitch, Archivo Black, Rock Salt, Bungee, Bebas Neue ===
+--- Anton ---
+Copyright 2020 The Anton Project Authors (https://github.com/googlefonts/AntonFont.git)
+--- Permanent Marker ---
+Apache License
+--- Special Elite ---
+Apache License
+--- Rubik Spray Paint ---
+Copyright 2020 The Rubik Filtered Project Authors (https://github.com/NaN-xyz/Rubik-Filtered)
+--- Black Ops One ---
+Copyright 2022 The PinyonScript Project Authors (https://github.com/SorkinType/Black-Ops)
+--- Rubik Glitch ---
+Copyright 2020 The Rubik Filtered Project Authors (https://github.com/NaN-xyz/Rubik-Filtered)
+--- Archivo Black ---
+Copyright 2017 The Archivo Black Project Authors (https://github.com/Omnibus-Type/ArchivoBlack)
+--- Rock Salt ---
+Apache License
+--- Bungee ---
+Copyright 2023 The Bungee Project Authors (https://github.com/djrrb/Bungee)
+--- Bebas Neue ---
+Copyright 2019 The Bebas Neue Project Authors (https://github.com/dharmatype/Bebas-Neue)
+(Each is licensed under the SIL Open Font License 1.1, reproduced above.)
+
+=== Genre packs (v0.5.0): Rubik Distressed, Londrina Solid, Reenie Beanie, Covered By Your Grace, Courier Prime, Monoton, Shrikhand, Righteous, Audiowide, Space Grotesk, Space Mono, Syne, Unbounded, Big Shoulders Display, Metal Mania, New Rocker, Cinzel Decorative, Grenze Gotisch, IM Fell English SC ===
+--- Rubik Distressed ---
+Copyright 2020 The Rubik Filtered Project Authors (https://github.com/NaN-xyz/Rubik-Filtered)
+--- Londrina Solid ---
+Copyright 2011 The Londrina Solid Authors (https://github.com/marcelommp/Londrina-Typeface), with Reserved Font Name "Londrina Solid" LondrinaSolid-Light.ttf: Copyright 2011 The Londrina Solid Authors (https://github.com/marcelommp/Londrina-Typeface), with Reserved Font Name "Londrina Solid" Londrin
+--- Reenie Beanie ---
+Copyright (c) 2010 Typeco (james@typeco.com). All rights reserved.
+--- Covered By Your Grace ---
+Copyright (c) 2010, Kimberly Geswein (kimberlygeswein.com)
+--- Courier Prime ---
+Copyright 2015 The Courier Prime Project Authors (https://github.com/quoteunquoteapps/CourierPrime). CourierPrime-Italic.ttf: Copyright 2015 The Courier Prime Project Authors (https://github.com/quoteunquoteapps/CourierPrime). CourierPrime-Bold.ttf: Copyright 2015 The Courier Prime Project Authors (
+--- Monoton ---
+Copyright (c) 2011, Vernon Adams (vern@newtypography.co.uk) with Reserved Font Name 'Monoton'. All rights reserved.
+--- Shrikhand ---
+Copyright (c) 2015 Jonny Pinhorn (jonpinhorn.typedesign@gmail.com)
+--- Righteous ---
+Copyright (c) 2011 by Brian J. Bonislawsky DBA Astigmatic (AOETI) (astigma@astigmatic.com), with Reserved Font Name "Righteous"
+--- Audiowide ---
+Copyright (c) 2012 by Brian J. Bonislawsky DBA Astigmatic (AOETI) (astigma@astigmatic.com), with Reserved Font Name "Audiowide"
+--- Space Grotesk ---
+Copyright 2020 The Space Grotesk Project Authors (https://github.com/floriankarsten/space-grotesk)
+--- Space Mono ---
+Copyright 2016 The Space Mono Project Authors (https://github.com/googlefonts/spacemono) SpaceMono-Italic.ttf: Copyright 2016 The Space Mono Project Authors (https://github.com/googlefonts/spacemono) SpaceMono-Bold.ttf: Copyright 2016 The Space Mono Project Authors (https://github.com/googlefonts/sp
+--- Syne ---
+Copyright 2019 The Syne Project Authors (https://gitlab.com/bonjour-monde/fonderie/syne-typeface)
+--- Unbounded ---
+Copyright 2022 The Unbounded Project Authors (https://github.com/googlefonts/unbounded)
+--- Big Shoulders Display ---
+Google Inc.
+--- Metal Mania ---
+Copyright (c) 2012 by Open Window (dathanboardman@gmail.com) with Reseved Font Name "Metal Mania"
+--- New Rocker ---
+Copyright (c) 2012, Pablo Impallari (www.impallari.com|impallari@gmail.com), Copyright (c) 2012, Brenda Gallo (gbrenda1987@gmail.com), Copyright (c) 2012, Rodrigo Fuenzalida (www.rfuenzalida.com|hello@rfuenzalida.com), with Reserved Font Name 'New Rocker'
+--- Cinzel Decorative ---
+Copyright  2012 Natanael Gama (info@ndiscovered.com), with Reserved Font Name 'Cinzel' CinzelDecorative-Bold.ttf: Copyright  2012 Natanael Gama (info@ndiscovered.com), with Reserved Font Name 'Cinzel' CinzelDecorative-Black.ttf: Copyright  2012 Natanael Gama (info@ndiscovered.com), with Reserved Fon
+--- Grenze Gotisch ---
+Copyright 2020 The Grenze Gotisch Project Authors (https://github.com/Omnibus-Type/Grenze-Gotisch)
+--- IM Fell English SC ---
+Google Inc.
+(Each is licensed under the SIL Open Font License 1.1, reproduced above.)
+
+=== Hindi pack II (v0.6.0): Dekko, Gotu, Inknut Antiqua, Jaini, Kurale, Sarpanch, Tillana ===
+--- Inknut Antiqua ---
+Copyright (c) 2014 by Claus Eggers Srensen (es@forthehearts.net). InknutAntiqua-Regular.ttf: Copyright (c) 2014 by Claus Eggers Srensen (es@forthehearts.net). InknutAntiqua-Medium.ttf: Copyright (c) 2014 by Claus Eggers Srensen (es@forthehearts.net). InknutAntiqua-SemiBold.ttf: Copyright (c) 2014 by
+--- Tillana ---
+Copyright (c) 2014 Indian Type Foundry (info@indiantypefoundry.com) Tillana-Medium.ttf: Copyright (c) 2014 Indian Type Foundry (info@indiantypefoundry.com) Tillana-SemiBold.ttf: Copyright (c) 2014 Indian Type Foundry (info@indiantypefoundry.com) Tillana-Bold.ttf: Copyright (c) 2014 Indian Type Found
+--- Dekko ---
+Copyright (c) 2000, Modular Infotech, Pune, INDIA. Copyright (c) 2014, Sorkin Type Co, Boston, MA, USA (www.sorkintype.com)
+--- Jaini ---
+Copyright 2023 The Jaini Project Authors (https://github.com/EkType/Jaini)
+--- Sarpanch ---
+Copyright (c) 2014 Indian Type Foundry (info@indiantypefoundry.com) Sarpanch-Medium.ttf: Copyright (c) 2014 Indian Type Foundry (info@indiantypefoundry.com) Sarpanch-SemiBold.ttf: Copyright (c) 2014 Indian Type Foundry (info@indiantypefoundry.com) Sarpanch-Bold.ttf: Copyright (c) 2014 Indian Type Fo
+--- Gotu ---
+Copyright (c) 2016, Ek Type. All rights reserved.
+--- Kurale ---
+Copyright 2013 The Kurale Project Authors (edu@tipo.net.ar)
+(Each is licensed under the SIL Open Font License 1.1, reproduced above.)

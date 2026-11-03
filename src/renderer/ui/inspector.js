@@ -1,0 +1,202 @@
+import { el, fmtTime } from './dom.js';
+import { store } from '../store.js';
+import { paramRow, flatRow, rowUpdaters } from './param-row.js';
+import { findMedia } from '/shared/project.js';
+import { setSpeed, MIN_SPEED, MAX_SPEED } from '/shared/timeline.js';
+import { toast } from './dom.js';
+import { EFFECTS, EFFECT_PRESETS, WET, createEffect, instantiatePreset } from '/shared/effects-defs.js';
+import { CLIP_PROPS, TEXT_PROPS, BLEND_MODES, TRANSITIONS } from '/shared/params.js';
+import { TEXT_ANIMATIONS } from '/shared/text-defs.js';
+import { ensureFontList } from './fonts.js';
+import { GEN_PARAMS, GEN_STYLES } from '/shared/organic-defs.js';
+import { maskCard, matteCard } from './mask-ui.js';
+import { rampCard } from './ramp-ui.js';
+import { shapeCard } from './shape-ui.js';
+
+export const USER_PRESET_KEY = 'hhlab.userEffectPresets';
+const loadUserPresets = () => { try { return JSON.parse(localStorage.getItem(USER_PRESET_KEY) || '[]'); } catch { return []; } };
+const saveUserPresets = (p) => { try { localStorage.setItem(USER_PRESET_KEY, JSON.stringify(p)); } catch { /* storage unavailable */ } };
+
+const card = (title, body, actions = []) =>
+  el('section', { class: 'card' }, el('h4', {}, title, el('span', { class: 'grow' }), actions), el('div', { class: 'body' }, body));
+
+/** Wraps an edit of a plain field: snapshot once, mutate, re-render preview. */
+function field(input, event, apply, { structural = false } = {}) {
+  let snapped = false;
+  input.addEventListener(event, () => {
+    if (!snapped) { store.snapshot(); snapped = true; }
+    apply(input);
+    store.touch(structural ? 'project' : 'render');
+  });
+  input.addEventListener('change', () => { snapped = false; });
+  return input;
+}
+
+export function mountInspector(root) {
+  let lastId = null;
+
+  const render = () => {
+    const clip = store.selectedClip;
+    lastId = clip?.id || null;
+    rowUpdaters.clear();
+    root.replaceChildren();
+    if (!clip) {
+      root.append(el('div', { class: 'empty', text: 'Select a clip on the timeline to edit its properties, effects and animation.' }));
+      return;
+    }
+    const lt = () => Math.min(Math.max(0, store.playhead - clip.start), clip.duration);
+    const media = clip.type === 'media' ? findMedia(store.project, clip.mediaId) : null;
+
+    // ---- Clip
+    const nameIn = field(el('input', { type: 'text', value: clip.name }), 'input', (i) => { clip.name = i.value; }, { structural: true });
+    const body = [flatRow('Name', nameIn)];
+    body.push(el('div', { class: 'stat' }, `start `, el('b', { text: fmtTime(clip.start) }), `  dur `, el('b', { text: fmtTime(clip.duration) }), media ? `  in ` : '', media ? el('b', { text: fmtTime(clip.in) }) : ''));
+    if (clip.type === 'media' && media?.kind !== 'image') {
+      const sp = el('input', { type: 'number', min: MIN_SPEED, max: MAX_SPEED, step: 0.05, value: (clip.speed || 1).toFixed(2), style: 'width:70px' });
+      sp.addEventListener('change', () => {
+        const v = Number(sp.value);
+        store.snapshot();
+        if (setSpeed(store.project, clip.id, v)) { store.touch('project'); store.emit('keyframes'); }
+        else { store.undoStack.pop(); sp.value = (clip.speed || 1).toFixed(2); toast(`Can't set ${v}×: out of range (${MIN_SPEED}–${MAX_SPEED}) or it would overlap the next clip.`, 'error'); }
+      });
+      body.push(flatRow('Speed', sp, el('span', { class: 'hint', text: '× (pitch kept)' })));
+    }
+    const fadeRow = (label, key) => {
+      const i = el('input', { type: 'range', min: 0, max: Math.max(0.1, +(clip.duration / 2).toFixed(2)), step: 0.05, value: clip[key] || 0 });
+      return flatRow(label, field(i, 'input', (n) => { clip[key] = Number(n.value); }));
+    };
+    body.push(fadeRow('Fade in (s)', 'fadeIn'), fadeRow('Fade out (s)', 'fadeOut'));
+    if (clip.type !== 'media' || media?.kind !== 'audio') {
+      clip.transition ||= { type: 'none', duration: 0.25 };
+      const tsel = field(el('select', {}, Object.entries(TRANSITIONS).map(([k, v]) => el('option', { value: k, text: v, ...(k === clip.transition.type ? { selected: true } : {}) }))), 'change', (i) => { clip.transition.type = i.value; });
+      const tdur = field(el('input', { type: 'range', min: 0.05, max: 1.5, step: 0.05, value: clip.transition.duration }), 'input', (i) => { clip.transition.duration = Number(i.value); });
+      body.push(flatRow('Cut-in look', tsel), flatRow('Cut-in length', tdur));
+    }
+    if (media?.hasAudio) {
+      const vol = el('input', { type: 'range', min: 0, max: 1.5, step: 0.01, value: clip.volume ?? 1 });
+      body.push(flatRow('Volume', field(vol, 'input', (i) => { clip.volume = Number(i.value); }, { structural: true })));
+    }
+    if (clip.type !== 'media' || media?.kind !== 'audio') {
+      for (const d of CLIP_PROPS) {
+        if ((clip.type === 'generator' || clip.type === 'adjust') && d.key !== 'opacity') continue;
+        body.push(paramRow({ owner: clip, def: d, getBase: () => clip.props[d.key], setBase: (v) => { clip.props[d.key] = v; }, localTime: lt }));
+      }
+      if (clip.type === 'media' || clip.type === 'text') {
+        const fh = field(el('input', { type: 'checkbox', checked: !!clip.props.flipX }), 'change', (i) => { clip.props.flipX = i.checked ? 1 : 0; });
+        const fv = field(el('input', { type: 'checkbox', checked: !!clip.props.flipY }), 'change', (i) => { clip.props.flipY = i.checked ? 1 : 0; });
+        body.push(flatRow('Flip', el('label', { class: 'chk', title: 'Mirror left ↔ right' }, fh, 'horizontal'), el('label', { class: 'chk', title: 'Mirror top ↔ bottom' }, fv, 'vertical')));
+      }
+      if (clip.type === 'text') for (const d of TEXT_PROPS) body.push(paramRow({ owner: clip, def: d, getBase: () => clip.props[d.key], setBase: (v) => { clip.props[d.key] = v; }, localTime: lt }));
+      if (clip.type !== 'adjust') {
+      const blend = el('select', {}, BLEND_MODES.map((m) => el('option', { value: m, text: m, ...(m === clip.props.blend ? { selected: true } : {}) })));
+      body.push(flatRow('Blend', field(blend, 'change', (i) => { clip.props.blend = i.value; })));
+      }
+    }
+    root.append(card(clip.type === 'text' ? 'Text clip' : clip.type === 'shape' ? 'Shape clip' : clip.type === 'generator' ? 'Organic clip' : clip.type === 'adjust' ? 'Adjustment layer' : 'Clip', body));
+
+    if (clip.type === 'media' && media?.kind === 'video') root.append(rampCard(clip, lt, card));
+    if (clip.type === 'text') root.append(textCard(clip, lt));
+    if (clip.type === 'shape') root.append(shapeCard(clip, card));
+    if (clip.type === 'generator') root.append(genCard(clip, lt));
+    if (clip.type !== 'media' || media?.kind !== 'audio') root.append(effectsCard(clip, lt), maskCard(clip, lt, card), matteCard(clip, card));
+  };
+
+  function textCard(clip, lt) {
+    const T = clip.text;
+    T.fx = { split: 0, shadow: 0, glow: 0, halo: 0, gradient: false, grad1: '#ffffff', grad2: '#7d8f85', ...(T.fx || {}) };
+    const ta = field(el('textarea', { rows: 3, spellcheck: false }), 'input', (i) => { T.content = i.value; });
+    ta.value = T.content;
+    ensureFontList();
+    const font = field(el('input', { type: 'text', value: T.font, list: 'font-list' }), 'input', (i) => { T.font = i.value; });
+    const weight = field(el('select', {}, [300, 400, 500, 700, 900].map((w) => el('option', { value: w, text: w, ...(w === T.weight ? { selected: true } : {}) }))), 'change', (i) => { T.weight = Number(i.value); });
+    const size = field(el('input', { type: 'range', min: 0.01, max: 0.5, step: 0.005, value: T.size }), 'input', (i) => { T.size = Number(i.value); });
+    const align = el('div', { class: 'seg' }, ['left', 'center', 'right'].map((a) =>
+      el('button', { class: T.align === a ? 'on' : '', text: a[0].toUpperCase(), title: a, onclick: () => { store.mutate(() => { T.align = a; }, 'project'); } })));
+    const color = field(el('input', { type: 'color', value: T.color }), 'input', (i) => { T.color = i.value; });
+    const stroke = field(el('input', { type: 'range', min: 0, max: 0.15, step: 0.002, value: T.strokeWidth }), 'input', (i) => { T.strokeWidth = Number(i.value); });
+    const strokeC = field(el('input', { type: 'color', value: T.strokeColor }), 'input', (i) => { T.strokeColor = i.value; });
+    const upper = field(el('input', { type: 'checkbox', checked: T.uppercase }), 'change', (i) => { T.uppercase = i.checked; });
+    const italic = field(el('input', { type: 'checkbox', checked: T.italic }), 'change', (i) => { T.italic = i.checked; });
+    const bgOn = field(el('input', { type: 'checkbox', checked: T.bg.enabled }), 'change', (i) => { T.bg.enabled = i.checked; });
+    const bgC = field(el('input', { type: 'color', value: T.bg.color }), 'input', (i) => { T.bg.color = i.value; });
+    const bgPad = field(el('input', { type: 'range', min: 0, max: 1.5, step: 0.01, value: T.bg.pad }), 'input', (i) => { T.bg.pad = Number(i.value); });
+    const anim = field(el('select', {}, Object.entries(TEXT_ANIMATIONS).map(([k, v]) => el('option', { value: k, text: v, ...(k === T.anim.type ? { selected: true } : {}) }))), 'change', (i) => { T.anim.type = i.value; });
+    const aDur = field(el('input', { type: 'range', min: 0.1, max: 12, step: 0.05, value: T.anim.duration }), 'input', (i) => { T.anim.duration = Number(i.value); });
+    const aSpd = field(el('input', { type: 'range', min: 0.1, max: 4, step: 0.05, value: T.anim.speed }), 'input', (i) => { T.anim.speed = Number(i.value); });
+    const hollow = field(el('input', { type: 'checkbox', checked: !!T.hollow }), 'change', (i) => { T.hollow = i.checked; });
+    const fillA = field(el('input', { type: 'range', min: 0, max: 1, step: 0.01, value: T.fillAlpha ?? 1 }), 'input', (i) => { T.fillAlpha = Number(i.value); });
+    const fit = field(el('input', { type: 'range', min: 0, max: 1, step: 0.01, value: T.fit || 0 }), 'input', (i) => { T.fit = Number(i.value); });
+    const sl = (key) => field(el('input', { type: 'range', min: 0, max: 1, step: 0.01, value: T.fx[key] }), 'input', (i) => { T.fx[key] = Number(i.value); });
+    const gradOn = field(el('input', { type: 'checkbox', checked: T.fx.gradient }), 'change', (i) => { T.fx.gradient = i.checked; });
+    const g1 = field(el('input', { type: 'color', value: T.fx.grad1 }), 'input', (i) => { T.fx.grad1 = i.value; T.fx.gradStops = null; });
+    const g2 = field(el('input', { type: 'color', value: T.fx.grad2 }), 'input', (i) => { T.fx.grad2 = i.value; T.fx.gradStops = null; });
+    const ransom = field(el('input', { type: 'checkbox', checked: !!T.ransom }), 'change', (i) => { T.ransom = i.checked; });
+    const vert = field(el('input', { type: 'checkbox', checked: !!T.vertical }), 'change', (i) => { T.vertical = i.checked; });
+    const colGap = field(el('input', { type: 'range', min: 0.8, max: 3, step: 0.05, value: T.colSpacing || 1.35 }), 'input', (i) => { T.colSpacing = Number(i.value); });
+    return card('Typography', [ta, flatRow('Font', font), flatRow('Weight', weight, el('label', { class: 'chk' }, italic, 'italic')),
+      flatRow('Size', size), flatRow('Fit width', fit), flatRow('Align', align, el('label', { class: 'chk' }, upper, 'CAPS')), flatRow('Vertical', vert, colGap), flatRow('Ransom note', el('label', { class: 'chk', title: 'Every letter on its own scrap of paper, in its own typeface' }, ransom, 'cut-out letters')), flatRow('Fill', color),
+      flatRow('Outline', stroke, strokeC), flatRow('Hollow', hollow, fillA), flatRow('Plate', bgOn, bgC, bgPad),
+      flatRow('Chrome fill', gradOn, g1, g2), flatRow('RGB split', sl('split')), flatRow('Shadow', sl('shadow')), flatRow('Glow', sl('glow')), flatRow('Halo (readability)', sl('halo')),
+      flatRow('Animation', anim), flatRow('Anim. time', aDur), flatRow('Anim. speed', aSpd)]);
+  }
+
+  function genCard(clip, lt) {
+    const G = clip.gen;
+    const style = field(el('select', {}, Object.entries(GEN_STYLES).map(([k, v]) => el('option', { value: k, text: v, ...(k === G.style ? { selected: true } : {}) }))), 'change', (i) => { G.style = i.value; });
+    const tr = field(el('input', { type: 'checkbox', checked: G.transparent }), 'change', (i) => { G.transparent = i.checked; });
+    const rows = GEN_PARAMS.map((d) => paramRow({ owner: G, def: d, getBase: () => G.params[d.key], setBase: (v) => { G.params[d.key] = v; }, localTime: lt }));
+    return card('Organic engine', [flatRow('Style', style), flatRow('Transparent', tr), ...rows]);
+  }
+
+  function effectsCard(clip, lt) {
+    const addSel = el('select', {}, el('option', { value: '', text: '+ Add effect…' }), Object.entries(EFFECTS).map(([k, v]) => el('option', { value: k, text: v.label })));
+    addSel.addEventListener('change', () => {
+      if (!addSel.value) return;
+      store.mutate(() => clip.effects.push(createEffect(addSel.value)));
+    });
+    const user = loadUserPresets();
+    const presetSel = el('select', {}, el('option', { value: '', text: 'Presets…' }),
+      EFFECT_PRESETS.map((p, i) => el('option', { value: `b${i}`, text: p.name })),
+      user.map((p, i) => el('option', { value: `u${i}`, text: `★ ${p.name}` })));
+    presetSel.addEventListener('change', () => {
+      const v = presetSel.value; if (!v) return;
+      const p = v[0] === 'b' ? EFFECT_PRESETS[Number(v.slice(1))] : user[Number(v.slice(1))];
+      store.mutate(() => {
+        if (v[0] === 'b') clip.effects.push(...instantiatePreset(p));
+        else clip.effects.push(...p.chain.map((e) => createEffect(e.type, e.params)));
+      });
+    });
+    const saveBtn = el('button', { text: 'Save chain', title: 'Save this clip\'s effect chain as a preset', onclick: () => {
+      if (!clip.effects.length) return;
+      const name = prompt('Preset name?'); if (!name) return;
+      saveUserPresets([...loadUserPresets(), { name, chain: clip.effects.map((e) => ({ type: e.type, params: { ...e.params } })) }]);
+      render();
+    } });
+    const list = clip.effects.map((fx, i) => {
+      const def = EFFECTS[fx.type];
+      const en = field(el('input', { type: 'checkbox', checked: fx.enabled, title: 'Enable' }), 'change', (inp) => { fx.enabled = inp.checked; }, { structural: false });
+      en.addEventListener('change', () => render());
+      const move = (d) => store.mutate(() => { const j = i + d; if (j < 0 || j >= clip.effects.length) return; [clip.effects[i], clip.effects[j]] = [clip.effects[j], clip.effects[i]]; });
+      const sec = el('section', { class: `card fx-card ${fx.enabled ? '' : 'off'}` },
+        el('h4', {}, en, def.label, el('span', { class: 'grow' }),
+          el('button', { text: '↑', title: 'Move earlier in chain', disabled: i === 0, onclick: () => move(-1) }),
+          el('button', { text: '↓', title: 'Move later in chain', disabled: i === clip.effects.length - 1, onclick: () => move(1) }),
+          el('button', { text: '✕', title: 'Remove', onclick: () => store.mutate(() => clip.effects.splice(i, 1)) })),
+        el('div', { class: 'body' }, paramRow({ owner: fx, def: WET, getBase: () => fx.wet ?? 1, setBase: (v) => { if (v >= 1) delete fx.wet; else fx.wet = v; }, localTime: lt }), def.params.map((d) => paramRow({ owner: fx, def: d, getBase: () => fx.params[d.key] ?? d.def, setBase: (v) => { fx.params[d.key] = v; }, localTime: lt }))));
+      return sec;
+    });
+    const c = card('Effects chain (top → bottom)', [el('div', { class: 'fx-toolbar' }, addSel, presetSel, saveBtn),
+      clip.effects.length ? null : el('div', { class: 'hint', text: 'No effects. Add one, or start from a preset.' })]);
+    // effect cards are nested outside the card body so they keep their own chrome
+    const holder = el('div', {}, c, ...list.map((s) => { s.style.marginTop = '8px'; return s; }));
+    return holder;
+  }
+
+  // Re-render only when the selection or clip structure changes; slider drags use 'render' and never rebuild.
+  store.on('selection', render);
+  store.on('maskedit', render);
+  store.on('project', () => { if (!document.activeElement || !root.contains(document.activeElement) || document.activeElement.tagName === 'BUTTON') render(); else if (lastId !== store.selection) render(); });
+  store.on('playhead', () => { for (const u of rowUpdaters) u(); });
+  store.on('keyframes', () => { for (const u of rowUpdaters) u(); });
+  render();
+}

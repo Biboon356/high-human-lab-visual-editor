@@ -1,0 +1,175 @@
+// Central state + pub/sub + snapshot-based undo/redo. UI modules never talk to each other directly.
+import { createProject, validateProject, findClip } from '/shared/project.js';
+import { audioSources } from '/shared/export-plan.js';
+
+const HISTORY_LIMIT = 100;
+// Still Here (project.stillHere) is deliberately outside undo: a fragment the artist kept must survive the undo of the edit that made
+// it. Snapshots leave it out (it also holds thumbnails, which would multiply by the history size) and a restore keeps the live shelf.
+const snapJson = (project) => JSON.stringify(project, (k, v) => (k === 'stillHere' ? undefined : v));
+
+class Store {
+  constructor() {
+    this.project = createProject();
+    this.filePath = null;
+    this.dirty = false;
+    this.selection = null; // primary clip id (what the Inspector shows)
+    this.multi = new Set(); // every selected clip id (always includes the primary)
+    this.playhead = 0;
+    this.playing = false;
+    this.zoom = 60; // px per second
+    this.analysis = null;
+    this.analysisStale = true;
+    this.analysisSig = null;
+    this.undoStack = [];
+    this.redoStack = [];
+    this.listeners = new Map();
+    this.pendingSnap = null;
+    this.clipboard = null; // copied clip (JSON)
+    this.relinkedMedia = null;
+    this.ghost = null; // a "what if": a copy of the project the monitor draws instead of the real one (see showGhost); the real project is never touched by it
+    this.ghostSpec = null;
+    this.loopRange = null; // [start, end] while a Take or Trace loops over a stretch (set by living/controller.js, read by the preview)
+    this.recorder = null; // a running Lab Take (see living/lab-take.js); param-row.js reports value changes to it
+    this.changeKind = 'load'; // what the last 'project' notification was: 'edit' | 'undo' | 'redo' | 'load' (the Creative Memory Engine reads it)
+  }
+
+  on(topic, fn) {
+    if (!this.listeners.has(topic)) this.listeners.set(topic, new Set());
+    this.listeners.get(topic).add(fn);
+    return () => this.listeners.get(topic).delete(fn);
+  }
+  emit(...topics) {
+    for (const t of topics) for (const fn of this.listeners.get(t) || []) fn();
+  }
+
+  get selectedClip() { return this.selection ? findClip(this.project, this.selection) : null; }
+
+  /** Take an undo snapshot once per gesture; subsequent calls with same token are ignored. */
+  snapshot() {
+    this.undoStack.push(snapJson(this.project));
+    if (this.undoStack.length > HISTORY_LIMIT) this.undoStack.shift();
+    this.redoStack = [];
+  }
+
+  /** Takes back the undo point made by the last snapshot() (a recording session that ended with nothing to keep). */
+  dropSnapshot() { this.undoStack.pop(); }
+
+  /**
+   * PREVIEW: shows what an action WOULD do, without doing it. `spec.apply(project)` is run on a copy (it must return false when it does
+   * not apply); the monitor draws the copy, so it can be played and judged like the real thing. Nothing is saved, nothing is added to
+   * Undo, and exports ignore it. commitGhost() makes it real as one Undo step; clearGhost() forgets it.
+   * @param spec {label, apply(project) → boolean, done?: string}
+   */
+  showGhost(spec) {
+    const copy = structuredClone(this.project);
+    let ok = false;
+    try { ok = spec.apply(copy) !== false; } catch (e) { console.error(e); }
+    if (!ok) return false;
+    this.ghost = copy; this.ghostSpec = spec;
+    this.emit('ghost', 'render');
+    return true;
+  }
+  clearGhost() {
+    if (!this.ghost) return;
+    this.ghost = null; this.ghostSpec = null;
+    this.emit('ghost', 'render');
+  }
+  /** Makes the previewed change real, as ONE undo step. Returns the spec's `done` text (or true), or false when it no longer applies. */
+  commitGhost() {
+    const spec = this.ghostSpec;
+    if (!spec) return false;
+    this.clearGhost();
+    this.snapshot();
+    let ok = false;
+    try { ok = spec.apply(this.project) !== false; } catch (e) { console.error(e); }
+    if (!ok) { this.dropSnapshot(); return false; }
+    this.touch('project', 'keyframes');
+    try { spec.after?.(); } catch (e) { console.error(e); }
+    return spec.done || true;
+  }
+
+  /** Discrete edit: snapshot, mutate, notify. */
+  mutate(fn, ...topics) {
+    this.snapshot();
+    const r = fn(this.project);
+    this.touch(...(topics.length ? topics : ['project']));
+    return r;
+  }
+
+  /** Notify after an in-place change (used inside gestures). Marks the project dirty and the audio analysis stale. */
+  touch(...topics) {
+    if (topics.includes('project') && this.ghost) this.clearGhost(); // the project moved on: the "what if" is out of date
+    this.changeKind = 'edit';
+    this.setDirty(true);
+    if (topics.includes('project')) this.analysisStale = this.audioSignature() !== this.analysisSig;
+    this.emit(...topics, 'render');
+  }
+
+  /** Fingerprint of everything that changes the audio mix (and therefore the analysis). */
+  audioSignature() {
+    return JSON.stringify(audioSources(this.project).map(({ clip, media }) => [media.path, clip.start, clip.in, clip.duration, clip.volume]));
+  }
+
+  setDirty(d) {
+    if (this.dirty !== d) { this.dirty = d; this.emit('dirty'); }
+  }
+
+  _restore(json, kind) {
+    this.clearGhost();
+    const shelf = this.project.stillHere;
+    this.project = JSON.parse(json);
+    this.project.stillHere = Array.isArray(shelf) ? shelf : [];
+    this.changeKind = kind;
+    if (this.selection && !findClip(this.project, this.selection)) this.selection = null;
+    this.multi = new Set([...this.multi].filter((id) => findClip(this.project, id)));
+    if (this.selection) this.multi.add(this.selection);
+    this.analysisStale = this.audioSignature() !== this.analysisSig;
+    this.setDirty(true);
+    this.emit('project', 'selection', 'render');
+  }
+  undo() {
+    if (!this.undoStack.length) return;
+    this.redoStack.push(snapJson(this.project));
+    this._restore(this.undoStack.pop(), 'undo');
+  }
+  redo() {
+    if (!this.redoStack.length) return;
+    this.undoStack.push(snapJson(this.project));
+    this._restore(this.redoStack.pop(), 'redo');
+  }
+
+  loadProject(project, filePath = null) {
+    this.clearGhost();
+    this.project = validateProject(project);
+    this.filePath = filePath;
+    this.selection = null;
+    this.multi = new Set();
+    this.playhead = 0;
+    this.playing = false;
+    this.undoStack = []; this.redoStack = [];
+    this.analysis = null; this.analysisStale = true; this.analysisSig = null;
+    this.dirty = false;
+    this.changeKind = 'load';
+    this.emit('project', 'selection', 'playhead', 'analysis', 'dirty', 'render', 'reset');
+  }
+
+  select(id) {
+    const same = this.selection === id && this.multi.size === (id ? 1 : 0);
+    this.selection = id;
+    this.multi = new Set(id ? [id] : []);
+    if (!same) this.emit('selection', 'render');
+  }
+
+  /** Shift/Ctrl-click: add or remove a clip from the selection. */
+  toggleSelect(id) {
+    if (this.multi.has(id)) { this.multi.delete(id); if (this.selection === id) this.selection = [...this.multi].pop() ?? null; }
+    else { this.multi.add(id); this.selection = id; }
+    this.emit('selection', 'render');
+  }
+  setPlayhead(t) {
+    this.playhead = Math.max(0, t);
+    this.emit('playhead', 'render');
+  }
+}
+
+export const store = new Store();
