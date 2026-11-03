@@ -3167,6 +3167,7 @@ await step('Font lab: a font made from a bundled one (Thai included) previews ne
 
 await step('Taste Brain: it notes what is applied, cancelled or undone at once (this computer only), stays silent until it knows enough, marks one clearly fitting idea with the reason, can be switched off and erased', async () => {
   await resetProject(); await ev((p) => window.__app.importPaths([p]), clip); await settle(800);
+  await ev(() => { const box = document.getElementById('vis-ai-on'); if (box.checked) { box.checked = false; box.dispatchEvent(new Event('change')); } }); // an earlier step may have left the online AI switched on (and stubbed)
   await ev(async () => { const { store } = window.__app; const { taste } = await import('./taste.js'); localStorage.setItem('hhlab.vision.ai', '0'); taste.setEnabled(true); taste.forget(); globalThis.__now = 1.7e12; taste.clock = () => globalThis.__now;
     const c = store.project.clips.find((x) => x.type === 'media'); store.multi = new Set([c.id]); store.selection = c.id; store.emit('selection', 'render'); });
   await ev(() => document.querySelector('[data-tab="looks"]').click()); await settle(300);
