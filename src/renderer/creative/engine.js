@@ -45,6 +45,7 @@ export class CreativeMemoryEngine {
     this.lastShownAt = -Infinity;
     this.lastEditAt = -Infinity;
     this.busyProbe = () => false; // the Living Lab says when a take or trace is running
+    this.holds = new Set(); // plan cards the artist has open (hold('timeline-card', true)): nothing is suggested while one is open
     this._sTimer = 0;
     this.stats = (() => { try { return cleanStats(JSON.parse(read(STATS_KEY, 'null'))); } catch { return cleanStats(null); } })();
   }
@@ -130,12 +131,17 @@ export class CreativeMemoryEngine {
 
   // ---- the Decision Gate: suggestions, one at a time, nearly always none ----
 
+  /** A plan card is open (on) or closed (off). While any is open the gate stays shut and a showing suggestion is withdrawn. */
+  hold(key, on) { const had = this.holds.size > 0; if (on) this.holds.add(key); else this.holds.delete(key); if (on && !had) this.revalidate(); }
+  /** Something is open that a suggestion must not talk over: a plan card, or a PREVIEW in the monitor (a suggestion's own preview would replace it). */
+  occupied() { return this.holds.size > 0 || !!store.ghost; }
+
   typing() {
     const a = document.activeElement;
     return !!a && (a.isContentEditable || a.tagName === 'TEXTAREA' || (a.tagName === 'INPUT' && !['checkbox', 'radio', 'range', 'button', 'color'].includes(a.type)));
   }
   _gateState(now) {
-    return { now, enabled: this.enabled && this.suggestOn, context: this.context, selection: [...store.multi], playing: !!store.playing, busy: !!(this.busyProbe() || store.recorder),
+    return { now, enabled: this.enabled && this.suggestOn, context: this.context, selection: [...store.multi], playing: !!store.playing, busy: !!(this.busyProbe() || store.recorder || this.occupied()),
       typing: this.typing(), lastEditAt: this.lastEditAt, active: !!this.suggestion, lastShownAt: this.lastShownAt, cooldowns: this.cooldowns, stats: this.stats };
   }
   _saveStats() { write(STATS_KEY, JSON.stringify(this.stats)); }
@@ -167,7 +173,7 @@ export class CreativeMemoryEngine {
     const s = this.suggestion;
     if (!s) return;
     const now = this.clock(), here = new Set([...store.multi, ...this.context.clipIds]);
-    const gone = store.playing || this.busyProbe() || store.recorder || this.typing() || !s.contexts.includes(this.context.kind) || !s.clipIds.every((id) => here.has(id) && store.project.clips.some((c) => c.id === id));
+    const gone = store.playing || this.busyProbe() || store.recorder || this.typing() || this.occupied() || !s.contexts.includes(this.context.kind) || !s.clipIds.every((id) => here.has(id) && store.project.clips.some((c) => c.id === id));
     if (gone) return this._withdraw();
     if (now - s.shownAt > SUGGESTION_LIFE_MS) { this.cooldowns[s.key] = now + GATE.ignoredCooldownMs; this.lastShownAt = now; this._withdraw(); }
   }

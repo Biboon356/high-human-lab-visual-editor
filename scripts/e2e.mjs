@@ -1748,6 +1748,15 @@ await step('memory bleed: all four modes render cleanly, a seek or a repaint nev
   }
   assert.deepEqual(bad, [], 'no GL errors or shader failures in any mode');
   assert.ok(new Set(Object.values(finals).map((p) => p.join(',').length + diff(p, finals[0]).toFixed(1))).size >= 3, 'the modes look different from each other');
+  // plain Screen washes bright footage out; the soft screen (the new default) keeps more of it: same memory, same frames, less white
+  const lum = (px) => { let t = 0, n = 0; for (let i = 0; i + 2 < px.length; i += 3) { t += px[i] * 0.299 + px[i + 1] * 0.587 + px[i + 2] * 0.114; n++; } return t / n; };
+  const setBlend = (b) => ev((b) => { window.__app.store.project.clips.find((x) => x.type === 'media').effects[0].params.blend = b; }, b);
+  await setBlend(1); const scr = await run({ t0: 0, n: 46, mode: 0, off: false });
+  await setBlend(4); const soft = await run({ t0: 0, n: 46, mode: 0, off: false });
+  assert.ok(lum(scr.px) > lum(soft.px) + 1, `the soft screen is less bright than plain Screen (${lum(soft.px).toFixed(1)} vs ${lum(scr.px).toFixed(1)}, the footage alone is ${lum(none.px).toFixed(1)})`);
+  assert.ok(diff(soft.px, none.px) < diff(scr.px, none.px), 'and it stays closer to the picture itself');
+  assert.ok(diff(soft.px, none.px) > 0.1, 'while the memory is still visible');
+  assert.equal(await ev(() => window.__app.store.project.clips.find((x) => x.type === 'media').effects[0].params.blend), 4, 'a new Memory Bleed starts on the soft screen');
 
   // a seek, a long detour or a repaint must not change what the memory shows for a given run of frames
   await run({ t0: 0, n: 45, mode: 0, off: false });
@@ -2300,6 +2309,17 @@ await step('decision gate: one quiet suggestion at a time; silent while playing,
   await ev(async () => { (await import('./creative/engine.js')).creative.busyProbe = () => true; });
   assert.equal(await step1(), null, 'silent while a take or trace is running');
   await ev(async () => { (await import('./creative/engine.js')).creative.busyProbe = () => false; });
+  // never over an open plan card (TIMELINE) or a PREVIEW in the monitor
+  const busyNow = () => ev(async () => (await import('./creative/engine.js')).creative._gateState(globalThis.__t).busy);
+  assert.equal(await busyNow(), false, 'nothing is open: not busy');
+  await ev(async () => (await import('./creative/engine.js')).creative.hold('timeline-card', true));
+  assert.equal(await busyNow(), true, 'an open TIMELINE plan card keeps the gate shut'); assert.equal(await step1(), null, 'so nothing is suggested');
+  await ev(async () => (await import('./creative/engine.js')).creative.hold('timeline-card', false));
+  assert.equal(await busyNow(), false, 'closing the card opens it again');
+  await ev(() => { window.__app.store.showGhost({ label: 'x', apply: () => true }); });
+  assert.equal(await busyNow(), true, 'a PREVIEW in the monitor keeps it shut too'); assert.equal(await step1(), null);
+  await ev(() => { window.__app.store.clearGhost(); });
+  assert.equal(await busyNow(), false);
   await ev(async () => { const { creative } = await import('./creative/engine.js'); creative.setSuggestions(false); });
   assert.equal(await step1(), null, 'silent when suggestions are switched off'); await settle(100);
   assert.equal(await ev(() => document.getElementById('creative-suggest').checked), false, 'and the switch shows it');

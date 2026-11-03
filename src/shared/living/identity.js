@@ -24,7 +24,7 @@ export function cleanIdentity(raw) {
     name: String(raw.name || 'Untitled identity').trim().slice(0, 60),
     traits, palette, biases,
     organic: { growSeconds: round(clamp(o.growSeconds, 1, 20, 5), 1), thickness: round(clamp(o.thickness, 0.02, 0.6, 0.16)), density: round(clamp(o.density, 0.5, 8, 2.4), 2), glow: round(clamp(o.glow, 0, 2, 0.9), 2), spores: round(clamp(o.spores, 0, 1, 0.3), 2) },
-    memory: { mode: Math.round(clamp(m.mode, 0, 3, 0)), length: round(clamp(m.length, 0.1, 6, 1.2), 2), decay: round(clamp(m.decay, 0, 1, 0.5), 2), intensity: round(clamp(m.intensity, 0, 1.5, 0.8), 2), blend: Math.round(clamp(m.blend, 0, 3, 1)) },
+    memory: { mode: Math.round(clamp(m.mode, 0, 3, 0)), length: round(clamp(m.length, 0.1, 6, 1.2), 2), decay: round(clamp(m.decay, 0, 1, 0.5), 2), intensity: round(clamp(m.intensity, 0, 1.5, 0.8), 2), blend: Math.round(clamp(m.blend, 0, 4, 4)) },
     trace: { smoothing: round(clamp(t.smoothing, 0, 1, 0.25), 2), mode: t.mode === 'residue' ? 'residue' : 'grow' },
     inputs: { bpm: i.bpm === null || i.bpm === undefined ? null : Math.round(clamp(i.bpm, 30, 300, 120)), duration: round(clamp(i.duration, 0, 36000, 0), 1), density: round(clamp(i.density, 0, 1, 0)), motion: round(clamp(i.motion, 0, 1, 0)),
       energy: Object.fromEntries(['rms', 'bass', 'mid', 'high'].map((k) => [k, round(clamp(i.energy?.[k], 0, 1, 0))])) },

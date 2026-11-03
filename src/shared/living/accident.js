@@ -48,7 +48,7 @@ export function memoryCut(project, rel, r) {
     summary: `The last moment of ${label(A)} bleeds into ${label(B)} for about ${length} s after the cut (${['Ghost', 'Stain', 'Scar', 'Echo'][mode]}).`,
     apply(p) {
       if (!byId(p, a) || !byId(p, b)) return false;
-      const fx = createEffect('memory', { mode, length, intensity: 1, blend: 1, decay: 0.5, rate: 3 });
+      const fx = createEffect('memory', { mode, length, intensity: 1, blend: 4, decay: 0.5, rate: 3 });
       // it builds up from the first moment of the layer, but only shows from the cut on, then lets go
       fx.keyframes.intensity = [{ t: 0, v: 0 }, { t: Math.round((at - start) * 1000) / 1000, v: 1 }, { t: Math.round(dur * 1000) / 1000, v: 0 }];
       const layer = createClip({ type: 'adjust', name: `Accident · the cut remembers`, start, duration: dur, props: defaultProps(), effects: [fx] });

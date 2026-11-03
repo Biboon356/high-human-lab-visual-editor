@@ -411,7 +411,7 @@ export const EFFECTS = {
       { key: 'length', label: 'Memory length (s)', min: 0.1, max: 6, step: 0.05, def: 1.2 },
       { key: 'decay', label: 'Decay (soft ↔ crisp tail)', min: 0, max: 1, step: 0.01, def: 0.5 },
       { key: 'intensity', label: 'Intensity', min: 0, max: 1.5, step: 0.01, def: 0.8 },
-      { key: 'blend', label: 'Blend', options: ['Behind (normal)', 'Screen', 'Add', 'Difference'], def: 1 },
+      { key: 'blend', label: 'Blend', options: ['Behind (normal)', 'Screen', 'Add', 'Difference', 'Screen (keeps bright footage)'], def: 4 }, // 4 is new: Screen washed out bright footage; saved projects keep the index they were made with
       { key: 'spread', label: 'Drift / scatter', min: 0, max: 1, step: 0.01, def: 0.3 },
       { key: 'rate', label: 'Echo rate (Hz)', min: 0.25, max: 8, step: 0.25, def: 2 },
     ],

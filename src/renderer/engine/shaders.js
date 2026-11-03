@@ -88,6 +88,10 @@ vec4 fadeMem(vec4 m){
   return vec4(m.rgb * (m.a > 1e-4 ? a/m.a : 0.), a);
 }
 vec4 blendMem(vec4 P, vec4 M){
+  if(u_blend > 3.5){                                                                // screen that keeps bright footage: the brighter the present, the less the memory is added
+    vec4 K = M * (1. - .8*smoothstep(.4, .95, luma(P.rgb)));
+    return vec4(1.-(1.-P.rgb)*(1.-K.rgb), max(P.a, K.a));
+  }
   if(u_blend < .5) return P + M*(1.-P.a);                                         // behind the present
   if(u_blend < 1.5) return vec4(1.-(1.-P.rgb)*(1.-M.rgb), max(P.a, M.a));          // screen
   if(u_blend < 2.5) return vec4(min(P.rgb + M.rgb, 1.), max(P.a, M.a));            // add

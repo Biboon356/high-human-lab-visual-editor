@@ -71,7 +71,7 @@ export function deriveProjectDna(rawInputs, { seed = 1, now = 0, name } = {}) {
     traits: { energy, warmth, grit, motion: n.motion, density: n.density, calm },
     palette, biases,
     organic: { growSeconds: r2(7 - 5 * energy), thickness: r2(0.12 + 0.2 * (1 - grit)), density: r2(0.8 + 2.2 * n.motion + energy), glow: r2(0.5 + 0.5 * energy), spores: r2(clamp01(n.energy.high * 1.2)) },
-    memory: { mode: memMode, length: r2(0.8 + calm * 2.2), decay: r2(0.3 + 0.5 * grit), intensity: r2(0.6 + 0.4 * energy), blend: 1 },
+    memory: { mode: memMode, length: r2(0.8 + calm * 2.2), decay: r2(0.3 + 0.5 * grit), intensity: r2(0.6 + 0.4 * energy), blend: 4 },
     trace: { smoothing: r2(0.15 + calm * 0.5), mode: calm > 0.5 ? 'grow' : 'residue' },
     inputs: { bpm: n.bpm, duration: n.duration, density: n.density, motion: n.motion, energy: n.energy },
   };

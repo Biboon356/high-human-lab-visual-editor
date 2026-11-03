@@ -97,7 +97,7 @@ export function mountLiving({ preview, runAnalysis, renderer }) {
 
   // ---- MEMORY ----
   const MEM_MODES = [['Ghost', 'Past frames fade into the present.'], ['Stain', 'Colour from earlier frames slowly leaks forward.'], ['Scar', 'Movement leaves a mark that changes slowly.'], ['Echo', 'Fragments of earlier motion return on a rhythm.']];
-  const mem = { mode: 0, length: 1.2, intensity: 0.8, blend: 1 };
+  const mem = { mode: 0, length: 1.2, intensity: 0.8, blend: 4 };
   const memMode = el('select', { id: 'memory-mode', 'aria-label': 'Memory mode' }, MEM_MODES.map(([l], i) => el('option', { value: i, text: l })));
   const memLine = el('p', { class: 'hint', id: 'memory-line', text: MEM_MODES[0][1] });
   memMode.addEventListener('change', () => { mem.mode = Number(memMode.value); memLine.textContent = MEM_MODES[mem.mode][1]; });
@@ -109,7 +109,7 @@ export function mountLiving({ preview, runAnalysis, renderer }) {
     memInputs[key] = { input, out, unit };
     return el('label', { class: 'mut-row' }, el('span', { class: 'liv-axis', text: label }), input, out);
   };
-  const memBlend = el('select', { id: 'memory-blend', 'aria-label': 'Memory blend' }, ['Behind (normal)', 'Screen', 'Add', 'Difference'].map((l, i) => el('option', { value: i, text: l, ...(i === mem.blend ? { selected: true } : {}) })));
+  const memBlend = el('select', { id: 'memory-blend', 'aria-label': 'Memory blend' }, ['Behind (normal)', 'Screen', 'Add', 'Difference', 'Screen (keeps bright footage)'].map((l, i) => el('option', { value: i, text: l, ...(i === mem.blend ? { selected: true } : {}) })));
   memBlend.addEventListener('change', () => { mem.blend = Number(memBlend.value); });
   const selectedClips = () => [...store.multi].map((id) => store.project.clips.find((c) => c.id === id)).filter(Boolean);
   const memEffect = () => createEffect('memory', { mode: mem.mode, length: mem.length, intensity: mem.intensity, blend: mem.blend });

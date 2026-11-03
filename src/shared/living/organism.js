@@ -52,7 +52,7 @@ export function createLivingLayerClip(identity, { start = 0, duration = 10, bars
     effects.push(spores);
   }
   // the vein remembers: a Stain, in the identity's own memory settings, kept soft
-  effects.push(effect('memory', { mode: 1, length: m.length, decay: m.decay, intensity: Math.min(1, m.intensity), blend: 1, spread: 0.4 }));
+  effects.push(effect('memory', { mode: 1, length: m.length, decay: m.decay, intensity: Math.min(1, m.intensity), blend: 4, spread: 0.4 }));
   return createClip({ type: 'adjust', name: `Living layer · ${identity.name}`, trackId, start, duration, props: defaultProps(), effects });
 }
 

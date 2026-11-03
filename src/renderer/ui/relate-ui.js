@@ -28,12 +28,12 @@ export function mountRelate({ preview, renderer }) {
       el('label', { class: 'mut-row chk', title: 'Now and then, at a quiet moment, a small note may offer one of these for the clips you are working on, or a memory from Still Here. Never during playback or typing, never more than one at a time, and it goes quiet if you dismiss it.' }, quiet, 'Quiet suggestions')));
 
   let current = null;
-  function clear(text = '') { store.clearGhost(); current = null; card.hidden = true; if (text !== null) status.textContent = text; }
+  function clear(text = '') { store.clearGhost(); current = null; card.hidden = true; creative.hold('timeline-card', false); if (text !== null) status.textContent = text; }
 
   function plan(kind) {
     const p = creative.planRelation(kind);
     if (p.reason) { clear(p.reason); return; }
-    current = p;
+    current = p; creative.hold('timeline-card', true); // a plan card is open: no suggestion pops up over it
     title.textContent = `${p.title} — ${p.line}`;
     summary.textContent = p.summary;
     note.textContent = p.preview === 'playback' ? 'This one shows while the timeline plays.' : '';
