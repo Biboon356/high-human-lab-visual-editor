@@ -37,7 +37,7 @@ export function mountCommand(root, { runAnalysis, preview }) {
     if (!r.ok) { status.textContent = r.reason; show([]); return; }
     show([...r.understood.map((t) => `✓ ${t}`), ...r.notes.map((t) => `• ${t}`)]);
     if (r.intent === 'bind' && (!store.analysis || store.analysisStale)) { status.textContent = 'Analyzing the audio first…'; await runAnalysis({ quiet: true }); }
-    const ok = store.showGhost({ label: `Tell it · ${r.understood[0]}${r.understood.length > 1 ? ` +${r.understood.length - 1}` : ''}`, apply: (p) => r.apply(p), done: 'Done. Undo takes it back.' });
+    const ok = store.showGhost({ taste: { tags: r.targets.filter((t) => t.kind === 'effect').map((t) => `fx:${t.type}`) }, label: `Tell it · ${r.understood[0]}${r.understood.length > 1 ? ` +${r.understood.length - 1}` : ''}`, apply: (p) => r.apply(p), done: 'Done. Undo takes it back.' });
     status.textContent = ok ? 'Previewing: press Space to play it. Apply keeps it, Cancel forgets it.' : 'Nothing to change (already like that, or no clip to work on).';
     if (ok && !store.analysis) status.textContent += ' (There is no audio in the project, so nothing will move yet.)';
   }

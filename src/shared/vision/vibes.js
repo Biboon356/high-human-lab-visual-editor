@@ -166,7 +166,7 @@ const typesSig = (plan) => plan.chain.map((c) => c.type).sort().join('+');
  * @param shown  the plans already on screen (never repeated)
  * @returns {{ok:true, plans:object[]} | {ok:false, reason:string}}
  */
-export function moreIdeas(text, shown = [], want = 3) {
+export function moreIdeas(text, shown = [], want = 3, taste = null) {
   const hits = findVibes(String(text ?? '').toLowerCase());
   if (!hits.length) return { ok: false, reason: 'I do not know these words, so I have no other offline readings. Turn on the online AI for more ideas.' };
   const room = Math.max(0, MAX_IDEAS - shown.length);
@@ -183,12 +183,20 @@ export function moreIdeas(text, shown = [], want = 3) {
   if (hits.length > 1) for (const h of hits) add('on its own', [h], 0.55); // each mood alone
   for (const c of COMPANIONS) add(`with ${EFFECTS[c].label.replace(/ \(.*/, '').toLowerCase()}`, hits, 0.55, [c]); // the look with one extra ingredient
   for (const [label, t] of [['Softer still', 0.1], ['Stronger still', 1], ['In between', 0.4], ['Almost there', 0.75]]) add(label, hits, t);
+  // the artist's taste (if it is known) only reorders and prunes: the ones with effects they often keep come first; ones with effects they keep dropping are left out while others remain
+  const tw = taste?.weights || null, wOf = (c) => tw?.[`fx:${c.type}`] ?? 0;
+  let pool = cands;
+  if (tw) {
+    const kept = pool.filter((pl) => !pl.chain.some((c) => wOf(c) < -0.5)); if (kept.length) pool = kept;
+    const mean = (pl) => pl.chain.reduce((a, c) => a + wOf(c), 0) / pl.chain.length;
+    pool = pool.map((pl, i) => [pl, i]).sort((a, b) => mean(b[0]) - mean(a[0]) || a[1] - b[1]).map((x) => x[0]);
+  }
   const out = [];
-  for (const c of cands) {
+  for (const c of pool) {
     if (out.length >= Math.min(want, room)) break;
     if (seenFull.has(planSig(c)) || out.some((o) => planSig(o) === planSig(c))) continue;
     // prefer a different set of effects; a same-effects variant (just another strength) only when nothing else is left
-    if (seenTypes.has(typesSig(c)) && cands.some((x) => !seenTypes.has(typesSig(x)) && !seenFull.has(planSig(x)) && !out.some((o) => planSig(o) === planSig(x)))) continue;
+    if (seenTypes.has(typesSig(c)) && pool.some((x) => !seenTypes.has(typesSig(x)) && !seenFull.has(planSig(x)) && !out.some((o) => planSig(o) === planSig(x)))) continue;
     out.push(c);
   }
   if (!out.length) return { ok: false, reason: 'That is everything the offline dictionary can offer for these words. The online AI can suggest more.' };

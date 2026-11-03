@@ -10,6 +10,9 @@ import { buildPayload } from '/shared/vision/payload.js';
 import { sampleFeatures } from '/shared/audio-analysis.js';
 import { MAX_DESCRIBE_SECONDS, MAX_SECONDS } from '/shared/command/dictation.js';
 import { attachDictation } from './dictation-button.js';
+import { taste } from '../taste.js';
+import { EFFECTS } from '/shared/effects-defs.js';
+import { MIN_SCORE, effectOf } from '/shared/taste/taste.js';
 
 const lsGet = (k, d) => { try { return localStorage.getItem(k) ?? d; } catch { return d; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch { /* storage unavailable */ } };
@@ -44,10 +47,30 @@ export function mountVision(root, { preview, renderer } = {}) {
     el('p', { class: 'hint', text: 'Off by default. When on, the sentence you type is sent to Anthropic (Claude) with your own API key, so freer wording can be understood. No video, pictures, audio, file names or paths are ever sent; open "What would be sent" to see it exactly. The key is stored encrypted by your operating system. If the AI cannot be reached, the offline dictionary is used.' }),
     el('label', { class: 'chk' }, aiOn, 'Use the online AI'), el('div', { class: 'cmd-row' }, model), el('div', { class: 'cmd-row' }, key, keySave, keyClear), keyStatus, sentBox);
 
+  // what it has learned: shown, switchable, erasable
+  const tOn = el('input', { type: 'checkbox', id: 'taste-on', checked: taste.enabled });
+  const tSum = el('p', { class: 'hint', id: 'taste-sum' });
+  const tForget = el('button', { id: 'taste-forget', text: 'Forget everything', title: 'Erase what it has learned about your taste', onclick: () => taste.forget() });
+  const tasteBox = el('details', { class: 'liv-adv', id: 'taste-box' }, el('summary', { text: 'Taste (what it has noticed)' }),
+    el('p', { class: 'hint', text: 'It notes which effects you apply, cancel, or undo right away, only on this computer and only effect names. It never applies anything: it can mark a reading "Fits your taste" (when it is fairly sure), put ideas you tend to like first, and, if you use the online AI, tell it which effects you like.' }),
+    el('label', { class: 'chk' }, tOn, 'Learn from what I apply, cancel and undo'), tSum, el('div', { class: 'cmd-row' }, tForget));
+  tOn.addEventListener('change', () => taste.setEnabled(tOn.checked));
+  const nameOf = (tag) => { const t = effectOf(tag); return t && EFFECTS[t] ? EFFECTS[t].label.replace(/ \(.*/, '') : tag; };
+  function renderTaste() {
+    tOn.checked = taste.enabled;
+    const sm = taste.summary(), c = sm.counts;
+    const parts = [`${c.applied} applied, ${c.cancelled} cancelled, ${c.regret} undone at once.`];
+    if (!sm.confident) parts.push(`Too early to say anything (it needs about 5).`);
+    else { parts.push(sm.likes.length ? `You tend to keep: ${sm.likes.map((r) => `${nameOf(r.tag)} (${r.n}×)`).join(', ')}.` : 'No clear favourites yet.'); if (sm.dislikes.length) parts.push(`You tend to drop: ${sm.dislikes.map((r) => `${nameOf(r.tag)} (${r.n}×)`).join(', ')}.`); }
+    if (!taste.enabled) parts.push('Learning is off.');
+    tSum.textContent = parts.join(' '); renderSent();
+    if (plans.length) render();
+  }
+  taste.listeners.add(renderTaste);
   root.append(el('section', { class: 'card', id: 'vision-card' }, el('h4', { text: 'Describe the look' }),
     el('div', { class: 'body' },
       el('p', { class: 'hint', text: 'Say the picture in your head. You get three readings of it (gentle, balanced, bold) to preview on the selected clips; nothing is applied until you press Apply.' }),
-      input, el('div', { class: 'cmd-row' }, go, mic, lang, el('label', { class: 'chk', title: 'The microphone also hears the song. Playback is paused while you hold the button and resumed after.' }, pauseChk, 'Pause playback while I speak')), status, list, el('div', { class: 'cmd-row' }, more), refineRow, ai)));
+      input, el('div', { class: 'cmd-row' }, go, mic, lang, el('label', { class: 'chk', title: 'The microphone also hears the song. Playback is paused while you hold the button and resumed after.' }, pauseChk, 'Pause playback while I speak')), status, list, el('div', { class: 'cmd-row' }, more), refineRow, ai, tasteBox)));
 
   try { lang.value = localStorage.getItem('hhlab.cmd.lang') || 'th'; } catch { /* storage unavailable */ }
   lang.addEventListener('change', () => lsSet('hhlab.cmd.lang', lang.value));
@@ -57,10 +80,11 @@ export function mountVision(root, { preview, renderer } = {}) {
     doneText: 'Is that what you said? Fix any word, then press Refine. Nothing has changed yet.' });
 
   const selectedIds = () => [...store.multi];
+  const tasteHints = () => { const sm = taste.enabled ? taste.summary() : null; return sm?.confident && (sm.likes.length || sm.dislikes.length) ? { likes: sm.likes.map((r) => effectOf(r.tag)).filter(Boolean), dislikes: sm.dislikes.map((r) => effectOf(r.tag)).filter(Boolean) } : undefined; };
   const effectsOnSelection = () => { const c = store.selectedClip; return c ? (c.effects || []).map((e) => e.type) : []; };
   const useAi = () => aiOn.checked && aiInfo.hasKey;
 
-  function renderSent() { sent.textContent = JSON.stringify({ ...buildPayload({ text: input.value, current: current ? { title: current.title, effects: current.chain } : undefined, clipEffects: effectsOnSelection() }), catalogue: '(the public list of effects and their safe ranges, no personal data)' }, null, 1); }
+  function renderSent() { sent.textContent = JSON.stringify({ ...buildPayload({ text: input.value, current: current ? { title: current.title, effects: current.chain } : undefined, clipEffects: effectsOnSelection(), taste: tasteHints() }), catalogue: '(the public list of effects and their safe ranges, no personal data)' }, null, 1); }
   function renderKey() {
     keyStatus.textContent = aiInfo.hasKey ? `A key is saved (${aiInfo.storage === 'encrypted' ? 'encrypted by your operating system' : 'kept in memory for this session only: this computer cannot encrypt it'}).` : 'No key saved.';
     if (aiOn.checked && !aiInfo.hasKey) keyStatus.textContent += ' Add one to use the AI; until then the offline dictionary is used.';
@@ -81,9 +105,14 @@ export function mountVision(root, { preview, renderer } = {}) {
   const thumbOf = () => el('canvas', { class: 'vis-thumb', width: 0, height: 0, hidden: true });
   function render() {
     const nowThumb = thumbOf(); nowThumb.dataset.now = '1';
-    const cards = plans.map((p, i) => { const th = thumbOf(); th.dataset.plan = String(i);
+    const label = (tag) => { const t = effectOf(tag); return t && EFFECTS[t] ? EFFECTS[t].label.replace(/ \(.*/, '') : tag; };
+    const fits = plans.map((p) => taste.fit(p.chain.map((c) => c.type)));
+    const top = fits.reduce((b, f, i) => (f && f.score >= MIN_SCORE && (b < 0 || f.score > fits[b].score) ? i : b), -1);
+    const unique = top >= 0 && fits.every((f, i) => i === top || !f || f.score < fits[top].score - 0.05); // only when one clearly fits best: otherwise it stays quiet
+    const cards = plans.map((p, i) => { const th = thumbOf(); th.dataset.plan = String(i); const f = fits[i];
+      const why = f && ((unique && i === top && f.liked.length) ? `You often keep ${f.liked.map(label).join(' and ')}.` : f?.disliked.length && f.score < 0 ? `Includes ${f.disliked.map(label).join(' and ')}, which you often drop.` : '');
       return el('div', { class: `vis-cand${p === current ? ' on' : ''}`, 'data-vis': i }, th,
-        el('div', { class: 'vis-body' }, el('b', { text: p.title }), el('span', { class: 'vis-src', text: p.source === 'ai' ? 'AI' : 'offline' }),
+        el('div', { class: 'vis-body' }, el('b', { text: p.title }), el('span', { class: 'vis-src', text: p.source === 'ai' ? 'AI' : 'offline' }), ...(unique && i === top ? [el('span', { class: 'vis-fit', text: 'Fits your taste' })] : []), ...(why ? [el('p', { class: 'hint vis-why', text: why })] : []),
           el('ul', { class: 'cmd-list' }, ...describePlan(p).map((t) => el('li', { text: t }))),
           el('button', { id: `vis-prev-${i}`, text: 'PREVIEW', title: 'See it in the monitor on the selected clips (press Space to play it). Nothing is applied until you press Apply.', onclick: () => previewPlan(p) }))); });
     list.replaceChildren(...(plans.length ? [el('div', { class: 'vis-cand vis-now' }, nowThumb, el('div', { class: 'vis-body' }, el('b', { text: 'Now' }), el('span', { class: 'vis-src', text: 'your frame' })))] : []), ...cards);
@@ -123,7 +152,7 @@ export function mountVision(root, { preview, renderer } = {}) {
     const ids = selectedIds();
     if (!ids.length) { status.textContent = 'Select a clip first, then press PREVIEW.'; return; }
     current = p;
-    const ok = store.showGhost({ label: p.title, apply: (proj) => applyPlan(proj, ids, p) > 0, done: `${p.title} added. Undo takes it back.` });
+    const ok = store.showGhost({ label: p.title, taste: { tags: p.chain.map((c) => `fx:${c.type}`) }, apply: (proj) => applyPlan(proj, ids, p) > 0, done: `${p.title} added. Undo takes it back.` });
     status.textContent = ok ? 'Previewing: press Space to play it. Apply keeps it, Cancel forgets it. Not happy? Refine it below.' : 'That could not be shown on the selected clips.';
     render();
   }
@@ -133,7 +162,7 @@ export function mountVision(root, { preview, renderer } = {}) {
     fellBack = '';
     if (useAi()) {
       status.textContent = 'Asking the AI…'; go.disabled = refineGo.disabled = more.disabled = true;
-      let r; try { r = await bridge.interpret({ model: model.value, input: { text, current: withCurrent && current ? { title: current.title, effects: current.chain } : undefined, clipEffects: effectsOnSelection(), avoid } }); } catch (e) { r = { ok: false, reason: e.message }; }
+      let r; try { r = await bridge.interpret({ model: model.value, input: { text, current: withCurrent && current ? { title: current.title, effects: current.chain } : undefined, clipEffects: effectsOnSelection(), avoid, taste: tasteHints() } }); } catch (e) { r = { ok: false, reason: e.message }; }
       go.disabled = refineGo.disabled = false; more.disabled = plans.length >= MAX_IDEAS;
       if (r.ok) return { plans: r.plans, notes: [r.notes].filter(Boolean), via: 'ai' };
       fellBack = `${r.reason} Used the offline dictionary instead.`;
@@ -158,7 +187,7 @@ export function mountVision(root, { preview, renderer } = {}) {
     const viaAi = await ask(text, false, plans.map((p) => ({ title: p.title, types: p.chain.map((c) => c.type) })));
     let add = null, note = '';
     if (viaAi) { add = viaAi.plans; note = viaAi.notes[0] || 'Three more readings from the AI (another request on your account).'; }
-    else { const r = moreIdeas(text, plans); if (!r.ok) { status.textContent = `${fellBack} ${r.reason}`.trim(); return; } add = r.plans; note = `${fellBack} Three more readings from the offline dictionary.`.trim(); }
+    else { const r = moreIdeas(text, plans, 3, { weights: taste.weights() }); if (!r.ok) { status.textContent = `${fellBack} ${r.reason}`.trim(); return; } add = r.plans; note = `${fellBack} Three more readings from the offline dictionary.`.trim(); }
     plans = [...plans, ...add.slice(0, MAX_IDEAS - plans.length)];
     status.textContent = `${note} ${plans.length} in all.`; render();
   }
@@ -178,6 +207,6 @@ export function mountVision(root, { preview, renderer } = {}) {
 
   store.on('selection', () => { renderSent(); paintThumbs(); });
   store.on('reset', () => { plans = []; current = null; lastText = ''; status.textContent = ''; render(); }); // a new or opened project: the old readings belonged to the old one
-  loadAi();
+  loadAi(); renderTaste();
   return { bridge, reload: loadAi, get plans() { return plans; } };
 }

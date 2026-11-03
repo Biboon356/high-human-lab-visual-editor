@@ -46,19 +46,19 @@ suggestions/curation are guesses, not tuned by real use.
 
 ## Where things stand
 
-* Released: v0.9.4 (Describe the look: offline mood dictionary or the optional online AI with the user's own key; read-only Graph tab). The owner confirmed
-  the mic button and the online AI work on their Mac. **v0.9.5 pending release** (branch `feat/v0.9.5`): Tell it uses gentle per-parameter default strengths; the Graph moves
-  with the sound (`shared/graph/live.js`, same maths as the renderer) and marks HEAVY effects; Describe the look can be spoken (shared `renderer/ui/dictation-button.js`,
-  30 s takes), shows a picture of each reading on the owner's own frame, and has "Show different ideas" (`vibes.js moreIdeas`, AI gets `alreadyShown`; 9 at most);
-  plus a FONT SPIKE with no UI (`shared/fonts/sfnt.js`, docs/FONTS.md): outlines of a TrueType/WOFF1 font can be changed and written as a renamed TTF with GSUB/GPOS untouched.
-  The owner chose "modify bundled fonts into brand fonts" (option a). Findings that shape the next step: NO Thai font is bundled (Thai uses system fonts), bundled fonts are
-  WOFF2 subsets (not readable by the spike), licence Reserved Font Names unchecked. Planned next: a Font lab (recipe + preview + one Undo step, recipe saved in the project),
-  after deciding which OFL fonts to bundle as WOFF/TTF (a Thai one too); an EDITABLE Graph (NOT a free TouchDesigner graph); Taste Brain; the "known to tune" items below.
+* Released: v0.9.4. **v0.9.5 is pending release** (branch `feat/v0.9.5`, already on `feat/mvp-visual-editor`: Tell it default strengths, live Graph + HEAVY marks, Describe the look speaks / shows
+  a picture per reading / "Show different ideas", font spike). **v0.9.6 is built on branch `feat/v0.9.6` and deliberately NOT yet on `feat/mvp-visual-editor`** (so that publishing v0.9.5 does not
+  carry untested v0.9.6 work): fast-forward it only after v0.9.5 is published, rerun the full e2e if the branch moved, then the usual "cl". v0.9.6 = editable Graph (`shared/graph/edit.js`, graph-ui
+  "Edit the graph": ↑ ↓ ● ✕, drag a signal onto a parameter, link strength, add-link menu; one Undo step each), Font lab (see docs/FONTS.md; four OFL bases in `renderer/fonts/base`, Noto Sans Thai
+  bundled; recipes in `project.fontRecipes`), Taste Brain v1 (`shared/taste/taste.js`, `renderer/taste.js`: applied / cancelled via button or Esc / undone within 20 s, effect names only, local
+  storage, shown / switchable / erasable; marks one idea "Fits your taste", reorders "different ideas", hints the AI), Memory Bleed soft screen (blend index 4, default for new effects; saved projects
+  keep theirs), no suggestion over an open TIMELINE card or a PREVIEW, Esc leaves a preview without clearing the selection.
+  Planned next: more Font lab moves/bases (weight, stencil), wider use of Taste Brain (Mutate, Make my look), Take/Trace on groups, the rest of "Known to tune" below.
 * Tell it amounts (fixed in v0.9.5): `parse.js baseAmount` defines "normal" strength per parameter (a binding moves a value by amount x its WHOLE range, so one default
   cannot fit all); the preview line states how far it moves.
 * Gotcha: in a module that receives the monitor's `preview` object do not name a function `preview` (it shadows the parameter; seen again and fixed in vision-ui as `previewPlan`).
+* Layout gotcha: `.card .body` is a grid with an auto column; a wide child (a canvas with a width attribute) pushes the whole card out of its panel. Give new cards `grid-template-columns: minmax(0,1fr)` and use `sticksOut('#card-id')` in the e2e.
 * e2e flakiness seen under load: a step can fail once in a full run and pass alone (preview editing; the Graph steps before the `defer` fix); rerun before suspecting code.
-* Known to tune: Ghost/Stain default `screen` blend washes out bright footage; a suggestion can pop up while a TIMELINE plan card is open;
-  Take/Trace work on one clip only (no group); curator/gate thresholds untested on real use; clips imported before the HDR fix keep a flat proxy.
+* Known to tune: Take/Trace work on one clip only (no group); curator/gate thresholds untested on real use; clips imported before the HDR fix keep a flat proxy.
 * Ideas not built: Root-Letters (roots out of letters), Living Score, per-section looks, palette lock from album art, Look Card, Human Groove,
   Lyric Alchemy, MIDI for Take.

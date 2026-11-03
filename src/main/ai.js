@@ -22,6 +22,7 @@ Rules:
 - "links" make a parameter follow the music (signal: rms=loudness, bass, mid, high, beat; amount between -1 and 1). Add links only when the request is about music, rhythm or reacting; otherwise leave links empty.
 - If "current" is given, the request is a refinement of that look: keep what the user did not mention and change what they asked for.
 - If "alreadyShown" is given, the user wants three NEW readings that are clearly different in character from those (different effects or a different mood), not the same ideas at another strength.
+- If "tasteHints" is given, these are effects the artist often keeps (likes) and often drops (dislikes): lean towards the likes and away from the dislikes, but still honour what they asked for.
 - "notes" is one short sentence in the user's language saying how you read the request.
 - Never include anything except the JSON.`;
 

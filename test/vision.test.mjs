@@ -171,3 +171,22 @@ test('the AI is told what is already on screen (titles and effect names only) so
   assert.equal(p.alreadyShown.length, 9); assert.deepEqual(p.alreadyShown[0], { title: 'Dream · Gentle', effects: ['blur', 'bloom'] }); assert.equal(p.alreadyShown[1].title.length, 80);
   assert.equal(buildPayload({ text: 'dream' }).alreadyShown, undefined);
 });
+
+test('taste only reorders and prunes more ideas: liked ingredients come first, strongly disliked ones are left out while others remain, nothing is invented', () => {
+  const text = 'ฝัน', shown = interpretVision(text).plans;
+  const plain = moreIdeas(text, shown).plans.map((p) => p.title);
+  const likes = moreIdeas(text, shown, 3, { weights: { 'fx:vhs': 0.9, 'fx:film': 0.6 } }).plans;
+  assert.ok(likes[0].chain.some((c) => c.type === 'vhs'), `the liked ingredient is offered first (${likes.map((p) => p.title)})`);
+  const dislikes = moreIdeas(text, shown, 9, { weights: { 'fx:vhs': -0.9, 'fx:film': -0.9, 'fx:grain': -0.9 } }).plans;
+  assert.ok(!dislikes.some((p) => /with (vhs|film|grain)/i.test(p.title)), `no disliked companion is offered (${dislikes.map((p) => p.title)})`);
+  assert.deepEqual(moreIdeas(text, shown, 3, { weights: {} }).plans.map((p) => p.title), plain, 'with nothing learned it is exactly as before');
+  assert.deepEqual(moreIdeas(text, shown, 3, null).plans.map((p) => p.title), plain);
+  const all = new Set(moreIdeas(text, shown, 9, { weights: { 'fx:chroma': 0.9 } }).plans.map((p) => p.title)); assert.ok([...all].every((t) => t.includes('Dream')), 'every idea still comes from the artist\'s own words');
+});
+
+test('the AI is told effect names the artist likes and drops, and nothing else about them, only when given', () => {
+  const p = buildPayload({ text: 'dream', taste: { likes: ['grain', 'bloom', 'a', 'b', 'c', 'd'], dislikes: ['vhs'] } });
+  assert.deepEqual(p.tasteHints.likes, ['grain', 'bloom', 'a', 'b', 'c']); assert.deepEqual(p.tasteHints.dislikes, ['vhs']);
+  assert.equal(buildPayload({ text: 'dream' }).tasteHints, undefined); assert.equal(buildPayload({ text: 'dream', taste: { likes: [], dislikes: [] } }).tasteHints, undefined);
+  assert.deepEqual(Object.keys(p).sort(), ['catalogue', 'request', 'tasteHints']);
+});

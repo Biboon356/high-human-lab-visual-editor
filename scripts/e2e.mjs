@@ -3165,6 +3165,64 @@ await step('Font lab: a font made from a bundled one (Thai included) previews ne
   assert.equal(await ev(() => document.getElementById('fl-status').textContent), '', 'no error');
 });
 
+await step('Taste Brain: it notes what is applied, cancelled or undone at once (this computer only), stays silent until it knows enough, marks one clearly fitting idea with the reason, can be switched off and erased', async () => {
+  await resetProject(); await ev((p) => window.__app.importPaths([p]), clip); await settle(800);
+  await ev(async () => { const { store } = window.__app; const { taste } = await import('./taste.js'); localStorage.setItem('hhlab.vision.ai', '0'); taste.setEnabled(true); taste.forget(); globalThis.__now = 1.7e12; taste.clock = () => globalThis.__now;
+    const c = store.project.clips.find((x) => x.type === 'media'); store.multi = new Set([c.id]); store.selection = c.id; store.emit('selection', 'render'); });
+  await ev(() => document.querySelector('[data-tab="looks"]').click()); await settle(300);
+  const prof = () => ev(async () => { const { taste } = await import('./taste.js'); return { counts: taste.profile.counts, events: taste.profile.events, items: Object.keys(taste.profile.items), conf: taste.summary().confident }; });
+  const showing = async (i, phase) => { await page.click(`#vis-prev-${i}`); await settle(300); const st = await ev(() => ({ ghost: !!window.__app.store.ghost, status: document.getElementById('vis-status').textContent, cards: document.querySelectorAll('.vis-cand:not(.vis-now)').length, tab: document.querySelector('[data-pane="looks"]').classList.contains('on') })); assert.equal(st.ghost, true, `a preview is showing (${phase}): ${JSON.stringify(st)}`); };
+  const interpret = async (text) => { await page.fill('#vis-input', text); await page.click('#vis-go'); await page.waitForFunction(() => document.querySelectorAll('.vis-cand:not(.vis-now)').length >= 3, null, { timeout: 20000 }); await settle(300); };
+  assert.match(await ev(() => document.getElementById('taste-sum').textContent), /0 applied, 0 cancelled, 0 undone at once\. Too early/);
+  await interpret('ฝัน');
+  // apply, then Undo at once: noted as applied AND as "not wanted"
+  await showing(1, 'first apply'); await page.click('#ghost-apply'); await settle(300);
+  let p = await prof(); assert.equal(p.counts.applied, 1); assert.ok(p.items.includes('fx:blur') && p.items.includes('fx:bloom'), `only effect names are kept (${p.items})`);
+  await ev(() => window.__app.store.undo()); await settle(300);
+  p = await prof(); assert.equal(p.counts.regret, 1, 'an Undo right after Apply counts');
+  // apply, wait, Undo later: not counted as regret
+  await showing(1, 'second apply'); await page.click('#ghost-apply'); await settle(300);
+  await ev(() => { globalThis.__now += 60000; }); await ev(() => window.__app.store.undo()); await settle(300);
+  p = await prof(); assert.equal(p.counts.applied, 2); assert.equal(p.counts.regret, 1, 'a later Undo does not count');
+  // cancel by the button and by Esc
+  await page.click('#vis-prev-0'); await settle(300); await page.click('#ghost-cancel'); await settle(300);
+  await page.click('#vis-prev-0'); await settle(300); await page.keyboard.press('Escape'); await settle(300);
+  p = await prof(); assert.equal(p.counts.cancelled, 2);
+  assert.equal(await ev(() => window.__app.store.multi.size), 1, 'Esc leaves the preview only: the clip stays selected');
+  assert.match(await ev(() => document.getElementById('taste-sum').textContent), /2 applied, 2 cancelled, 1 undone at once/);
+  // a preview that is replaced, or dropped by a new interpretation, is NOT a cancel
+  await page.click('#vis-prev-0'); await settle(300); await interpret('ฝัน'); assert.equal((await prof()).counts.cancelled, 2, 'only an explicit Cancel counts');
+  // switched off: nothing is noted
+  await page.click('#vis-ai summary').catch(() => {}); await ev(() => { document.getElementById('taste-box').open = true; });
+  await page.uncheck('#taste-on'); await showing(1, 'apply while off'); await page.click('#ghost-apply'); await settle(300);
+  assert.equal((await prof()).counts.applied, 2, 'off: nothing recorded'); assert.match(await ev(() => document.getElementById('taste-sum').textContent), /Learning is off/);
+  await ev(() => window.__app.store.undo()); await page.check('#taste-on');
+  // not confident yet: silent; no badge; no hints to the AI
+  assert.equal(await ev(() => document.querySelectorAll('.vis-fit').length), 0); assert.doesNotMatch(await ev(() => document.getElementById('vis-sent').textContent), /tasteHints/);
+  // teach it: grain is kept, VHS is dropped
+  await ev(async () => { const { taste } = await import('./taste.js'); for (let i = 0; i < 6; i++) taste.record('applied', ['fx:grain']); for (let i = 0; i < 4; i++) taste.record('cancelled', ['fx:vhs']); });
+  assert.equal((await prof()).conf, true);
+  assert.match(await ev(() => document.getElementById('taste-sum').textContent), /You tend to keep: Grain/); assert.match(await ev(() => document.getElementById('taste-sum').textContent), /You tend to drop: VHS/);
+  // three readings with the same effects fit equally: still silent. More ideas include different ones: the best fitting one is marked, with the reason
+  await interpret('ฝัน อบอุ่น'); assert.equal(await ev(() => document.querySelectorAll('.vis-fit').length), 0, 'equal fits: it does not pick');
+  await page.click('#vis-more'); await settle(600);
+  const fitCards = await ev(() => [...document.querySelectorAll('.vis-cand:not(.vis-now)')].filter((c) => c.querySelector('.vis-fit')).map((c) => ({ title: c.querySelector('b').textContent, why: c.querySelector('.vis-why')?.textContent || '' })));
+  const scores = await ev(async () => { const { taste } = await import('./taste.js'); return window.__app.vision.plans.map((pl) => [pl.title, pl.chain.map((c) => c.type).join('+'), taste.fit(pl.chain.map((c) => c.type))?.score?.toFixed(3) ?? null]); });
+  assert.equal(fitCards.length, 1, `exactly one idea is marked (${JSON.stringify(fitCards)}) scores ${JSON.stringify(scores)}`); assert.match(fitCards[0].title, /grain/i); assert.match(fitCards[0].why, /You often keep Grain/);
+  assert.equal(await ev(() => [...document.querySelectorAll('.vis-cand:not(.vis-now) b')].some((b) => /with vhs/i.test(b.textContent)), ), false, 'an ingredient it keeps dropping is not offered');
+  // what the AI would be told: effect names only, and only while learning is on
+  assert.match(await ev(() => document.getElementById('vis-sent').textContent), /"tasteHints"[\s\S]*"grain"[\s\S]*"vhs"/);
+  await page.uncheck('#taste-on'); assert.doesNotMatch(await ev(() => document.getElementById('vis-sent').textContent), /tasteHints/); assert.equal(await ev(() => document.querySelectorAll('.vis-fit').length), 0, 'off: no marks');
+  await page.check('#taste-on');
+  // stored locally as plain numbers; forgetting erases it
+  const stored = await ev(() => JSON.parse(localStorage.getItem('hhlab.taste.v1')));
+  assert.equal(stored.v, 1); assert.ok(Object.keys(stored.items).every((k) => /^fx:/.test(k))); assert.ok(JSON.stringify(stored).length < 4000);
+  await page.click('#taste-forget'); await settle(300);
+  p = await prof(); assert.deepEqual(p.counts, { applied: 0, cancelled: 0, regret: 0 }); assert.equal(p.items.length, 0); assert.equal(await ev(() => document.querySelectorAll('.vis-fit').length), 0);
+  assert.match(await ev(() => document.getElementById('taste-sum').textContent), /Too early/);
+  await ev(async () => { const { taste } = await import('./taste.js'); taste.clock = () => Date.now(); taste.forget(); });
+});
+
 const bad = logs.filter((l) => !/GPU stall|swiftshader|GL Driver Message|Automatic fallback/i.test(l));
 await step('no unexpected console errors during the whole run', async () => { assert.deepEqual(bad, []); });
 // Quitting mid-export must not leave ffmpeg processes behind (they would burn CPU forever).

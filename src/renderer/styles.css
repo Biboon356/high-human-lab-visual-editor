@@ -441,3 +441,4 @@ kbd { font: 500 9.5px var(--mono); letter-spacing: .04em; padding: 1px 6px; bord
 .fl-item { border: 1px solid var(--line2, #444); padding: 6px 8px; margin: 6px 0; overflow-wrap: anywhere; } .fl-item b { font-size: 16px; font-weight: 400; }
 #fontlab-card .body, #vision-card .body, #cmd-card .body { min-width: 0; } #fontlab-card select, #fontlab-card input[type=text] { max-width: 100%; box-sizing: border-box; min-width: 0; } #fontlab-card .cmd-row > select { flex: 1 1 100%; } .fl-preview { max-width: 100%; height: auto; }
 #fontlab-card .body, #vision-card .body, #cmd-card .body { grid-template-columns: minmax(0, 1fr); } /* an auto column grows to the widest child (a 560 px canvas) and pushes the whole card out of its panel */
+.vis-fit { display: inline-block; margin: 0 0 4px; padding: 1px 6px; border: 1px solid var(--accent2, #5c8); color: var(--accent2, #5c8); font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase; } .vis-why { margin: 2px 0 4px; }

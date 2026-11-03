@@ -292,6 +292,28 @@ without you.
   "at the loudest it moves up by 0.25". `subtle`, `strong`, `40%` and `invert` scale that normal strength.
 * Not tried on a real Mac or Windows machine; whether the live drawing stays smooth on a real GPU is unverified.
 
+## v0.9.6 — an editable Graph, the Font lab, and the first Taste Brain
+
+* **Editable Graph** (Graph tab, "Edit the graph", off by default): from the picture you can run an effect earlier or later (↑ ↓), switch it off or on (●), remove it (✕), **drag a link
+  from a signal box (loudness, bass, mids, highs, beats) onto a parameter** to make it follow the music, click a link to set how strongly (or remove it), and add a link for any
+  parameter from a menu (also the ones that have no row on the picture). Each change is one Undo step and goes through the same data as the Inspector; the default strength is
+  Tell it's "normal" for that parameter. It never edits while a PREVIEW is showing. Still a chain per clip: not a free TouchDesigner-style graph.
+* **Font lab** (Type tab): make a font of your own from one of four bundled fonts (Noto Sans Thai for Thai + Latin, Anton, Archivo Black, Space Grotesk Bold) by changing its outlines:
+  **Slant**, **Wobble** or **Wave**, with a strength and a seed (the same seed always gives the same font). You see it on your own words, over the original. Saving stores only a small
+  **recipe** in the project (the font is rebuilt when the project opens, and before an export); "Use on the selected text" is one Undo step. Thai tone marks and vowels keep their
+  places because the font's own placement rules are copied untouched. A made font gets its own name (HHLAB …) and keeps the copyright and licence notices of its base (SIL OFL).
+  **Noto Sans Thai** is now also a bundled font you can type with, the first Thai font in the app.
+* **Taste Brain, first version** (Describe the look → "Taste"): it notes which effects you apply, cancel (button or Esc) or undo right away, on this computer only and only effect names, with a
+  45-day memory. It never applies anything. Once it has seen about 5 things it can mark one idea "Fits your taste" with the reason ("You often keep Grain"), put ideas with ingredients you
+  tend to keep first in "Show different ideas" (and leave out ones you keep dropping), and, if you use the online AI, tell it which effects you like. It stays silent until it is fairly sure.
+  You can see what it has noticed, switch learning off, and erase it.
+* **Memory Bleed no longer washes bright footage out** (fix): a new blend, "Screen (keeps bright footage)", is the default for new Memory Bleed effects, for REMEMBER, for Accident's memory cut and for
+  Project DNA. Saved projects keep the blend they were made with.
+* **Quieter suggestions** (fix): no suggestion appears over an open TIMELINE plan card or while any PREVIEW is showing. Esc used to leave a preview and also clear the selected clip; now it only leaves the preview.
+* **Cards no longer overflow the side panel** (fix): a wide canvas could push a whole card out of its panel; the tests now check that nothing sticks out.
+* Never tried on a real Mac or Windows machine. The Font lab has only three moves, made fonts have one weight, and how good a made font looks as a typeface is the author's eye, not measured. Taste Brain needs
+  real use to learn anything; its thresholds (5 events, 45 days, how strongly a Cancel counts) are guesses.
+
 ## HDR phone footage (iPhone HLG / PQ)
 
 A clip shot in HDR is 10-bit BT.2020 with an HLG curve. Decoded as ordinary video it looks washed out. The app now recognises such
