@@ -16,6 +16,7 @@ import { mountSuggestionChip } from './ui/suggestion-chip.js';
 import { mountGhostBar } from './ui/ghost-bar.js';
 import { mountReactive, runAnalysis } from './ui/reactive-ui.js';
 import { mountCommand } from './ui/command-ui.js';
+import { mountVision } from './ui/vision-ui.js';
 import { mountProjectSettings } from './ui/project-settings.js';
 import { openExportDialog, isExporting } from './ui/export-dialog.js';
 import { openAutoEdit } from './ui/autoedit-panel.js';
@@ -147,6 +148,8 @@ const mutateUi = mountMutate({ preview });
 const living = mountLiving({ preview, runAnalysis, renderer: mutateUi.renderer });
 try { mountGhostBar(); mountSuggestionChip(); creative.start(); } catch (e) { console.error('[creative]', e); } // the intelligence layer is an extra: if it cannot start, the editor still works
 mountReactive($('reactive'));
+let visionUi = null;
+try { visionUi = mountVision($('vision-root')); } catch (e) { console.error('[vision]', e); } // an extra: if it cannot start the editor still works
 let commandUi = null;
 try { commandUi = mountCommand($('reactive'), { runAnalysis, preview }); } catch (e) { console.error('[command]', e); } // an extra: if it cannot start the editor still works
 mountProjectSettings($('project-settings'));
@@ -197,7 +200,7 @@ document.addEventListener('paste', (e) => { if (!inTextField() && store.clipboar
 
 // ---- automation hook (used by scripts/e2e.mjs; harmless in normal use)
 window.__app = {
-  command: commandUi, mutateUi, living, reverseSelected, freezeAtPlayhead, placeAdlibs, stutterAtPlayhead, previewEdit, maskEditor, maskEdit, store, preview, timeline, autoEdit: autoEditEngine, captionEdit: { applyCaptionEdits }, smartMontage, autosave: { writeNow, offerRecovery }, runAnalysis, cutOnBeats, autoMontage, importPaths: async (paths) => importResults(await hh.probePaths(paths)),
+  command: commandUi, vision: visionUi, mutateUi, living, reverseSelected, freezeAtPlayhead, placeAdlibs, stutterAtPlayhead, previewEdit, maskEditor, maskEdit, store, preview, timeline, autoEdit: autoEditEngine, captionEdit: { applyCaptionEdits }, smartMontage, autosave: { writeNow, offerRecovery }, runAnalysis, cutOnBeats, autoMontage, importPaths: async (paths) => importResults(await hh.probePaths(paths)),
   exportTo: async (outPath, overrides = {}) => {
     const s = store.project.settings;
     const { range: _r, ...ov } = overrides; const settings = { width: s.width, height: s.height, fps: s.fps, quality: "draft", format: outPath.endsWith(".webm") ? "webm" : "mp4", ...ov, outPath };

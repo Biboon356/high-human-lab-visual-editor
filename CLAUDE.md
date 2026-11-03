@@ -46,11 +46,12 @@ suggestions/curation are guesses, not tuned by real use.
 
 ## Where things stand
 
-* Released: v0.9.2 (loop playback of the In/Out range, PREVIEW in the monitor). **v0.9.3 pending release** (branch `feat/v0.9.3`): **Tell it**
-  (Audio-Reactive tab: a Thai/English sentence → audio-reactive bindings, shown and previewed first; `shared/command/parse.js`, a fixed
-  vocabulary, not free-form) and **Hold to speak** (mic → local Whisper → text in the box; `shared/command/dictation.js`, `asr:dictate`,
-  `main/permissions.js`: audio-only mic). Mic/Whisper on real Mac/Windows never tried. Next ideas: Taste Brain (learn from Apply/Cancel/Undo),
-  user glossary for dictation, then the "known to tune" items below.
+* Released: v0.9.3 (Tell it + Hold to speak). **v0.9.4 pending release** (branch `feat/v0.9.4`): **Describe the look** (Looks tab: a free-form
+  description → three look plans via an offline mood dictionary `shared/vision/vibes.js`, or the optional online AI `main/ai.js` with the user's own
+  key kept by `main/ai-key.js` (safeStorage); every plan passes `shared/vision/plan.js` → Mutation Engine `validateChain/composeChain`; PREVIEW first;
+  refine by sentence). The online AI has only been tested against a fake server, never a real key. Mic/Whisper on a real Mac/Windows: the owner is trying
+  v0.9.3. Planned next: Chain Graph (a node-style view over the existing chain and audio bindings: read-only first, editable later; NOT a free
+  TouchDesigner graph, that would need a new compositor), Taste Brain, then the "known to tune" items below.
 * Known to tune: Ghost/Stain default `screen` blend washes out bright footage; a suggestion can pop up while a TIMELINE plan card is open;
   Take/Trace work on one clip only (no group); curator/gate thresholds untested on real use; clips imported before the HDR fix keep a flat proxy.
 * Ideas not built: Root-Letters (roots out of letters), Living Score, per-section looks, palette lock from album art, Look Card, Human Groove,

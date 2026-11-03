@@ -251,6 +251,22 @@ without you.
 * Never tried on a real Mac or Windows machine: how well Whisper hears short Thai commands mixed with English words ("glitch", "bass")
   and the macOS microphone prompt are unverified. The strong/subtle amounts (0.85 / 0.25) are guesses.
 
+## v0.9.4 — Describe the look: say the picture in your head
+
+* **Describe the look** (Looks tab): write the picture in your head in your own words (Thai or English), for example `ฉากเหมือนฝันตอนบ่าย สีส้มซีด`
+  or `dreamy warm afternoon, a bit like old film`. You get **three readings** (gentle, balanced, bold) to **PREVIEW** on the selected clips in the
+  monitor; **Apply** is one Undo step, **Cancel** changes nothing. Then **refine** with a short sentence: `more grain`, `ลด glitch`, `add bloom`,
+  `remove blur`. Every plan goes through the Mutation Engine's own gate (known effects, safe ranges, at most 6 effects), so nothing wild can reach a clip.
+* **Offline dictionary** (always on): about 20 moods in Thai and English (dream, soft, vintage, tape, warm, cool, dark, gritty, glitch, neon, Y2K, organic,
+  comic, xerox, film, noir, fog, sparkle, beat pulse), built from the effects that already exist. A phrase with no known word is explained, never guessed.
+* **Online AI** (optional, **off by default**; "AI (online, optional)"): with your own Anthropic API key the sentence is read by Claude, so freer wording works.
+  The key is stored encrypted by your operating system (or kept in memory for the session when the computer cannot encrypt it). What is sent: your sentence,
+  the look you are refining (effect names and numbers), the names of effects already on the clip, and the public list of effects with their safe ranges; never
+  video, pictures, audio, file names or paths. "What would be sent" shows it. The AI is charged to your own account. If it cannot be reached or the key is
+  refused, the offline dictionary answers instead and says so.
+* Never tried on a real Mac or Windows machine, and the online AI has only been tested against a fake server (no real key was used here): how well it
+  reads Thai descriptions of a picture, what it costs per request and the macOS keychain behaviour are unverified. The dictionary's strengths are guesses.
+
 ## HDR phone footage (iPhone HLG / PQ)
 
 A clip shot in HDR is 10-bit BT.2020 with an HLG curve. Decoded as ordinary video it looks washed out. The app now recognises such
@@ -327,7 +343,7 @@ Legend: ✅ works and is covered by the automated tests · 🧪 prototype (works
 
 ## Testing
 
-`npm test` runs 263 unit tests. `scripts/e2e.mjs` (83 checks) is a real end-to-end run of the Electron app (see table above): it
+`npm test` runs 279 unit tests. `scripts/e2e.mjs` (84 checks) is a real end-to-end run of the Electron app (see table above): it
 generates test media with ffmpeg, drives the app, reads pixels out of the compositor, and probes exported files.
 Native file dialogs are stubbed at the Electron main-process level; every other path is the production code.
 

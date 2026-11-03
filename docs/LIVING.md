@@ -152,3 +152,9 @@ track above it) — and plans up to three accidents of different kinds, each wit
 Not part of the Living Lab itself, but it sits beside it: **Tell it** and **Hold to speak** (Audio-Reactive tab). `shared/command/parse.js` turns a
 sentence into `{source, amount}` bindings on the selected clips (effects or clip properties), `shared/command/dictation.js` prepares
 microphone audio for Whisper, and both reuse `store.showGhost` so nothing is applied without a preview and one Undo step.
+
+## v0.9.4 additions
+
+Also beside the Living Lab: **Describe the look** (Looks tab). One plan shape (`shared/vision/plan.js`) is produced either by the offline mood dictionary
+(`shared/vision/vibes.js`) or by the optional online AI (`main/ai.js`, structured output, the user's own key in `main/ai-key.js`), always passes the Mutation
+Engine's `validateChain`/`composeChain`, is shown with `store.showGhost`, and only ever adds effects as one Undo step.

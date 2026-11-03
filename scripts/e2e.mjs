@@ -2787,6 +2787,72 @@ await step('Speak: hold the button, the words land in the box (not run), a silen
   assert.equal(await ev(() => document.getElementById('cmd-mic').classList.contains('rec')), false);
 });
 
+await step('Describe the look: three readings, PREVIEW first, refine, Apply is one Undo step; unknown words are explained; the AI is optional, shown before use, and falls back to the dictionary', async () => {
+  await resetProject(); await ev((p) => window.__app.importPaths([p]), clip); await settle(800);
+  await ev(() => { const s = window.__app.store; const c = s.project.clips.find((x) => x.type === 'media'); s.multi = new Set([c.id]); s.selection = c.id; s.emit('selection', 'render'); localStorage.setItem('hhlab.vision.ai', '0'); });
+  await ev(() => document.querySelector('[data-tab="looks"]').click()); await settle(300);
+  const fxCount = () => ev(() => window.__app.store.project.clips.find((x) => x.type === 'media').effects.length);
+  const depth = () => ev(() => window.__app.store.undoStack.length);
+  const d0 = await depth();
+  // the real wiring, no network and no key
+  const st = await ev(async () => window.hh.aiStatus());
+  assert.equal(st.hasKey, false); assert.ok(Object.keys(st.models).length >= 3);
+  assert.equal((await ev(async () => window.hh.aiInterpret({ input: { text: 'dream' } }))).code, 'no-key');
+  assert.equal((await ev(async () => window.hh.aiSetKey('nope'))).ok, false);
+  // offline: Thai words, three readings
+  await page.fill('#vis-input', 'ฉากเหมือนฝันตอนบ่าย สีส้ม'); await page.click('#vis-go'); await settle(300);
+  assert.equal(await ev(() => document.querySelectorAll('.vis-cand').length), 3);
+  assert.match(await ev(() => document.getElementById('vis-status').textContent), /ฝัน/);
+  assert.equal(await ev(() => [...document.querySelectorAll('.vis-src')].every((n) => n.textContent === 'offline')), true);
+  assert.equal(await fxCount(), 0, 'interpreting changes nothing');
+  await page.click('#vis-prev-1'); await settle(300);
+  assert.equal(await page.locator('#ghost-bar').isVisible(), true);
+  assert.equal(await fxCount(), 0, 'previewing changes nothing real'); assert.equal(await depth(), d0);
+  const ghostFx = await ev(() => window.__app.store.ghost.clips.find((x) => x.type === 'media').effects.length);
+  assert.ok(ghostFx >= 2, `the monitor draws the look (${ghostFx} effects)`);
+  // refine: the preview changes, the real project still does not
+  await page.fill('#vis-refine', 'add glitch'); await page.click('#vis-refine-go'); await settle(300);
+  assert.equal(await ev(() => window.__app.store.ghost.clips.find((x) => x.type === 'media').effects.some((e) => e.type === 'glitch')), true, 'the refined look has glitch');
+  assert.equal(await fxCount(), 0); assert.equal(await depth(), d0);
+  await page.click('#ghost-apply'); await settle(300);
+  assert.ok((await fxCount()) >= 3); assert.equal(await depth(), d0 + 1, 'one Undo step');
+  await ev(() => window.__app.store.undo()); await settle(200);
+  assert.equal(await fxCount(), 0, 'Undo takes it all back');
+  // unknown words: explained, no cards
+  await page.fill('#vis-input', 'quantum marmalade'); await page.click('#vis-go'); await settle(200);
+  assert.match(await ev(() => document.getElementById('vis-status').textContent), /do not know these words/);
+  assert.equal(await ev(() => document.querySelectorAll('.vis-cand').length), 0);
+  // the optional AI (stubbed bridge): what would be sent is shown, the answer becomes cards, a failure falls back to the dictionary
+  const sentText = await ev(() => { document.getElementById('vis-input').value = 'dreamy sunset'; document.getElementById('vis-input').dispatchEvent(new Event('input')); return document.getElementById('vis-sent').textContent; });
+  assert.match(sentText, /dreamy sunset/); assert.doesNotMatch(sentText, /\.mp4|\.mov|path/i, 'no file names in what would be sent');
+  await ev(async () => {
+    const v = window.__app.vision; const { makePlan } = await import('/shared/vision/plan.js');
+    window.__calls = [];
+    v.bridge.status = async () => ({ hasKey: true, storage: 'encrypted', models: { 'claude-opus-5-5': 'Opus' }, defaultModel: 'claude-opus-5-5' });
+    v.bridge.interpret = async (o) => { window.__calls.push(o); if (window.__fail) return { ok: false, code: 'auth', reason: 'The API key was not accepted.' };
+      return { ok: true, notes: 'Read as a hazy sunset.', plans: ['Gentle', 'Balanced', 'Bold'].map((t, i) => makePlan({ title: `AI ${t}`, summary: '', source: 'ai' }, [{ type: 'bloom', params: { intensity: 0.3 + i * 0.3 } }, { type: 'grain', params: { amount: 0.2 } }]).plan) }; };
+    const box = document.getElementById('vis-ai-on'); box.checked = true; box.dispatchEvent(new Event('change'));
+  });
+  await ev(async () => { await window.__app.vision.reload(); const box = document.getElementById('vis-ai-on'); box.checked = true; box.dispatchEvent(new Event('change')); document.getElementById('vis-ai').setAttribute('open', ''); });
+  await page.fill('#vis-input', 'dreamy sunset'); await page.click('#vis-go'); await settle(400);
+  const calls = await ev(() => window.__calls);
+  assert.equal(calls.length, 1, 'the AI was asked once'); assert.equal(calls[0].input.text, 'dreamy sunset'); assert.equal(calls[0].model, 'claude-opus-5-5');
+  assert.deepEqual(await ev(() => [...document.querySelectorAll('.vis-src')].map((n) => n.textContent)), ['AI', 'AI', 'AI']);
+  assert.match(await ev(() => document.getElementById('vis-status').textContent), /hazy sunset/);
+  assert.equal(await fxCount(), 0, 'an AI answer is only a preview too');
+  // a failing AI: the dictionary answers instead and says so
+  await ev(() => { window.__fail = true; });
+  await page.fill('#vis-input', 'dream'); await page.click('#vis-go'); await settle(400);
+  assert.equal((await ev(() => window.__calls)).length, 2);
+  assert.match(await ev(() => document.getElementById('vis-status').textContent), /offline dictionary/i);
+  assert.deepEqual(await ev(() => [...new Set([...document.querySelectorAll('.vis-src')].map((n) => n.textContent))]), ['offline']);
+  // AI off: it is not asked at all
+  await ev(() => { const box = document.getElementById('vis-ai-on'); box.checked = false; box.dispatchEvent(new Event('change')); });
+  await page.click('#vis-go'); await settle(300);
+  assert.equal((await ev(() => window.__calls)).length, 2, 'switched off: nothing is sent');
+  await ev(() => { localStorage.setItem('hhlab.vision.ai', '0'); });
+});
+
 const bad = logs.filter((l) => !/GPU stall|swiftshader|GL Driver Message|Automatic fallback/i.test(l));
 await step('no unexpected console errors during the whole run', async () => { assert.deepEqual(bad, []); });
 // Quitting mid-export must not leave ffmpeg processes behind (they would burn CPU forever).

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu, dialog, ipcMain, protocol, net, shell, systemPreferences, session as electronSession } from 'electron';
+import { app, BrowserWindow, Menu, dialog, ipcMain, protocol, net, shell, systemPreferences, safeStorage, session as electronSession } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
@@ -11,6 +11,8 @@ import { rmsEnvelope } from '../shared/audio-analysis.js';
 import { analyzeFile, killFootage } from './footage.js';
 import { mountUpdates } from './update.js';
 import { allowPermission } from './permissions.js';
+import { interpretWithClaude, AI_MODELS, DEFAULT_AI_MODEL } from './ai.js';
+import { createKeyStore } from './ai-key.js';
 import { buildAnalysisArgs, buildExportArgs, validateExportSettings, FORMATS } from '../shared/export-plan.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -287,6 +289,18 @@ function registerIpc() {
     asrJob = { aborted: false };
     try { return await transcribeDictation({ pcm: new Int16Array(pcm), modelPath, language: language === 'en' ? 'en' : 'th', prompt: typeof prompt === 'string' ? prompt.slice(0, 400) : undefined, signal: asrJob }); }
     finally { asrJob = null; }
+  });
+  // ---- Optional online AI for "Describe the look": the user's own key, kept encrypted by the OS; only the typed sentence travels (see ai.js) ----
+  const aiKeys = createKeyStore({ dir: app.getPath('userData'), safeStorage });
+  let aiBusy = false;
+  ipcMain.handle('ai:status', () => ({ hasKey: aiKeys.has(), storage: aiKeys.storage(), models: AI_MODELS, defaultModel: DEFAULT_AI_MODEL }));
+  ipcMain.handle('ai:setKey', (_e, key) => aiKeys.set(key));
+  ipcMain.handle('ai:clearKey', () => aiKeys.clear());
+  ipcMain.handle('ai:interpret', async (_e, { model, input } = {}) => {
+    if (aiBusy) return { ok: false, code: 'busy', reason: 'Still working on the last request.' };
+    aiBusy = true;
+    try { return await interpretWithClaude({ apiKey: aiKeys.get(), model, baseURL: process.env.HHLAB_AI_BASE, input }); }
+    finally { aiBusy = false; }
   });
   // ---- Footage analysis for the smart montage ---------------------------------------------------------------
   let montageJob = null;

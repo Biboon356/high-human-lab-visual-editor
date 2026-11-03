@@ -17,7 +17,7 @@ const SOURCE_WORDS = [ // [word, source]: more specific first; "เสียง"
 ];
 const SOURCE_EXPLICIT = new Set(['เสียงสูง', 'ไฮแฮท', 'ไฮฮัท', 'treble', 'high', 'highs', 'เสียงแหลม', 'แหลม', 'เสียงกลาง', 'เสียงร้อง', 'vocal', 'mid', 'กลาง', 'เสียงต่ำ', 'เบส', 'bass', 'กลองใหญ่', 'คิก', 'kick', 'ทุ้ม', 'จังหวะ', 'บีท', 'บีต', 'beat', 'กลอง', 'ความดัง', 'loudness', 'volume', 'rms', 'amplitude']);
 
-const EFFECT_ALIASES = { // extra words (the effect's own key is always an alias)
+export const EFFECT_ALIASES = { // extra words (the effect's own key is always an alias)
   glitch: ['กลิทช์', 'กลิตช์', 'จอแตก', 'จอกระตุก'], grain: ['เกรน', 'เม็ดเกรน'], blur: ['เบลอ', 'ภาพเบลอ'], bloom: ['เรืองแสง', 'บลูม', 'แสงฟุ้ง'],
   glints: ['ประกาย', 'แสงดาว', 'ระยิบ'], shake: ['สั่น', 'กระตุก', 'ช็อก', 'camera shake', 'punch'], flash: ['แฟลช', 'วาบ', 'ไฟกะพริบ'], chroma: ['แยกสี', 'โครมา', 'chromatic'],
   vhs: ['วีเอชเอส', 'เทปเก่า'], film: ['ฟิล์ม', '35mm'], veins: ['เส้นเลือด', 'ราก', 'รากไม้'], spores: ['สปอร์', 'ฝุ่นลอย'], crt: ['ซีอาร์ที', 'จอเก่า', 'ทีวีเก่า'],
