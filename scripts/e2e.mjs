@@ -2801,9 +2801,9 @@ await step('Describe the look: three readings, PREVIEW first, refine, Apply is o
   assert.equal((await ev(async () => window.hh.aiSetKey('nope'))).ok, false);
   // offline: Thai words, three readings
   await page.fill('#vis-input', 'ฉากเหมือนฝันตอนบ่าย สีส้ม'); await page.click('#vis-go'); await settle(300);
-  assert.equal(await ev(() => document.querySelectorAll('.vis-cand').length), 3);
+  assert.equal(await ev(() => document.querySelectorAll('.vis-cand:not(.vis-now)').length), 3);
   assert.match(await ev(() => document.getElementById('vis-status').textContent), /ฝัน/);
-  assert.equal(await ev(() => [...document.querySelectorAll('.vis-src')].every((n) => n.textContent === 'offline')), true);
+  assert.equal(await ev(() => [...document.querySelectorAll('.vis-cand:not(.vis-now) .vis-src')].every((n) => n.textContent === 'offline')), true);
   assert.equal(await fxCount(), 0, 'interpreting changes nothing');
   await page.click('#vis-prev-1'); await settle(300);
   assert.equal(await page.locator('#ghost-bar').isVisible(), true);
@@ -2821,7 +2821,7 @@ await step('Describe the look: three readings, PREVIEW first, refine, Apply is o
   // unknown words: explained, no cards
   await page.fill('#vis-input', 'quantum marmalade'); await page.click('#vis-go'); await settle(200);
   assert.match(await ev(() => document.getElementById('vis-status').textContent), /do not know these words/);
-  assert.equal(await ev(() => document.querySelectorAll('.vis-cand').length), 0);
+  assert.equal(await ev(() => document.querySelectorAll('.vis-cand:not(.vis-now)').length), 0);
   // the optional AI (stubbed bridge): what would be sent is shown, the answer becomes cards, a failure falls back to the dictionary
   const sentText = await ev(() => { document.getElementById('vis-input').value = 'dreamy sunset'; document.getElementById('vis-input').dispatchEvent(new Event('input')); return document.getElementById('vis-sent').textContent; });
   assert.match(sentText, /dreamy sunset/); assert.doesNotMatch(sentText, /\.mp4|\.mov|path/i, 'no file names in what would be sent');
@@ -2837,7 +2837,7 @@ await step('Describe the look: three readings, PREVIEW first, refine, Apply is o
   await page.fill('#vis-input', 'dreamy sunset'); await page.click('#vis-go'); await settle(400);
   const calls = await ev(() => window.__calls);
   assert.equal(calls.length, 1, 'the AI was asked once'); assert.equal(calls[0].input.text, 'dreamy sunset'); assert.equal(calls[0].model, 'claude-opus-5-5');
-  assert.deepEqual(await ev(() => [...document.querySelectorAll('.vis-src')].map((n) => n.textContent)), ['AI', 'AI', 'AI']);
+  assert.deepEqual(await ev(() => [...document.querySelectorAll('.vis-cand:not(.vis-now) .vis-src')].map((n) => n.textContent)), ['AI', 'AI', 'AI']);
   assert.match(await ev(() => document.getElementById('vis-status').textContent), /hazy sunset/);
   assert.equal(await fxCount(), 0, 'an AI answer is only a preview too');
   // a failing AI: the dictionary answers instead and says so
@@ -2845,7 +2845,7 @@ await step('Describe the look: three readings, PREVIEW first, refine, Apply is o
   await page.fill('#vis-input', 'dream'); await page.click('#vis-go'); await settle(400);
   assert.equal((await ev(() => window.__calls)).length, 2);
   assert.match(await ev(() => document.getElementById('vis-status').textContent), /offline dictionary/i);
-  assert.deepEqual(await ev(() => [...new Set([...document.querySelectorAll('.vis-src')].map((n) => n.textContent))]), ['offline']);
+  assert.deepEqual(await ev(() => [...new Set([...document.querySelectorAll('.vis-cand:not(.vis-now) .vis-src')].map((n) => n.textContent))]), ['offline']);
   // AI off: it is not asked at all
   await ev(() => { const box = document.getElementById('vis-ai-on'); box.checked = false; box.dispatchEvent(new Event('change')); });
   await page.click('#vis-go'); await settle(300);
@@ -2921,6 +2921,68 @@ await step('Graph live: lines, numbers and signal levels follow the sound at the
   // too many heavy effects: the caption warns
   await ev(async () => { const { store } = window.__app; const { createEffect } = await import('/shared/effects-defs.js'); store.mutate(() => { const c = store.project.clips.find((x) => x.type === 'media'); c.effects.push(createEffect('object3d'), createEffect('pattern')); }); }); await settle(400);
   assert.match((await snap()).cap, /3 heavy effects: more than the editor suggests/); assert.equal(await ev(() => document.querySelectorAll('.g-cost').length), 3);
+});
+
+await step('Describe the look: speak the description, see each reading on your own frame, and ask for different ideas (3 more, up to 9; the AI is told what is shown)', async () => {
+  await resetProject(); await ev((p) => window.__app.importPaths([p]), clip); await settle(800);
+  await ev(() => { const s = window.__app.store; const c = s.project.clips.find((x) => x.type === 'media'); s.multi = new Set([c.id]); s.selection = c.id; s.emit('selection', 'render'); localStorage.setItem('hhlab.vision.ai', '0'); });
+  await ev(() => document.querySelector('[data-tab="looks"]').click()); await settle(300);
+  // a pretend microphone through the real capture code, and a pretend recogniser
+  await ev(() => {
+    navigator.mediaDevices.getUserMedia = async () => { const ac = new AudioContext(); const o = ac.createOscillator(), g = ac.createGain(), d = ac.createMediaStreamDestination(); g.gain.value = 0.3; o.frequency.value = 220; o.connect(g); g.connect(d); o.start(); return d.stream; };
+    window.__says = ['ฉากเหมือนฝัน', 'อบอุ่น', 'add glitch']; window.__heard = [];
+    window.__app.vision.bridge.dictate = async (o) => { window.__heard.push({ bytes: o.pcm.byteLength, maxSeconds: o.maxSeconds, prompt: o.prompt, language: o.language }); return { ok: true, text: window.__says.shift(), seconds: 1.5 }; };
+    document.getElementById('vis-input').value = '';
+  });
+  const hold = async (sel) => { await page.dispatchEvent(sel, 'pointerdown', { pointerId: 1 }); await page.waitForTimeout(1300); await page.dispatchEvent(sel, 'pointerup', { pointerId: 1 }); await settle(500); };
+  await hold('#vis-mic');
+  assert.equal(await ev(() => document.getElementById('vis-input').value), 'ฉากเหมือนฝัน', 'the words land in the box');
+  assert.equal(await ev(() => document.querySelectorAll('.vis-cand:not(.vis-now)').length), 0, 'speaking alone interprets nothing');
+  await hold('#vis-mic');
+  assert.equal(await ev(() => document.getElementById('vis-input').value), 'ฉากเหมือนฝัน อบอุ่น', 'a second take is added to the first');
+  const heard = await ev(() => window.__heard);
+  assert.equal(heard.length, 2); assert.equal(heard[0].maxSeconds, 30, 'a description may be longer than a command'); assert.equal(heard[0].prompt, undefined, 'no command vocabulary is pushed on a description'); assert.ok(heard[0].bytes / 2 >= 16000 * 0.9);
+  assert.match(await ev(() => document.getElementById('vis-status').textContent), /press Interpret/);
+  // interpret: a picture of each reading on the selected frame, and one of the frame as it is
+  await page.click('#vis-go'); await page.waitForFunction(() => document.querySelectorAll('canvas.vis-thumb[data-painted="1"]').length >= 4, null, { timeout: 30000 });
+  const means = await ev(() => [...document.querySelectorAll('canvas.vis-thumb')].map((c) => { const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let r = 0, g = 0, b = 0, n = 0; for (let i = 0; i < d.length; i += 4) { r += d[i]; g += d[i + 1]; b += d[i + 2]; n++; } return { now: c.dataset.now === '1', plan: c.dataset.plan, w: c.width, h: c.height, m: [r / n, g / n, b / n] }; }));
+  assert.equal(means.length, 4); assert.equal(means.filter((x) => x.now).length, 1); assert.ok(means.every((x) => x.w > 0 && x.h > 0));
+  const base = means.find((x) => x.now).m;
+  const diff = Math.max(...means.filter((x) => !x.now).map((x) => Math.abs(x.m[0] - base[0]) + Math.abs(x.m[1] - base[1]) + Math.abs(x.m[2] - base[2])));
+  assert.ok(diff > 3, `a reading looks different from the frame as it is (colour difference ${diff.toFixed(1)})`);
+  await shot('46-describe-thumbs');
+  assert.equal(await ev(() => window.__app.store.project.clips.find((x) => x.type === 'media').effects.length), 0, 'looking at pictures changes nothing');
+  // different ideas, offline: 3 more each time, up to nine, then the button says so
+  await page.click('#vis-more'); await settle(500);
+  assert.equal(await ev(() => document.querySelectorAll('.vis-cand:not(.vis-now)').length), 6);
+  const titles = await ev(() => [...document.querySelectorAll('.vis-cand:not(.vis-now) b')].map((b) => b.textContent));
+  assert.equal(new Set(titles).size, titles.length, `no repeated reading: ${titles}`);
+  await page.click('#vis-more'); await settle(500);
+  assert.equal(await ev(() => document.querySelectorAll('.vis-cand:not(.vis-now)').length), 9);
+  assert.equal(await ev(() => document.getElementById('vis-more').disabled), true); assert.match(await ev(() => document.getElementById('vis-more').textContent), /most I show/);
+  // refine by voice: the words land in the refine box, nothing runs
+  await page.click('#vis-prev-1'); await settle(300);
+  const fxBefore = await ev(() => window.__app.store.ghost.clips.find((x) => x.type === 'media').effects.length);
+  await hold('#vis-refine-mic');
+  assert.equal(await ev(() => document.getElementById('vis-refine').value), 'add glitch');
+  assert.equal(await ev(() => window.__app.store.ghost.clips.find((x) => x.type === 'media').effects.length), fxBefore, 'speaking does not refine by itself');
+  await ev(() => window.__app.store.clearGhost());
+  // the AI path: asked once for three more, and told what is on screen
+  await ev(async () => {
+    const v = window.__app.vision; const { makePlan } = await import('/shared/vision/plan.js');
+    window.__calls = [];
+    v.bridge.status = async () => ({ hasKey: true, storage: 'encrypted', models: { 'claude-opus-5-5': 'Opus' }, defaultModel: 'claude-opus-5-5' });
+    v.bridge.interpret = async (o) => { window.__calls.push(o); return { ok: true, notes: 'Three more.', plans: ['A', 'B', 'C'].map((t, i) => makePlan({ title: `AI ${t}${window.__calls.length}`, summary: '', source: 'ai' }, [{ type: 'grain', params: { amount: 0.2 + i * 0.1 } }, { type: 'chroma', params: {} }]).plan) }; };
+    await v.reload(); const box = document.getElementById('vis-ai-on'); box.checked = true; box.dispatchEvent(new Event('change'));
+    document.getElementById('vis-input').value = 'dreamy sunset';
+  });
+  await page.click('#vis-go'); await settle(500);
+  assert.equal(await ev(() => document.querySelectorAll('.vis-cand:not(.vis-now)').length), 3);
+  await page.click('#vis-more'); await settle(500);
+  const calls = await ev(() => window.__calls);
+  assert.equal(calls.length, 2); assert.equal(calls[1].input.avoid.length, 3, 'the three shown are listed'); assert.deepEqual(Object.keys(calls[1].input.avoid[0]).sort(), ['title', 'types']);
+  assert.equal(await ev(() => document.querySelectorAll('.vis-cand:not(.vis-now)').length), 6);
+  await ev(() => { localStorage.setItem('hhlab.vision.ai', '0'); });
 });
 
 const bad = logs.filter((l) => !/GPU stall|swiftshader|GL Driver Message|Automatic fallback/i.test(l));

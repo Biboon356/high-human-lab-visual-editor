@@ -3,6 +3,10 @@
 export const DICTATION_RATE = 16000;
 export const MIN_SECONDS = 0.4; // shorter than this is a click or a bump, not a sentence
 export const MAX_SECONDS = 15; // a command, not a speech
+export const MAX_DESCRIBE_SECONDS = 30; // describing a picture takes longer than giving a command
+export const HARD_MAX_SECONDS = 45;
+/** The longest take allowed for a request, kept between the command length and a hard cap. */
+export const clampSeconds = (s) => Math.min(HARD_MAX_SECONDS, Math.max(MAX_SECONDS, Number(s) || MAX_SECONDS));
 export const PAD_SECONDS = 1.2; // whisper.cpp wants about a second of input; shorter takes are padded with silence
 export const MIN_RMS = 0.006; // 0..1 full scale; below this the take is treated as silence (a quiet room is ~0.001, speech ~0.03+)
 
@@ -19,14 +23,15 @@ export function rmsOf(pcm) {
 }
 
 /** @returns {{ok:true, pcm:Int16Array, seconds:number, rms:number} | {ok:false, reason:string}} */
-export function prepareDictation(pcm) {
+export function prepareDictation(pcm, { maxSeconds = MAX_SECONDS } = {}) {
+  const limit = clampSeconds(maxSeconds);
   const seconds = pcm.length / DICTATION_RATE;
   if (seconds < MIN_SECONDS) return { ok: false, reason: 'That was too short: hold the button while you speak.' };
   const rms = rmsOf(pcm);
   if (rms < MIN_RMS) return { ok: false, reason: 'I did not hear anything. Check the microphone and speak a little closer.' };
-  let out = pcm.length > MAX_SECONDS * DICTATION_RATE ? pcm.subarray(0, MAX_SECONDS * DICTATION_RATE) : pcm;
+  let out = pcm.length > limit * DICTATION_RATE ? pcm.subarray(0, limit * DICTATION_RATE) : pcm;
   if (out.length < PAD_SECONDS * DICTATION_RATE) { const padded = new Int16Array(Math.ceil(PAD_SECONDS * DICTATION_RATE)); padded.set(out); out = padded; }
-  return { ok: true, pcm: out, seconds: Math.min(seconds, MAX_SECONDS), rms };
+  return { ok: true, pcm: out, seconds: Math.min(seconds, limit), rms };
 }
 
 /** Joins whisper segments into one line. Thai is written without spaces between words, so segments are joined with a space only when both sides are Latin. */

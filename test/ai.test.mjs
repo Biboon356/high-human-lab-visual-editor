@@ -35,6 +35,16 @@ test('a good answer becomes plans; the request carries the sentence, the catalog
   await s.close();
 });
 
+test('asking for different ideas sends the titles and effect names already shown, and tells the model not to repeat them', async () => {
+  const s = await server(ok(JSON.stringify(GOOD)));
+  const r = await interpretWithClaude({ apiKey: 'sk-ant-test-key-0123456789', baseURL: s.url, input: { text: 'dream', avoid: [{ title: 'Dream · Gentle', types: ['blur', 'bloom'] }] } });
+  assert.ok(r.ok, r.reason);
+  const body = s.seen[0].body; const sent = JSON.parse(body.messages[0].content);
+  assert.deepEqual(sent.alreadyShown, [{ title: 'Dream · Gentle', effects: ['blur', 'bloom'] }]);
+  assert.match(body.system, /alreadyShown/);
+  await s.close();
+});
+
 test('refinement sends the current look (names and numbers only), capped', () => {
   const p = buildPayload({ text: 'more grain', current: { title: 'T', effects: [{ type: 'grain', params: { amount: 0.4, color: '#fff', size: 2 } }, ...Array(20).fill({ type: 'blur', params: {} })] } });
   assert.equal(p.current.effects.length, 8); assert.deepEqual(p.current.effects[0].params, { amount: 0.4, size: 2 });

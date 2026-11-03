@@ -5,7 +5,7 @@
 import { EFFECTS } from '../effects-defs.js';
 import { mutationRange } from '../mutation/effect-meta.js';
 import { EFFECT_ALIASES } from '../command/parse.js';
-import { makePlan, primaryParam } from './plan.js';
+import { makePlan, primaryParam, MAX_PLAN_EFFECTS } from './plan.js';
 import { newItem } from '../mutation/chain.js';
 
 const fx = (type, p = {}, b = null) => ({ type, p, b });
@@ -152,4 +152,45 @@ export function refinePlan(plan, text) {
   if (!moved) return { ok: false, reason: changes.join('; ') || 'Nothing to change.' };
   const r = makePlan({ title: plan.title, summary: plan.summary, source: plan.source }, out);
   return r.ok ? { ok: true, plan: r.plan, changes } : { ok: false, reason: r.reason };
+}
+
+// ---- "show different ideas": more readings of the same phrase that are genuinely different, not the same look at another strength ----
+export const MAX_IDEAS = 9;
+const COMPANIONS = ['grain', 'bloom', 'chroma', 'vhs', 'film', 'glints', 'halftone', 'fluid']; // light touches that change the character of a look
+const planSig = (plan) => plan.chain.map((c) => `${c.type}:${Object.entries(c.params).filter(([, v]) => typeof v === 'number').map(([k, v]) => `${k}=${(+v).toFixed(2)}`).join(',')}`).join('|');
+const typesSig = (plan) => plan.chain.map((c) => c.type).sort().join('+');
+
+/**
+ * Offline, the dictionary can offer: each mood on its own, the look plus one companion effect, and strengths in between or beyond the first three.
+ * It says plainly when it has run out (the online AI can suggest more).
+ * @param shown  the plans already on screen (never repeated)
+ * @returns {{ok:true, plans:object[]} | {ok:false, reason:string}}
+ */
+export function moreIdeas(text, shown = [], want = 3) {
+  const hits = findVibes(String(text ?? '').toLowerCase());
+  if (!hits.length) return { ok: false, reason: 'I do not know these words, so I have no other offline readings. Turn on the online AI for more ideas.' };
+  const room = Math.max(0, MAX_IDEAS - shown.length);
+  if (!room) return { ok: false, reason: `That is the most I show at once (${MAX_IDEAS}). Refine one of them, or interpret again.` };
+  const seenFull = new Set(shown.map(planSig)), seenTypes = new Set(shown.map(typesSig));
+  const names = hits.map((h) => h.vibe.name);
+  const cands = [];
+  const add = (label, hs, t, extra = []) => {
+    const items = chainAt(hs, t);
+    for (const type of extra) if (!items.some((i) => i.type === type) && items.length < MAX_PLAN_EFFECTS) { const d = primaryParam(type); const it = { type, params: {}, bindings: {} }; if (d) { const [lo, hi] = mutationRange(type, d); it.params[d.key] = lo + (hi - lo) * 0.45; } items.push(it); }
+    const r = makePlan({ title: `${(hs === hits ? names : hs.map((h) => h.vibe.name)).join(' + ')} · ${label}`, summary: `Another reading of "${String(text).trim().slice(0, 60)}".`, source: 'offline' }, items);
+    if (r.ok) cands.push(r.plan);
+  };
+  if (hits.length > 1) for (const h of hits) add('on its own', [h], 0.55); // each mood alone
+  for (const c of COMPANIONS) add(`with ${EFFECTS[c].label.replace(/ \(.*/, '').toLowerCase()}`, hits, 0.55, [c]); // the look with one extra ingredient
+  for (const [label, t] of [['Softer still', 0.1], ['Stronger still', 1], ['In between', 0.4], ['Almost there', 0.75]]) add(label, hits, t);
+  const out = [];
+  for (const c of cands) {
+    if (out.length >= Math.min(want, room)) break;
+    if (seenFull.has(planSig(c)) || out.some((o) => planSig(o) === planSig(c))) continue;
+    // prefer a different set of effects; a same-effects variant (just another strength) only when nothing else is left
+    if (seenTypes.has(typesSig(c)) && cands.some((x) => !seenTypes.has(typesSig(x)) && !seenFull.has(planSig(x)) && !out.some((o) => planSig(o) === planSig(x)))) continue;
+    out.push(c);
+  }
+  if (!out.length) return { ok: false, reason: 'That is everything the offline dictionary can offer for these words. The online AI can suggest more.' };
+  return { ok: true, plans: out };
 }

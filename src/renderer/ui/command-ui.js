@@ -5,7 +5,7 @@ import { el } from './dom.js';
 import { parseCommand } from '/shared/command/parse.js';
 import { dictationPrompt } from '/shared/command/dictation.js';
 import { EFFECTS } from '/shared/effects-defs.js';
-import { startCapture } from './dictate.js';
+import { attachDictation } from './dictation-button.js';
 
 export function mountCommand(root, { runAnalysis, preview }) {
   const api = { dictate: (o) => window.hh.asrDictate(o) }; // a seam: window.hh is frozen by the preload bridge, so the e2e swaps this instead
@@ -24,44 +24,9 @@ export function mountCommand(root, { runAnalysis, preview }) {
   lang.addEventListener('change', () => { try { localStorage.setItem('hhlab.cmd.lang', lang.value); } catch { /* storage unavailable */ } });
   input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); submit(); } });
 
-  // ---- speak ----
-  let rec = null, starting = false, wasPlaying = false;
-  async function begin() {
-    if (rec || starting) return;
-    starting = true; status.textContent = 'Starting the microphone…';
-    try {
-      const ok = await window.hh.micEnsure();
-      if (!ok.ok) throw new Error(ok.reason || 'Microphone access was not allowed.');
-      wasPlaying = !!store.playing && pauseChk.checked;
-      if (wasPlaying) preview?.pause();
-      rec = await startCapture();
-      mic.classList.add('rec'); mic.textContent = '● Listening… let go when done'; status.textContent = 'Listening…';
-      if (!held) end(); // the button was already released while the microphone was starting
-    } catch (e) { status.textContent = e.message; if (wasPlaying) preview?.play(); wasPlaying = false; }
-    finally { starting = false; }
-  }
-  async function end() {
-    if (!rec) return;
-    const r = rec; rec = null;
-    mic.classList.remove('rec'); mic.textContent = '🎙 Hold to speak';
-    status.textContent = 'Recognising…';
-    try {
-      const pcm = await r.stop();
-      if (wasPlaying) preview?.play();
-      wasPlaying = false;
-      const res = await api.dictate({ pcm: pcm.buffer, language: lang.value, prompt: dictationPrompt(Object.values(EFFECTS).map((e) => e.label.replace(/ \(.*/, ''))) });
-      if (!res.ok) { status.textContent = res.reason; return; }
-      input.value = res.text; input.focus();
-      status.textContent = 'Is that what you said? Fix any word, then press Show me. Nothing has changed yet.';
-    } catch (e) { status.textContent = `Speech failed: ${e.message}`; if (wasPlaying) preview?.play(); wasPlaying = false; }
-  }
-  let held = false;
-  const down = () => { held = true; begin(); }, up = () => { held = false; end(); };
-  mic.addEventListener('pointerdown', (e) => { e.preventDefault(); try { mic.setPointerCapture(e.pointerId); } catch { /* not capturable */ } down(); });
-  mic.addEventListener('pointerup', up); mic.addEventListener('pointercancel', up);
-  mic.addEventListener('keydown', (e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); if (!e.repeat) down(); } });
-  mic.addEventListener('keyup', (e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); up(); } });
-  mic.addEventListener('blur', () => { if (held) up(); });
+  // ---- speak ---- (the shared hold-to-speak button: the words land in the box, nothing runs)
+  attachDictation({ mic, input, setStatus: (t) => { status.textContent = t; }, getLang: () => lang.value, pauseChk, preview, dictate: (o) => api.dictate(o),
+    prompt: () => dictationPrompt(Object.values(EFFECTS).map((e) => e.label.replace(/ \(.*/, ''))), doneText: 'Is that what you said? Fix any word, then press Show me. Nothing has changed yet.' });
 
   function show(lines, cls = '') { list.replaceChildren(...lines.map((t) => el('li', { class: cls, text: t }))); }
 

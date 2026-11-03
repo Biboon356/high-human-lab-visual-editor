@@ -151,7 +151,7 @@ try { mountGhostBar(); mountSuggestionChip(); creative.start(); } catch (e) { co
 mountReactive($('reactive'));
 try { mountGraph($('graph')); } catch (e) { console.error('[graph]', e); } // an extra: if it cannot start the editor still works
 let visionUi = null;
-try { visionUi = mountVision($('vision-root')); } catch (e) { console.error('[vision]', e); } // an extra: if it cannot start the editor still works
+try { visionUi = mountVision($('vision-root'), { preview, renderer: mutateUi.renderer }); } catch (e) { console.error('[vision]', e); } // an extra: if it cannot start the editor still works
 let commandUi = null;
 try { commandUi = mountCommand($('reactive'), { runAnalysis, preview }); } catch (e) { console.error('[command]', e); } // an extra: if it cannot start the editor still works
 mountProjectSettings($('project-settings'));

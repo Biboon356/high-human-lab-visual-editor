@@ -109,8 +109,8 @@ export async function transcribeChunks({ pcm, chunks, modelPath, language = 'th'
 }
 
 /** One short spoken command → one line of text. Refuses silence/too-short takes before any model runs (whisper makes words up from silence). */
-export async function transcribeDictation({ pcm, modelPath, language = 'th', prompt, signal, loader, threads }) {
-  const prep = prepareDictation(pcm);
+export async function transcribeDictation({ pcm, modelPath, language = 'th', prompt, maxSeconds, signal, loader, threads }) {
+  const prep = prepareDictation(pcm, { maxSeconds });
   if (!prep.ok) return { ok: false, reason: prep.reason };
   const r = await transcribePcm({ pcm: prep.pcm, modelPath, language, prompt, signal, loader, threads });
   const text = joinSegments(r.segments);

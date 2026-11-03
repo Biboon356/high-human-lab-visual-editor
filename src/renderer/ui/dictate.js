@@ -1,9 +1,10 @@
 // Microphone capture for spoken commands: hold to record, release to stop. Everything stays on this computer.
 // The sound is recorded at 16 kHz mono and handed to Whisper through the main process; nothing is stored and nothing is sent anywhere.
-import { floatToInt16, DICTATION_RATE, MAX_SECONDS } from '/shared/command/dictation.js';
+import { floatToInt16, DICTATION_RATE, MAX_SECONDS, clampSeconds } from '/shared/command/dictation.js';
 
 /** Starts capturing. Returns {stop(): Promise<Int16Array>, cancel()}; rejects (with a readable message) when there is no microphone or it is not allowed. */
-export async function startCapture() {
+export async function startCapture({ maxSeconds = MAX_SECONDS } = {}) {
+  const limit = clampSeconds(maxSeconds);
   if (!navigator.mediaDevices?.getUserMedia) throw new Error('This computer did not offer a microphone to the app.');
   let stream;
   try { stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: false, noiseSuppression: true, autoGainControl: true }, video: false }); }
@@ -15,7 +16,7 @@ export async function startCapture() {
     await ctx.audioWorklet.addModule(new URL('./dictate-worklet.js', import.meta.url).href);
     src = ctx.createMediaStreamSource(stream);
     node = new AudioWorkletNode(ctx, 'hhlab-dictate-tap', { numberOfInputs: 1, numberOfOutputs: 0 });
-    node.port.onmessage = (e) => { if (n < MAX_SECONDS * ctx.sampleRate) { chunks.push(e.data); n += e.data.length; } };
+    node.port.onmessage = (e) => { if (n < limit * ctx.sampleRate) { chunks.push(e.data); n += e.data.length; } };
     src.connect(node);
   } catch (e) { await close(); throw new Error(`The microphone could not be started (${e?.message || e}).`); }
   return {

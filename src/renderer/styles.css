@@ -421,3 +421,9 @@ kbd { font: 500 9.5px var(--mono); letter-spacing: .04em; padding: 1px 6px; bord
 
 .graph-svg .g-cost { fill: var(--warn, #e0a33a); font-size: 8.5px; text-transform: uppercase; letter-spacing: .1em; } .graph-svg .g-level { fill: var(--accent2, #5c8); }
 .graph-svg .g-wire { transition: opacity .08s linear; } .graph-note { color: var(--warn, #e0a33a); min-height: 0; }
+
+.vis-cand { display: flex; gap: 10px; align-items: flex-start; } .vis-body { flex: 1; min-width: 0; } .vis-thumb { flex: none; border: 1px solid var(--line2, #444); background: var(--bg, #000); max-width: 128px; }
+.vis-now { opacity: .85; } .vis-now .vis-body b { color: var(--dim); font-weight: 500; }
+.vis-body, .vis-body .cmd-list li, .vis-body b { overflow-wrap: anywhere; word-break: break-word; } .vis-body .vis-src { display: block; margin: 2px 0 4px; }
+.vis-cand { overflow: hidden; } .vis-body .cmd-list { margin-bottom: 6px; }
+.cmd-row { flex-wrap: wrap; } .vision-card .cmd-row select, #vision-card .cmd-row select { max-width: 100%; }

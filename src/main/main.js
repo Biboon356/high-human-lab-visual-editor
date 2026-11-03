@@ -280,14 +280,14 @@ function registerIpc() {
     if (st === 'not-determined') return { ok: await systemPreferences.askForMediaAccess('microphone'), reason: 'Microphone access was not allowed.' };
     return { ok: false, reason: 'Microphone access is turned off for this app: System Settings › Privacy & Security › Microphone.' };
   });
-  ipcMain.handle('asr:dictate', async (_e, { pcm, model = DEFAULT_MODEL, language = 'th', prompt }) => {
+  ipcMain.handle('asr:dictate', async (_e, { pcm, model = DEFAULT_MODEL, language = 'th', prompt, maxSeconds }) => {
     const m = MODELS[model];
     if (!m) throw new Error(`Unknown speech model "${model}".`);
     const modelPath = path.join(modelsDir(), m.file);
     if (!modelStatus(modelsDir())[model]?.installed) return { ok: false, reason: `The speech model is not downloaded yet: open the Auto-Edit panel and download "${m.label}" once.`, needModel: true };
     if (asrJob) return { ok: false, reason: 'Another speech task is running: try again when it is done.' };
     asrJob = { aborted: false };
-    try { return await transcribeDictation({ pcm: new Int16Array(pcm), modelPath, language: language === 'en' ? 'en' : 'th', prompt: typeof prompt === 'string' ? prompt.slice(0, 400) : undefined, signal: asrJob }); }
+    try { return await transcribeDictation({ pcm: new Int16Array(pcm), modelPath, language: language === 'en' ? 'en' : 'th', prompt: typeof prompt === 'string' ? prompt.slice(0, 400) : undefined, maxSeconds: Number(maxSeconds) || undefined, signal: asrJob }); }
     finally { asrJob = null; }
   });
   // ---- Optional online AI for "Describe the look": the user's own key, kept encrypted by the OS; only the typed sentence travels (see ai.js) ----

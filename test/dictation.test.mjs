@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { floatToInt16, rmsOf, prepareDictation, joinSegments, dictationPrompt, DICTATION_RATE } from '../src/shared/command/dictation.js';
+import { floatToInt16, rmsOf, prepareDictation, joinSegments, dictationPrompt, DICTATION_RATE, clampSeconds, MAX_DESCRIBE_SECONDS } from '../src/shared/command/dictation.js';
 import { transcribeDictation, releaseEngine } from '../src/main/asr.js';
 
 const tone = (sec, amp = 0.2) => { const f = new Float32Array(Math.round(sec * DICTATION_RATE)); for (let i = 0; i < f.length; i++) f[i] = amp * Math.sin(i / 20); return floatToInt16(f); };
@@ -60,4 +60,12 @@ test('permissions: fonts and audio-only microphone are allowed; camera, mixed ca
   assert.equal(allowPermission('media', {}), false, 'unknown kind of capture');
   assert.equal(allowPermission('media'), false);
   for (const x of ['geolocation', 'notifications', 'clipboard-read', 'display-capture', 'midi']) assert.equal(allowPermission(x, { mediaTypes: ['audio'] }), false, x);
+});
+
+test('a longer take is allowed for describing a picture, with a hard cap', () => {
+  assert.equal(prepareDictation(tone(20)).pcm.length, 15 * DICTATION_RATE, 'commands stay at 15 s');
+  assert.equal(prepareDictation(tone(20), { maxSeconds: MAX_DESCRIBE_SECONDS }).pcm.length, 20 * DICTATION_RATE);
+  assert.equal(prepareDictation(tone(40), { maxSeconds: MAX_DESCRIBE_SECONDS }).pcm.length, 30 * DICTATION_RATE);
+  assert.equal(clampSeconds(9999), 45); assert.equal(clampSeconds(1), 15); assert.equal(clampSeconds(undefined), 15); assert.equal(clampSeconds('x'), 15);
+  assert.equal(prepareDictation(tone(50), { maxSeconds: 9999 }).pcm.length, 45 * DICTATION_RATE);
 });

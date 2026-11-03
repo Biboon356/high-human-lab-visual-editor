@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { interpretVision, refinePlan, findVibes, VIBES } from '../src/shared/vision/vibes.js';
+import { interpretVision, refinePlan, findVibes, VIBES, moreIdeas, MAX_IDEAS } from '../src/shared/vision/vibes.js';
+import { buildPayload } from '../src/shared/vision/payload.js';
 import { makePlan, applyPlan, describePlan, catalogue, plansFromAi, AI_SCHEMA, MAX_PLAN_EFFECTS } from '../src/shared/vision/plan.js';
 import { validateChain } from '../src/shared/mutation/chain.js';
 import { createProject, createClip } from '../src/shared/project.js';
@@ -134,4 +135,39 @@ test('refine: more / less move the main parameter, add / remove change the chain
   assert.equal(refinePlan(only, 'remove grain').ok, false, 'the last effect is never removed');
   assert.ok(single);
   assert.deepEqual(plan.chain, interpretVision('glitch gritty').plans[1].chain, 'refining never mutates the original plan');
+});
+
+test('more ideas: three new readings per request, never a repeat, nine at most, and it says plainly when the dictionary has run out', () => {
+  const text = 'ฝัน อบอุ่น';
+  let shown = [...interpretVision(text).plans];
+  const rounds = [];
+  for (let i = 0; i < 2; i++) { const r = moreIdeas(text, shown); assert.ok(r.ok, r.reason); assert.equal(r.plans.length, 3); rounds.push(...r.plans); shown = [...shown, ...r.plans]; }
+  assert.equal(shown.length, MAX_IDEAS);
+  const sigs = shown.map((p) => JSON.stringify(p.chain.map((c) => [c.type, c.params])));
+  assert.equal(new Set(sigs).size, shown.length, 'no two readings are the same');
+  assert.ok(rounds.every((p) => p.source === 'offline'));
+  const full = moreIdeas(text, shown); assert.equal(full.ok, false); assert.match(full.reason, /most I show/);
+});
+
+test('more ideas differ in character, not just in strength: other moods on their own, and the look with one more ingredient', () => {
+  const text = 'ฝัน อบอุ่น';
+  const first = interpretVision(text).plans;
+  const r = moreIdeas(text, first);
+  const firstTypes = new Set(first.map((p) => p.chain.map((c) => c.type).sort().join('+')));
+  assert.ok(r.plans.some((p) => !firstTypes.has(p.chain.map((c) => c.type).sort().join('+'))), 'at least one has a different set of effects');
+  assert.ok(r.plans.some((p) => /on its own/.test(p.title)), 'a single mood alone is offered when two were named');
+  for (const p of r.plans) assert.deepEqual(validateChain(p.chain).issues, [], p.title);
+});
+
+test('more ideas: unknown words give a reason, a single mood falls back to ingredients and strengths, and the shown list is never changed', () => {
+  assert.equal(moreIdeas('quantum marmalade', []).ok, false);
+  const shown = interpretVision('glitch').plans, before = JSON.stringify(shown);
+  const r = moreIdeas('glitch', shown); assert.ok(r.ok); assert.ok(r.plans.length >= 1);
+  assert.equal(JSON.stringify(shown), before);
+});
+
+test('the AI is told what is already on screen (titles and effect names only) so it does not repeat', () => {
+  const p = buildPayload({ text: 'dream', avoid: [{ title: 'Dream · Gentle', types: ['blur', 'bloom'] }, ...Array(20).fill({ title: 'x'.repeat(500), types: ['grain'] })] });
+  assert.equal(p.alreadyShown.length, 9); assert.deepEqual(p.alreadyShown[0], { title: 'Dream · Gentle', effects: ['blur', 'bloom'] }); assert.equal(p.alreadyShown[1].title.length, 80);
+  assert.equal(buildPayload({ text: 'dream' }).alreadyShown, undefined);
 });
