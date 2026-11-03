@@ -2,7 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { parseCommand } from '../src/shared/command/parse.js';
 import { createProject, createClip } from '../src/shared/project.js';
-import { createEffect } from '../src/shared/effects-defs.js';
+import { createEffect, EFFECTS } from '../src/shared/effects-defs.js';
+import { baseAmount } from '../src/shared/command/parse.js';
+import { mutationRange } from '../src/shared/mutation/effect-meta.js';
+import { CLIP_PROPS } from '../src/shared/params.js';
 
 function scene() {
   const p = createProject();
@@ -76,20 +79,43 @@ test('"mid" is not found inside other words', () => {
   assert.ok(!/mids/.test(r.understood[0]));
 });
 
-test('clip properties: zoom follows bass', () => {
+test('clip properties: zoom follows bass, and "normal" means a sensible swing, not half of the whole range', () => {
   const { p, r } = run('zoom follow bass');
   assert.ok(r.ok);
+  assert.match(r.understood[0], /Scale ← bass.*up by 0\.25/);
   r.apply(p);
-  assert.deepEqual(p.clips[0].bindings.scale, { source: 'bass', amount: 0.5 });
+  const b = p.clips[0].bindings.scale;
+  assert.equal(b.source, 'bass'); assert.ok(Math.abs(b.amount * (5 - 0.05) - 0.25) < 1e-9, `Scale moves by 0.25 at the loudest (amount ${b.amount})`);
 });
 
-test('subtle, percent and inverted change the amount', () => {
-  let { r, p } = run('bloom follow bass subtle'); r.apply(p);
+test('subtle, percent and inverted scale the "normal" strength; 0..1 knobs keep their old amounts', () => {
+  let { r, p } = run('glitch follow bass subtle'); r.apply(p);
+  assert.equal(p.clips[0].effects[0].bindings.amount.amount, 0.25);
+  ({ r, p } = run('glitch follow bass 40%')); r.apply(p);
+  assert.ok(Math.abs(p.clips[0].effects[0].bindings.amount.amount - 0.4) < 1e-9);
+  ({ r, p } = run('glitch follow bass invert')); r.apply(p);
+  assert.equal(p.clips[0].effects[0].bindings.amount.amount, -0.5);
+  // a wide-range parameter (Bloom intensity spans 0..2, its safe window is 0.2..1.2): half of the safe window
+  ({ r, p } = run('bloom follow bass')); r.apply(p);
   assert.equal(p.clips[0].effects[0].bindings.intensity.amount, 0.25);
-  ({ r, p } = run('bloom follow bass 40%')); r.apply(p);
-  assert.equal(p.clips[0].effects[0].bindings.intensity.amount, 0.4);
+  ({ r, p } = run('bloom follow bass subtle')); r.apply(p);
+  assert.equal(p.clips[0].effects[0].bindings.intensity.amount, 0.125);
   ({ r, p } = run('bloom follow bass invert')); r.apply(p);
-  assert.equal(p.clips[0].effects[0].bindings.intensity.amount, -0.5);
+  assert.equal(p.clips[0].effects[0].bindings.intensity.amount, -0.25);
+});
+
+test('a default binding never swings any parameter further than half its safe range (every effect parameter and every clip property)', () => {
+  for (const [type, def] of Object.entries(EFFECTS)) {
+    for (const d of def.params) {
+      if (d.kind || d.toggle || d.options || !Number.isFinite(d.min) || !Number.isFinite(d.max)) continue;
+      const amt = baseAmount({ kind: 'effect', type, key: d.key }), span = d.max - d.min;
+      const [lo, hi] = mutationRange(type, d);
+      assert.ok(amt > 0 && amt <= 0.5 + 1e-9, `${type}.${d.key}: amount ${amt}`);
+      if (span > 1.5) assert.ok(amt * span <= 0.5 * (hi - lo) + 1e-9, `${type}.${d.key} swings ${amt * span}, safe half-window ${0.5 * (hi - lo)}`);
+    }
+  }
+  for (const d of CLIP_PROPS) { const amt = baseAmount({ kind: 'clip', key: d.key }); assert.ok(amt > 0 && amt <= 1, d.key); assert.ok(amt * (d.max - d.min) <= (d.max - d.min) / 2 + 1e-9, `${d.key} swing`); }
+  assert.ok(baseAmount({ kind: 'clip', key: 'rotation' }) * 720 <= 8 + 1e-9, 'rotation swings by degrees, not by half a turn');
 });
 
 test('several effects in one sentence', () => {

@@ -7,6 +7,7 @@
 //   "ปิดการตอบสนองของ glitch"           → remove the binding
 import { EFFECTS, createEffect } from '../effects-defs.js';
 import { CLIP_PROPS, REACTIVE_SOURCES } from '../params.js';
+import { mutationRange } from '../mutation/effect-meta.js';
 
 const SOURCE_WORDS = [ // [word, source]: more specific first; "เสียง" alone is the last resort
   ['เสียงสูง', 'high'], ['ไฮแฮท', 'high'], ['ไฮฮัท', 'high'], ['treble', 'high'], ['high', 'high'], ['highs', 'high'], ['เสียงแหลม', 'high'], ['แหลม', 'high'],
@@ -39,6 +40,20 @@ const UNBIND_WORDS = ['ปิดการตอบสนอง', 'เลิก�
 const STRONG = ['แรงๆ', 'มากๆ', 'เยอะๆ', 'แรงมาก', 'จัดๆ', 'จัด', 'strong', 'hard', 'heavy', 'extreme', 'แรง', 'มาก', 'เยอะ'];
 const SUBTLE = ['เบาๆ', 'นิดๆ', 'นิดหน่อย', 'เบา', 'นุ่มๆ', 'subtle', 'soft', 'light', 'gentle', 'slight', 'little'];
 const INVERT = ['ผกผัน', 'ตรงข้าม', 'กลับด้าน', 'invert', 'inverse', 'opposite', 'duck'];
+
+// A binding moves a parameter by amount x its WHOLE range (see resolveParam), so one default amount cannot suit every parameter: 0.5 on Scale (range 0.05 to 5)
+// would swing it 3.5 times too big. "Normal" strength is therefore defined by how far a parameter may sensibly swing, and the amount is worked out from that.
+const CLIP_SWING = { opacity: 0.5, x: 0.1, y: 0.1, scale: 0.25, rotation: 8, rotX: 10, rotY: 10, depth: 0.25 }; // in the parameter's own units
+const targetDef = (t) => (t.kind === 'clip' ? CLIP_PROPS.find((d) => d.key === t.key) : EFFECTS[t.type].params.find((d) => d.key === t.key));
+const spanOf = (t) => { const d = targetDef(t); return d.max - d.min; };
+/** The amount for "normal" strength: half the range for the 0..1-ish knobs (unchanged), otherwise half of the safe range the Mutate engine allows, or the clip swing above. */
+export function baseAmount(t) {
+  const d = targetDef(t), span = d.max - d.min;
+  if (t.kind === 'clip') return Math.min(1, (CLIP_SWING[t.key] ?? span * 0.25) / span);
+  if (span <= 1.5) return 0.5;
+  const [lo, hi] = mutationRange(t.type, d);
+  return Math.min(0.5, (0.5 * (hi - lo)) / span);
+}
 
 const has = (s, w) => s.includes(w);
 const isLatinWord = (w) => /^[a-z0-9 ]+$/.test(w);
@@ -117,13 +132,15 @@ export function parseCommand(text, project, ctx = {}) {
   if (!clipIds.length) return { ok: false, reason: 'Select a clip first (or several), then tell me what should react.' };
 
   // 4. how much, and which way
-  let amount = 0.5, how = '';
+  let mult = 1, how = ''; // relative to "normal" strength for each parameter (see baseAmount)
   const pct = /(\d{1,3})\s*(%|เปอร์เซ็นต์)/.exec(s);
-  if (pct) { amount = Math.min(1, Math.max(0.05, Number(pct[1]) / 100)); how = `${Math.round(amount * 100)}% of the range`; }
-  else if (STRONG.some((w) => find(s, w) >= 0)) { amount = 0.85; how = 'strong'; }
-  else if (SUBTLE.some((w) => find(s, w) >= 0)) { amount = 0.25; how = 'subtle'; }
+  if (pct) { mult = Math.min(2, Math.max(0.1, Number(pct[1]) / 50)); how = `${Math.round(Number(pct[1]))}% (50% is normal strength)`; }
+  else if (STRONG.some((w) => find(s, w) >= 0)) { mult = 1.7; how = 'strong'; }
+  else if (SUBTLE.some((w) => find(s, w) >= 0)) { mult = 0.5; how = 'subtle'; }
   const inverted = INVERT.some((w) => find(s, w) >= 0);
-  if (inverted) { amount = -amount; how = `${how ? `${how}, ` : ''}inverted (quieter when the sound is louder)`; }
+  if (inverted) { mult = -mult; how = `${how ? `${how}, ` : ''}inverted (quieter when the sound is louder)`; }
+  const amountFor = (t) => Math.min(1, Math.max(-1, mult * baseAmount(t)));
+  const swingText = (t) => { const sw = amountFor(t) * spanOf(t); return `${sw < 0 ? 'down by' : 'up by'} ${+Math.abs(sw).toFixed(3)}`; };
 
   const understood = [], notes = [];
   const noteAnalysis = () => { if (!ctx.hasAnalysis) notes.push('The audio is not analyzed yet: I will analyze it so the preview can move.'); };
@@ -147,7 +164,7 @@ export function parseCommand(text, project, ctx = {}) {
   const useSource = (t) => source || (t.kind === 'effect' ? DEFAULT_SOURCE[t.type] : t.key === 'scale' ? 'bass' : 'rms') || 'rms';
   for (const t of targets) {
     const src = useSource(t);
-    understood.push(`${t.label} ← ${SIGNAL_NAMES[src]}${how ? `, ${how}` : ''}`);
+    understood.push(`${t.label} ← ${SIGNAL_NAMES[src]}${how ? `, ${how}` : ''} (at the loudest it moves ${swingText(t)})`);
     if (!sourceExplicit && !source) notes.push(`You did not say which sound, so I picked ${SIGNAL_NAMES[src]} for ${t.label} (my guess).`);
     if (t.assumedParam) notes.push(`You did not name a parameter, so I used ${t.label.split(' › ')[1]} on ${t.label.split(' › ')[0]}.`);
   }
@@ -171,7 +188,7 @@ export function parseCommand(text, project, ctx = {}) {
           if (!owner) { owner = createEffect(t.type); c.effects.push(owner); }
         }
         owner.bindings ||= {};
-        owner.bindings[t.key] = { source: src, amount };
+        owner.bindings[t.key] = { source: src, amount: amountFor(t) };
         n++;
       }
     }

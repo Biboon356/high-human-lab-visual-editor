@@ -47,13 +47,13 @@ suggestions/curation are guesses, not tuned by real use.
 ## Where things stand
 
 * Released: v0.9.4 (Describe the look: offline mood dictionary or the optional online AI with the user's own key; read-only Graph tab). The owner confirmed
-  the mic button and the online AI work on their Mac. **v0.9.5 pending release** (branch `feat/v0.9.5`): the Graph moves with the sound (`shared/graph/live.js`
+  the mic button and the online AI work on their Mac. **v0.9.5 pending release** (branch `feat/v0.9.5`): Tell it uses gentle per-parameter default strengths (Scale no longer swings 3.5x), and the Graph moves with the sound (`shared/graph/live.js`
   uses the renderer's own `resolveParam`; signal levels, line thickness, live numbers; notes when there is no analysis / bindings are off) and marks HEAVY effects
   (`effect-meta` cost). Still read-only. Planned next: voice input in Describe the look (reuse Hold to speak; raise the 15 s cap), real-frame thumbnails per
   reading, "Show different ideas" (3 more, up to 9), then an EDITABLE Graph (drag to reorder, drag a wire to bind; NOT a free TouchDesigner graph), Taste Brain,
   and the "known to tune" items below.
-* Known issue found, not fixed: a binding moves a parameter by `amount x its whole range`, so Tell it's default amount 0.5 on clip Scale (range 0.05-5) swings it to
-  about 3.5x. Tell it should use a smaller default for wide-range clip properties.
+* Tell it amounts (fixed in v0.9.5): `parse.js baseAmount` defines "normal" strength per parameter (a binding moves a value by amount x its WHOLE range, so one default
+  cannot fit all); the preview line states how far it moves.
 * e2e flakiness seen under load: a step can fail once in a full run and pass alone (preview editing; the Graph steps before the `defer` fix); rerun before suspecting code.
 * Known to tune: Ghost/Stain default `screen` blend washes out bright footage; a suggestion can pop up while a TIMELINE plan card is open;
   Take/Trace work on one clip only (no group); curator/gate thresholds untested on real use; clips imported before the HDR fix keep a flat proxy.

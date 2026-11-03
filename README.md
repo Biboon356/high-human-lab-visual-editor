@@ -280,6 +280,10 @@ without you.
 * **Heavy effects are marked**: effects classed "heavy" (Pattern, 3D Object) get a HEAVY badge, and the caption warns when there are more than 2 enabled (the limit the
   Mutate engine already keeps). The heavy/medium/light classes are the editor's own estimate: GPU timing has never been measured on a real computer.
 * Still a read-only view: it never changes the project.
+* **Tell it: gentler defaults for wide parameters** (fix). A binding moves a parameter by amount x its whole range, so the old default (half of the range) made
+  `zoom follow bass` swing Scale up to about 3.5x. "Normal" strength now means a sensible swing: Scale +0.25, rotation 8 degrees, position 0.1, and for effect
+  parameters with a wide range half of the safe range the Mutate engine allows (0..1 knobs are unchanged). The preview line says how far it moves, for example
+  "at the loudest it moves up by 0.25". `subtle`, `strong`, `40%` and `invert` scale that normal strength.
 * Not tried on a real Mac or Windows machine; whether the live drawing stays smooth on a real GPU is unverified.
 
 ## HDR phone footage (iPhone HLG / PQ)
@@ -358,7 +362,7 @@ Legend: ✅ works and is covered by the automated tests · 🧪 prototype (works
 
 ## Testing
 
-`npm test` runs 292 unit tests. `scripts/e2e.mjs` (86 checks) is a real end-to-end run of the Electron app (see table above): it
+`npm test` runs 293 unit tests. `scripts/e2e.mjs` (86 checks) is a real end-to-end run of the Electron app (see table above): it
 generates test media with ffmpeg, drives the app, reads pixels out of the compositor, and probes exported files.
 Native file dialogs are stubbed at the Electron main-process level; every other path is the production code.
 
