@@ -17,6 +17,7 @@ import { mountGhostBar } from './ui/ghost-bar.js';
 import { mountReactive, runAnalysis } from './ui/reactive-ui.js';
 import { mountCommand } from './ui/command-ui.js';
 import { mountVision } from './ui/vision-ui.js';
+import { mountGraph } from './ui/graph-ui.js';
 import { mountProjectSettings } from './ui/project-settings.js';
 import { openExportDialog, isExporting } from './ui/export-dialog.js';
 import { openAutoEdit } from './ui/autoedit-panel.js';
@@ -148,6 +149,7 @@ const mutateUi = mountMutate({ preview });
 const living = mountLiving({ preview, runAnalysis, renderer: mutateUi.renderer });
 try { mountGhostBar(); mountSuggestionChip(); creative.start(); } catch (e) { console.error('[creative]', e); } // the intelligence layer is an extra: if it cannot start, the editor still works
 mountReactive($('reactive'));
+try { mountGraph($('graph')); } catch (e) { console.error('[graph]', e); } // an extra: if it cannot start the editor still works
 let visionUi = null;
 try { visionUi = mountVision($('vision-root')); } catch (e) { console.error('[vision]', e); } // an extra: if it cannot start the editor still works
 let commandUi = null;

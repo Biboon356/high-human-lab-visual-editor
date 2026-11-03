@@ -49,9 +49,8 @@ suggestions/curation are guesses, not tuned by real use.
 * Released: v0.9.3 (Tell it + Hold to speak). **v0.9.4 pending release** (branch `feat/v0.9.4`): **Describe the look** (Looks tab: a free-form
   description → three look plans via an offline mood dictionary `shared/vision/vibes.js`, or the optional online AI `main/ai.js` with the user's own
   key kept by `main/ai-key.js` (safeStorage); every plan passes `shared/vision/plan.js` → Mutation Engine `validateChain/composeChain`; PREVIEW first;
-  refine by sentence). The online AI has only been tested against a fake server, never a real key. Mic/Whisper on a real Mac/Windows: the owner is trying
-  v0.9.3. Planned next: Chain Graph (a node-style view over the existing chain and audio bindings: read-only first, editable later; NOT a free
-  TouchDesigner graph, that would need a new compositor), Taste Brain, then the "known to tune" items below.
+  refine by sentence) and the **Graph** tab (`shared/graph/layout.js` + `renderer/ui/graph-ui.js`: a READ-ONLY drawing of the selected clip's chain and audio bindings, draws the PREVIEW copy and marks what is new). The online AI has only been tested against a fake server, never a real key. Mic/Whisper on a real Mac/Windows: the owner is trying
+  v0.9.3. Planned next: make the Graph editable (drag to reorder, drag a wire to bind; NOT a free TouchDesigner graph, that would need a new compositor), Taste Brain, then the "known to tune" items below.
 * Known to tune: Ghost/Stain default `screen` blend washes out bright footage; a suggestion can pop up while a TIMELINE plan card is open;
   Take/Trace work on one clip only (no group); curator/gate thresholds untested on real use; clips imported before the HDR fix keep a flat proxy.
 * Ideas not built: Root-Letters (roots out of letters), Living Score, per-section looks, palette lock from album art, Look Card, Human Groove,

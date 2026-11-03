@@ -2853,6 +2853,42 @@ await step('Describe the look: three readings, PREVIEW first, refine, Apply is o
   await ev(() => { localStorage.setItem('hhlab.vision.ai', '0'); });
 });
 
+await step('Graph: the chain is drawn in order with the music links as wires, a PREVIEW is drawn with what is new marked, clicking an effect opens it, and drawing changes nothing', async () => {
+  await resetProject(); await ev((p) => window.__app.importPaths([p]), clip); await settle(800);
+  await ev(async () => {
+    const { store } = window.__app; const { createEffect } = await import('/shared/effects-defs.js');
+    const c = store.project.clips.find((x) => x.type === 'media'); store.multi = new Set([c.id]); store.selection = c.id;
+    store.mutate(() => { const g = createEffect('glitch'); g.bindings.amount = { source: 'bass', amount: 0.6 }; const gr = createEffect('grain'); gr.bindings.amount = { source: 'rms', amount: 0.4 }; c.effects.push(g, gr, createEffect('bloom')); c.bindings.scale = { source: 'beat', amount: 0.5 }; });
+    store.emit('selection', 'render');
+  });
+  await ev(() => document.querySelector('[data-tab="graph"]').click()); await settle(500);
+  const info = () => ev(() => ({ nodes: [...document.querySelectorAll('.g-node')].map((n) => n.dataset.kind + ':' + (n.dataset.type || '')), wires: document.querySelectorAll('.g-wire').length, fresh: document.querySelectorAll('.g-node.new').length, cap: document.getElementById('graph-caption').textContent }));
+  const before = await ev(() => JSON.stringify(window.__app.store.project));
+  let g = await info();
+  assert.deepEqual(g.nodes.filter((n) => !n.startsWith('signal')), ['clip:', 'effect:glitch', 'effect:grain', 'effect:bloom', 'out:'], 'chain in order');
+  assert.equal(g.nodes.filter((n) => n.startsWith('signal')).length, 3, 'bass, loudness and beats are in use'); assert.equal(g.wires, 3);
+  assert.match(g.cap, /3 effects, 3 links/);
+  await shot('43-graph');
+  // a PREVIEW is drawn, what is new is marked, and it goes away with Cancel
+  await ev(async () => { const { store } = window.__app; const { interpretVision } = await import('/shared/vision/vibes.js'); const { applyPlan } = await import('/shared/vision/plan.js'); const plan = interpretVision('pulse').plans[1]; const ids = [...store.multi]; store.showGhost({ label: 'pulse', apply: (p) => applyPlan(p, ids, plan) > 0, done: 'x' }); });
+  await settle(500); g = await info();
+  assert.ok(g.fresh >= 2, `the new effects are marked (${g.fresh})`); assert.match(g.cap, /PREVIEW/); assert.ok(g.wires > 3, 'the preview adds music links');
+  assert.ok(g.nodes.includes('effect:shake'));
+  await shot('44-graph-preview');
+  await ev(() => window.__app.store.clearGhost()); await settle(400); g = await info();
+  assert.equal(g.fresh, 0); assert.equal(g.wires, 3); assert.ok(!g.nodes.includes('effect:shake'));
+  // follows the project: removing a link removes its wire
+  await ev(() => { const { store } = window.__app; store.mutate(() => { const c = store.project.clips.find((x) => x.type === 'media'); delete c.effects[0].bindings.amount; }); }); await settle(400);
+  assert.equal((await info()).wires, 2);
+  // clicking an effect opens it in the Inspector
+  await page.click('.g-node[data-type="grain"]'); await settle(300);
+  assert.equal(await ev(() => document.querySelector('[data-tabs="right"] [data-tab="inspector"]').classList.contains('on')), true);
+  // no clip selected: it says so
+  await ev(() => { const { store } = window.__app; store.selection = null; store.multi = new Set(); store.emit('selection', 'render'); document.querySelector('[data-tab="graph"]').click(); }); await settle(400);
+  assert.match(await ev(() => document.getElementById('graph-caption').textContent), /Select a clip/);
+  assert.notEqual(await ev(() => JSON.stringify(window.__app.store.project)), before, 'the only change was the one binding removed on purpose');
+});
+
 const bad = logs.filter((l) => !/GPU stall|swiftshader|GL Driver Message|Automatic fallback/i.test(l));
 await step('no unexpected console errors during the whole run', async () => { assert.deepEqual(bad, []); });
 // Quitting mid-export must not leave ffmpeg processes behind (they would burn CPU forever).

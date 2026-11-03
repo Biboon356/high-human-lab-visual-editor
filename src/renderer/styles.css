@@ -407,3 +407,14 @@ kbd { font: 500 9.5px var(--mono); letter-spacing: .04em; padding: 1px 6px; bord
 .vis-list { display: grid; gap: 8px; margin: 8px 0; } .vis-cand { border: 1px solid var(--line, rgba(255,255,255,.12)); border-radius: 6px; padding: 8px 10px; } .vis-cand.on { border-color: var(--accent, #3a5); }
 .vis-src { margin-left: 8px; font-size: 10px; color: var(--dim); text-transform: uppercase; letter-spacing: .08em; }
 .vis-sent { max-height: 180px; overflow: auto; font-size: 10px; white-space: pre-wrap; margin: 6px 0 0; }
+
+.graph-holder { padding: 0 8px 8px; } .graph-svg { display: block; max-width: 340px; margin: 0 auto; font-family: var(--mono, monospace); }
+.graph-svg .g-box { fill: var(--panel2, #1a1a1a); stroke: var(--line2, #444); stroke-width: 1; }
+.graph-svg .g-node.clip .g-box { stroke: var(--accent2, #5c8); } .graph-svg .g-node.out .g-box { stroke-dasharray: 3 3; }
+.graph-svg .g-node.signal .g-box { fill: none; stroke: var(--accent2, #5c8); } .graph-svg .g-node.signal .g-title { fill: var(--accent2, #5c8); }
+.graph-svg .g-node.off { opacity: .45; } .graph-svg .g-node.new .g-box { stroke: var(--accent2, #5c8); stroke-width: 1.6; }
+.graph-svg text { fill: var(--text, #ddd); font-size: 9.5px; } .graph-svg .g-title { font-size: 10.5px; font-weight: 600; letter-spacing: .04em; }
+.graph-svg .g-port { fill: var(--dim, #999); } .graph-svg .g-val { fill: var(--text, #ddd); } .graph-svg .g-badge { fill: var(--accent2, #5c8); font-size: 8.5px; text-transform: uppercase; letter-spacing: .1em; }
+.graph-svg .g-flow { stroke: var(--dim, #888); stroke-width: 1.2; } .graph-svg .g-flow.new { stroke: var(--accent2, #5c8); } .graph-svg .g-arrowhead { fill: var(--dim, #888); }
+.graph-svg .g-wire { fill: none; stroke: var(--accent2, #5c8); stroke-width: 1.3; opacity: .8; } .graph-svg .g-wire.neg { stroke-dasharray: 4 3; } .graph-svg .g-wire.new { stroke-width: 2; opacity: 1; }
+.graph-svg .g-dot { fill: var(--accent2, #5c8); } .graph-svg .g-amt { fill: var(--text, #ddd); font-size: 9px; paint-order: stroke; stroke: var(--panel, #111); stroke-width: 3px; stroke-linejoin: round; }

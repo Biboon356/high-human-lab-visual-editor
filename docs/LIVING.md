@@ -158,3 +158,6 @@ microphone audio for Whisper, and both reuse `store.showGhost` so nothing is app
 Also beside the Living Lab: **Describe the look** (Looks tab). One plan shape (`shared/vision/plan.js`) is produced either by the offline mood dictionary
 (`shared/vision/vibes.js`) or by the optional online AI (`main/ai.js`, structured output, the user's own key in `main/ai-key.js`), always passes the Mutation
 Engine's `validateChain`/`composeChain`, is shown with `store.showGhost`, and only ever adds effects as one Undo step.
+
+The **Graph** tab (`shared/graph/layout.js`, `renderer/ui/graph-ui.js`) is a pure, read-only layout of one clip: effect chain top to bottom, audio bindings as wires from
+signal boxes to parameter rows. With a PREVIEW showing it receives the ghost copy plus the real clip as `base`, and flags what the preview adds.
