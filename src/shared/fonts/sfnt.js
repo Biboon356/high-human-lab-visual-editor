@@ -202,6 +202,12 @@ export function roughen(amount, seed = 1) {
   return { point: (x, y, c) => [x + (hash(c.glyph, c.index * 2) - 0.5) * 2 * amount * c.em, y + (hash(c.glyph, c.index * 2 + 1) - 0.5) * 2 * amount * c.em] };
 }
 
+/** A sideways ripple: every point moves along x by a sine of its height (amp and period are fractions of the em; the seed sets where the wave starts). Composite offsets are left alone. */
+export function wave(amp, period = 0.4, seed = 1) {
+  const phase = ((seed * 137.508) % 360) * Math.PI / 180;
+  return { point: (x, y, c) => [x + amp * c.em * Math.sin((2 * Math.PI * y) / (period * c.em) + phase), y] };
+}
+
 // ---- names (OFL: a changed font gets its own name) ----
 const utf16 = (s) => { const b = new Uint8Array(s.length * 2); for (let i = 0; i < s.length; i++) { b[i * 2] = s.charCodeAt(i) >> 8; b[i * 2 + 1] = s.charCodeAt(i) & 255; } return b; };
 const latin1 = (s) => Uint8Array.from(s, (c) => c.charCodeAt(0) & 255);

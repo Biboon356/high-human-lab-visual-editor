@@ -18,6 +18,8 @@ import { mountReactive, runAnalysis } from './ui/reactive-ui.js';
 import { mountCommand } from './ui/command-ui.js';
 import { mountVision } from './ui/vision-ui.js';
 import { mountGraph } from './ui/graph-ui.js';
+import { mountFontLab } from './ui/font-lab-ui.js';
+import { ensureRecipes } from './engine/font-recipes.js';
 import { mountProjectSettings } from './ui/project-settings.js';
 import { openExportDialog, isExporting } from './ui/export-dialog.js';
 import { openAutoEdit } from './ui/autoedit-panel.js';
@@ -150,6 +152,9 @@ const living = mountLiving({ preview, runAnalysis, renderer: mutateUi.renderer }
 try { mountGhostBar(); mountSuggestionChip(); creative.start(); } catch (e) { console.error('[creative]', e); } // the intelligence layer is an extra: if it cannot start, the editor still works
 mountReactive($('reactive'));
 try { mountGraph($('graph')); } catch (e) { console.error('[graph]', e); } // an extra: if it cannot start the editor still works
+try { mountFontLab($('fontlab-root')); } catch (e) { console.error('[font-lab]', e); } // an extra: if it cannot start the editor still works
+const rebuildFonts = () => ensureRecipes(store.project.fontRecipes).then((n) => { if (n) store.emit('render'); }).catch(() => {}); // fonts made in the Font lab are rebuilt when a project opens
+store.on('reset', rebuildFonts); rebuildFonts();
 let visionUi = null;
 try { visionUi = mountVision($('vision-root'), { preview, renderer: mutateUi.renderer }); } catch (e) { console.error('[vision]', e); } // an extra: if it cannot start the editor still works
 let commandUi = null;

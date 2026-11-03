@@ -73,6 +73,8 @@ await ev(() => {
   };
 });
 const shot = (n) => page.screenshot({ path: path.join(shots, `${n}.png`) });
+// a layout check that would have caught the clipped cards: nothing inside the card may stick out of its panel
+const sticksOut = (sel) => ev((sel) => { const root = document.querySelector(sel), pane = root.closest('.pane') || root.parentElement, lim = pane.getBoundingClientRect().right; return [...root.querySelectorAll('*')].filter((n) => { const r = n.getBoundingClientRect(); return r.width > 0 && r.right > lim + 1; }).map((n) => `${n.tagName.toLowerCase()}${n.id ? '#' + n.id : ''}${n.className && typeof n.className === 'string' ? '.' + n.className.split(' ')[0] : ''} +${Math.round(n.getBoundingClientRect().right - lim)}px`).slice(0, 8); }, sel);
 const px = () => ev(() => { const d = window.__grab(64, 36); let s = 0, nz = 0; for (let i = 0; i < d.length; i += 3) { const v = d[i] + d[i + 1] + d[i + 2]; s += v; if (v > 30) nz++; } return { mean: s / d.length, lit: nz / (d.length / 3) }; });
 const settle = async (ms = 500) => { await page.waitForTimeout(ms); };
 
@@ -2971,6 +2973,7 @@ await step('Describe the look: speak the description, see each reading on your o
   const diff = Math.max(...means.filter((x) => !x.now).map((x) => Math.abs(x.m[0] - base[0]) + Math.abs(x.m[1] - base[1]) + Math.abs(x.m[2] - base[2])));
   assert.ok(diff > 3, `a reading looks different from the frame as it is (colour difference ${diff.toFixed(1)})`);
   await shot('46-describe-thumbs');
+  assert.deepEqual(await sticksOut('#vision-card'), [], 'nothing in the Describe the look card sticks out of the panel');
   assert.equal(await ev(() => window.__app.store.project.clips.find((x) => x.type === 'media').effects.length), 0, 'looking at pictures changes nothing');
   // different ideas, offline: 3 more each time, up to nine, then the button says so
   await page.click('#vis-more'); await settle(500);
@@ -3106,6 +3109,60 @@ await step('Graph edit: reorder, switch off, remove, drag a signal onto a parame
   // switched off again: read-only
   await page.click('#graph-edit'); await settle(400);
   assert.equal(await ev(() => document.querySelectorAll('.g-btn').length), 0); assert.equal(await ev(() => document.querySelectorAll('.g-node.signal').length), 1, 'only the used signal is drawn again');
+});
+
+await step('Font lab: a font made from a bundled one (Thai included) previews next to the original, is saved as a recipe in the project, is used on text as one Undo step, is rebuilt when the project opens, and Thai marks keep their places', async () => {
+  await resetProject();
+  await ev(async () => { const { store } = window.__app; const TD = await import('/shared/text-defs.js');
+    store.mutate((p) => { const c = TD.createTextClip(TD.TEXT_PRESETS[0], 0, 4); c.text.content = 'น้ำที่ ก้ กิ'; c.text.anim = { ...c.text.anim, type: 'none' }; c.trackId = p.tracks.find((t) => t.kind === 'video').id; p.clips.push(c); });
+    const c = store.project.clips.find((x) => x.type === 'text'); store.multi = new Set([c.id]); store.selection = c.id; store.emit('selection', 'render'); });
+  await ev(() => document.querySelector('[data-tab="type"]').click()); await settle(300);
+  await ev(() => document.getElementById('fontlab-card').scrollIntoView()); await settle(300);
+  assert.deepEqual(await sticksOut('#fontlab-card'), [], 'nothing in the Font lab card sticks out of the panel');
+  assert.equal(await ev(() => document.getElementById('fl-base').options.length), 4);
+  assert.match(await ev(() => document.getElementById('fl-name').value), /^HHLAB Slant 1$/);
+  // the bundled Thai font itself is usable on text
+  assert.equal(await ev(async () => { await document.fonts.load('400 40px "Noto Sans Thai"', 'น้ำที่'); return document.fonts.check('400 40px "Noto Sans Thai"', 'น้ำที่'); }), true, 'Noto Sans Thai is bundled');
+  const faceCount = (fam) => ev((fam) => [...document.fonts].filter((f) => f.family.replace(/"/g, '') === fam).length, fam);
+  // preview: Thai base, slant
+  await page.selectOption('#fl-base', 'noto-sans-thai'); await page.selectOption('#fl-move', 'slant');
+  await page.waitForFunction(() => document.getElementById('fl-preview').dataset.painted, null, { timeout: 30000 });
+  await page.locator('#fl-strength').fill('0.8'); await settle(900);
+  const painted = await ev(() => { const c = document.getElementById('fl-preview'); const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let ink = 0; for (let i = 0; i < d.length; i += 4) if (d[i] > 150) ink++; return { font: c.dataset.font, ink, ok: document.fonts.check('40px "' + c.dataset.font + '"', 'น้ำที่') }; });
+  assert.match(painted.font, /^HHLAB Preview \d+$/); assert.ok(painted.ink > 800, `the preview shows words (${painted.ink} bright pixels)`); assert.equal(await faceCount(painted.font), 2, 'the preview font is registered');
+  await shot('49-font-lab');
+  // save: a recipe in the project, one Undo step, the font is registered under its own name
+  const d0 = await ev(() => window.__app.store.undoStack.length);
+  await page.fill('#fl-name', 'Brand Lean'); await page.click('#fl-save'); await settle(1500);
+  const rec = await ev(() => window.__app.store.project.fontRecipes);
+  assert.equal(rec.length, 1); assert.deepEqual({ name: rec[0].name, base: rec[0].base, move: rec[0].move, strength: rec[0].strength }, { name: 'HHLAB Brand Lean', base: 'noto-sans-thai', move: 'slant', strength: 0.8 });
+  assert.equal(await ev(() => window.__app.store.undoStack.length), d0 + 1); assert.equal(await faceCount('HHLAB Brand Lean'), 2, 'its Thai and Latin faces are registered under its own name');
+  assert.equal(await ev(() => document.querySelectorAll('#fl-list .fl-item').length), 1);
+  await page.fill('#fl-name', 'Brand Lean'); await page.click('#fl-save'); await settle(300);
+  assert.match(await ev(() => document.getElementById('fl-status').textContent), /already have a font called/); assert.equal((await ev(() => window.__app.store.project.fontRecipes)).length, 1, 'a name is used once');
+  // use on the selected text: one Undo step; Undo takes it back
+  const d1 = await ev(() => window.__app.store.undoStack.length), before = await ev(() => window.__app.store.project.clips.find((x) => x.type === 'text').text.font);
+  await page.click('#fl-use-0'); await settle(500);
+  assert.equal(await ev(() => window.__app.store.project.clips.find((x) => x.type === 'text').text.font), 'HHLAB Brand Lean'); assert.equal(await ev(() => window.__app.store.undoStack.length), d1 + 1);
+  // Thai marks keep their places: draw the original and the new font and compare where the tone mark and vowels sit
+  const marks = await ev(() => { const ink = (fam, text) => { const c = document.createElement('canvas'); c.width = 600; c.height = 260; const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, 600, 260); x.fillStyle = '#000'; x.font = `120px "${fam}"`; x.fillText(text, 30, 170); const d = x.getImageData(0, 0, 600, 260).data; let y0 = 999, y1 = -1; for (let j = 0; j < 260; j++) for (let i = 0; i < 600; i++) if (d[(j * 600 + i) * 4] < 128) { if (j < y0) y0 = j; if (j > y1) y1 = j; } return { y0, y1 }; };
+    const o = { base: ink('Noto Sans Thai', 'ก'), tone: ink('Noto Sans Thai', 'ก้'), low: ink('Noto Sans Thai', 'กุ') }, n = { base: ink('HHLAB Brand Lean', 'ก'), tone: ink('HHLAB Brand Lean', 'ก้'), low: ink('HHLAB Brand Lean', 'กุ') }; return { o, n }; });
+  assert.ok(marks.n.tone.y0 < marks.n.base.y0 - 6 && marks.n.low.y1 > marks.n.base.y1 + 6, `the tone mark is above and the lower vowel below in the new font (${JSON.stringify(marks.n)})`);
+  assert.ok(Math.abs(marks.n.tone.y0 - marks.o.tone.y0) <= 3 && Math.abs(marks.n.low.y1 - marks.o.low.y1) <= 3, 'at the same heights as in the original');
+  // the project file carries only the recipe; opening it rebuilds the font
+  const saved = await ev(() => JSON.parse(JSON.stringify(window.__app.store.project)));
+  assert.ok(JSON.stringify(saved).length < 200000 && !JSON.stringify(saved.fontRecipes).includes('wOFF'), 'a recipe, not a font file');
+  await ev(async () => { const m = await import('./engine/font-recipes.js'); await m.dropRecipeFont(window.__app.store.project.fontRecipes[0]); }); // forget it, as a fresh start of the app would have
+  assert.equal(await faceCount('HHLAB Brand Lean'), 0, '(removed by hand to prove the rebuild)');
+  await ev((d) => { window.__app.store.loadProject(d, null); }, saved); await settle(2500);
+  assert.equal(await faceCount('HHLAB Brand Lean'), 2, 'opening the project rebuilt the font from its recipe');
+  // delete
+  await ev(() => { window.__app.store.select(window.__app.store.project.clips.find((x) => x.type === 'text').id); });
+  await ev(() => document.querySelector('[data-tab="type"]').click()); await page.click('#fl-del-0'); await settle(300);
+  assert.equal((await ev(() => window.__app.store.project.fontRecipes)).length, 0); assert.equal(await ev(() => !!document.getElementById('fl-empty')), true);
+  // a Latin base with another move
+  await page.selectOption('#fl-base', 'anton'); await page.selectOption('#fl-move', 'wave'); await page.waitForFunction(() => document.getElementById('fl-preview').dataset.font && /Preview/.test(document.getElementById('fl-preview').dataset.font), null, { timeout: 30000 }); await settle(900);
+  assert.equal(await ev(() => document.getElementById('fl-status').textContent), '', 'no error');
 });
 
 const bad = logs.filter((l) => !/GPU stall|swiftshader|GL Driver Message|Automatic fallback/i.test(l));

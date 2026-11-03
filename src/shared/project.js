@@ -1,4 +1,5 @@
 // Project model: plain JSON, no behaviour. Timeline mutations live in timeline.js.
+import { normalizeRecipes } from './fonts/recipes.js';
 export const PROJECT_VERSION = 1;
 
 export const uid = (prefix = 'id') =>
@@ -30,6 +31,7 @@ export function createProject(name = 'Untitled Lab') {
     clips: [],
     reactive: { enabled: true },
     dna: [], // saved Mutation Engine configurations (see shared/mutation/dna.js)
+    fontRecipes: [], // fonts made in the Font lab: only the recipe is saved, the font is rebuilt when the project opens (shared/fonts/recipes.js)
     stillHere: [], // kept fragments of how clips moved / looked / felt (see shared/creative/still-here.js); not part of undo
   };
 }
@@ -102,6 +104,7 @@ export function validateProject(p) {
   }
   p.reactive ||= { enabled: true };
   if (!Array.isArray(p.dna)) p.dna = []; // entries are repaired when the library is first used (dna.js: libraryOf)
+  p.fontRecipes = normalizeRecipes(p.fontRecipes);
   if (!Array.isArray(p.stillHere)) p.stillHere = []; // entries are repaired when the shelf is first used (still-here.js: shelfOf)
   return p;
 }

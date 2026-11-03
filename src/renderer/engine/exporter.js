@@ -1,5 +1,6 @@
 // Offline renderer: for every output frame, seek all sources, render through the same
 // compositor as the preview, read the pixels back and stream them into ffmpeg (main process).
+import { ensureRecipes } from './font-recipes.js';
 import { Compositor } from './compositor.js';
 import { Sources } from './sources.js';
 import { sampleFeatures } from '/shared/audio-analysis.js';
@@ -12,6 +13,7 @@ export class ExportCancelled extends Error {}
  * @returns {Promise<{path,bytes,duration,width,height,hasAudio,frames}>}
  */
 export async function renderProject({ project, settings, analysis, onProgress, signal, range = null }) {
+  await ensureRecipes(project.fontRecipes); // fonts made in the Font lab must exist before the first frame is drawn
   const full = projectDuration(project);
   if (full <= 0) throw new Error('The timeline is empty — nothing to render.');
   // a marked range renders only [in, out): frame i shows timeline time in + i/fps, and the sound is cut to the same window
