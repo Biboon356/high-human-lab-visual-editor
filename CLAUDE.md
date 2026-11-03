@@ -47,13 +47,16 @@ suggestions/curation are guesses, not tuned by real use.
 ## Where things stand
 
 * Released: v0.9.4 (Describe the look: offline mood dictionary or the optional online AI with the user's own key; read-only Graph tab). The owner confirmed
-  the mic button and the online AI work on their Mac. **v0.9.5 pending release** (branch `feat/v0.9.5`): Tell it uses gentle per-parameter default strengths (Scale no longer swings 3.5x), and the Graph moves with the sound (`shared/graph/live.js`
-  uses the renderer's own `resolveParam`; signal levels, line thickness, live numbers; notes when there is no analysis / bindings are off) and marks HEAVY effects
-  (`effect-meta` cost). Still read-only. Planned next: voice input in Describe the look (reuse Hold to speak; raise the 15 s cap), real-frame thumbnails per
-  reading, "Show different ideas" (3 more, up to 9), then an EDITABLE Graph (drag to reorder, drag a wire to bind; NOT a free TouchDesigner graph), Taste Brain,
-  and the "known to tune" items below.
+  the mic button and the online AI work on their Mac. **v0.9.5 pending release** (branch `feat/v0.9.5`): Tell it uses gentle per-parameter default strengths; the Graph moves
+  with the sound (`shared/graph/live.js`, same maths as the renderer) and marks HEAVY effects; Describe the look can be spoken (shared `renderer/ui/dictation-button.js`,
+  30 s takes), shows a picture of each reading on the owner's own frame, and has "Show different ideas" (`vibes.js moreIdeas`, AI gets `alreadyShown`; 9 at most);
+  plus a FONT SPIKE with no UI (`shared/fonts/sfnt.js`, docs/FONTS.md): outlines of a TrueType/WOFF1 font can be changed and written as a renamed TTF with GSUB/GPOS untouched.
+  The owner chose "modify bundled fonts into brand fonts" (option a). Findings that shape the next step: NO Thai font is bundled (Thai uses system fonts), bundled fonts are
+  WOFF2 subsets (not readable by the spike), licence Reserved Font Names unchecked. Planned next: a Font lab (recipe + preview + one Undo step, recipe saved in the project),
+  after deciding which OFL fonts to bundle as WOFF/TTF (a Thai one too); an EDITABLE Graph (NOT a free TouchDesigner graph); Taste Brain; the "known to tune" items below.
 * Tell it amounts (fixed in v0.9.5): `parse.js baseAmount` defines "normal" strength per parameter (a binding moves a value by amount x its WHOLE range, so one default
   cannot fit all); the preview line states how far it moves.
+* Gotcha: in a module that receives the monitor's `preview` object do not name a function `preview` (it shadows the parameter; seen again and fixed in vision-ui as `previewPlan`).
 * e2e flakiness seen under load: a step can fail once in a full run and pass alone (preview editing; the Graph steps before the `defer` fix); rerun before suspecting code.
 * Known to tune: Ghost/Stain default `screen` blend washes out bright footage; a suggestion can pop up while a TIMELINE plan card is open;
   Take/Trace work on one clip only (no group); curator/gate thresholds untested on real use; clips imported before the HDR fix keep a flat proxy.

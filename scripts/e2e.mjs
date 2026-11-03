@@ -2985,6 +2985,45 @@ await step('Describe the look: speak the description, see each reading on your o
   await ev(() => { localStorage.setItem('hhlab.vision.ai', '0'); });
 });
 
+await step('Font spike: a font with changed outlines loads in the browser and Thai tone marks and vowels still sit where the font\'s own rules put them', async () => {
+  const bytes = [...fs.readFileSync(path.join(root, 'node_modules/@fontsource/noto-sans-thai/files/noto-sans-thai-thai-400-normal.woff'))];
+  const r = await ev(async (arr) => {
+    const { mutateFont, skew, roughen } = await import('/shared/fonts/sfnt.js');
+    const src = new Uint8Array(arr);
+    const inflate = async (b) => new Uint8Array(await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('deflate'))).arrayBuffer());
+    const make = { SpikeOrig: null, SpikeSame: {}, SpikeSkew: skew(0.2), SpikeRough: roughen(0.012, 3) };
+    const out = { loaded: {}, errors: {} };
+    for (const [name, move] of Object.entries(make)) {
+      try { const data = move === null ? src : await mutateFont(src, { move, family: name, inflate }); const ff = new FontFace(name, data); await ff.load(); document.fonts.add(ff); out.loaded[name] = data.length; }
+      catch (e) { out.errors[name] = String(e.message || e); }
+    }
+    const ink = (family, text) => { const c = document.createElement('canvas'); c.width = 700; c.height = 260; const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, 700, 260); x.fillStyle = '#000'; x.font = `120px ${family}`; x.textBaseline = 'alphabetic'; x.fillText(text, 30, 170);
+      const d = x.getImageData(0, 0, 700, 260).data; let x0 = 9999, y0 = 9999, x1 = -1, y1 = -1, n = 0; for (let j = 0; j < 260; j++) for (let i = 0; i < 700; i++) { if (d[(j * 700 + i) * 4] < 128) { n++; if (i < x0) x0 = i; if (i > x1) x1 = i; if (j < y0) y0 = j; if (j > y1) y1 = j; } } return { x0, y0, x1, y1, n }; };
+    out.ink = {};
+    for (const name of Object.keys(make)) if (out.loaded[name]) out.ink[name] = { base: ink(name, 'ก'), tone: ink(name, 'ก้'), above: ink(name, 'กิ'), below: ink(name, 'กุ'), word: ink(name, 'น้ำที่') };
+    // a picture for the eyes: the same Thai line in each font
+    const pic = document.createElement('canvas'); pic.id = 'font-spike-pic'; pic.width = 900; pic.height = 330; pic.style.cssText = 'position:fixed;left:20px;top:20px;z-index:99999;background:#fff';
+    const px = pic.getContext('2d'); px.fillStyle = '#fff'; px.fillRect(0, 0, 900, 330); px.fillStyle = '#000'; let yy = 70; for (const name of Object.keys(make)) { if (!out.loaded[name]) continue; px.font = `56px ${name}`; px.fillText('น้ำที่ ก้ กิ กุ สวัสดีครับ', 20, yy); px.font = '14px monospace'; px.fillText(name, 700, yy); yy += 80; }
+    document.body.append(pic);
+    return out;
+  }, bytes);
+  await settle(300); await shot('47-font-spike'); await ev(() => document.getElementById('font-spike-pic')?.remove());
+  assert.deepEqual(r.errors, {}, 'the browser accepts every font we wrote (its sanitiser checks the tables)');
+  assert.deepEqual(Object.keys(r.loaded).sort(), ['SpikeOrig', 'SpikeRough', 'SpikeSame', 'SpikeSkew']);
+  const near = (a, b, tol) => Math.abs(a - b) <= tol;
+  const o = r.ink.SpikeOrig, same = r.ink.SpikeSame;
+  for (const k of ['base', 'tone', 'above', 'below', 'word']) { assert.ok(near(same[k].x0, o[k].x0, 2) && near(same[k].x1, o[k].x1, 2) && near(same[k].y0, o[k].y0, 2) && near(same[k].y1, o[k].y1, 2), `an unchanged outline draws where the original draws (${k}: ${JSON.stringify(same[k])} vs ${JSON.stringify(o[k])})`); assert.ok(Math.abs(same[k].n - o[k].n) / o[k].n < 0.06, `and with about the same ink (${k})`); }
+  for (const name of Object.keys(r.ink)) {
+    const f = r.ink[name];
+    assert.ok(f.tone.y0 < f.base.y0 - 6, `${name}: the tone mark still rises above the consonant (${f.tone.y0} vs ${f.base.y0})`);
+    assert.ok(f.above.y0 < f.base.y0 - 3, `${name}: the upper vowel still sits above (${f.above.y0} vs ${f.base.y0})`);
+    assert.ok(f.below.y1 > f.base.y1 + 6, `${name}: the lower vowel still hangs below (${f.below.y1} vs ${f.base.y1})`);
+    assert.ok(f.word.n > 200, `${name}: the word has ink`);
+  }
+  assert.ok(r.ink.SpikeSkew.base.x1 > o.base.x1 + 3, `the slanted font really is different (right edge ${o.base.x1} -> ${r.ink.SpikeSkew.base.x1})`);
+  assert.notEqual(JSON.stringify(r.ink.SpikeRough.word), JSON.stringify(o.word), 'the roughened font really is different');
+});
+
 const bad = logs.filter((l) => !/GPU stall|swiftshader|GL Driver Message|Automatic fallback/i.test(l));
 await step('no unexpected console errors during the whole run', async () => { assert.deepEqual(bad, []); });
 // Quitting mid-export must not leave ffmpeg processes behind (they would burn CPU forever).

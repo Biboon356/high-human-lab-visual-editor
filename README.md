@@ -272,7 +272,7 @@ without you.
 * Never tried on a real Mac or Windows machine, and the online AI has only been tested against a fake server (no real key was used here): how well it
   reads Thai descriptions of a picture, what it costs per request and the macOS keychain behaviour are unverified. The dictionary's strengths are guesses.
 
-## v0.9.5 — the Graph moves with the sound
+## v0.9.5 — the Graph moves with the sound, and Describe the look grows
 
 * **Graph, live**: while you play or scrub, each signal box fills with how loud that signal is at the playhead, the lines to the parameters it moves get thicker
   with it, and the parameter numbers change to the value the renderer is actually using right then (the same maths as the picture). If the lines cannot move it
@@ -280,6 +280,12 @@ without you.
 * **Heavy effects are marked**: effects classed "heavy" (Pattern, 3D Object) get a HEAVY badge, and the caption warns when there are more than 2 enabled (the limit the
   Mutate engine already keeps). The heavy/medium/light classes are the editor's own estimate: GPU timing has never been measured on a real computer.
 * Still a read-only view: it never changes the project.
+* **Describe the look, more complete**: you can **speak** the description (hold 🎙, up to 30 seconds; the words land in the box to fix, nothing runs until Interpret; the refine
+  box has its own 🎙); every reading now shows **a small picture on your own frame** (the selected clip at the playhead) next to a picture of the frame as it is; and
+  **Show different ideas** adds three more readings that differ in character, up to nine (offline: each mood on its own, the look with one more ingredient, other strengths;
+  online AI: it is told which ideas are on screen so it does not repeat, and each press is another request on your account). Starting a new project clears the old readings.
+* **Font spike (no UI yet)**: see docs/FONTS.md. A bundled font's outlines can be changed (slant, wobble) and written as a new font that the app loads, with the Thai/Devanagari
+  placement rules copied untouched. Not a feature: no Thai font is bundled, WOFF2 is not read, only two moves exist. Notes and open questions are in that file.
 * **Tell it: gentler defaults for wide parameters** (fix). A binding moves a parameter by amount x its whole range, so the old default (half of the range) made
   `zoom follow bass` swing Scale up to about 3.5x. "Normal" strength now means a sensible swing: Scale +0.25, rotation 8 degrees, position 0.1, and for effect
   parameters with a wide range half of the safe range the Mutate engine allows (0..1 knobs are unchanged). The preview line says how far it moves, for example
@@ -362,7 +368,7 @@ Legend: ✅ works and is covered by the automated tests · 🧪 prototype (works
 
 ## Testing
 
-`npm test` runs 293 unit tests. `scripts/e2e.mjs` (86 checks) is a real end-to-end run of the Electron app (see table above): it
+`npm test` runs 305 unit tests. `scripts/e2e.mjs` (88 checks) is a real end-to-end run of the Electron app (see table above): it
 generates test media with ffmpeg, drives the app, reads pixels out of the compositor, and probes exported files.
 Native file dialogs are stubbed at the Electron main-process level; every other path is the production code.
 
