@@ -3044,6 +3044,70 @@ await step('Font spike: a font with changed outlines loads in the browser and Th
   assert.notEqual(JSON.stringify(r.ink.SpikeRough.word), JSON.stringify(o.word), 'the roughened font really is different');
 });
 
+await step('Graph edit: reorder, switch off, remove, drag a signal onto a parameter, set or remove a link, add a link from the menu: each one Undo step, read-only unless switched on, and never while a PREVIEW shows', async () => {
+  await resetProject(); await ev((p) => window.__app.importPaths([p]), clip); await settle(800);
+  const ids = await ev(async () => {
+    const { store } = window.__app; const { createEffect } = await import('/shared/effects-defs.js');
+    const c = store.project.clips.find((x) => x.type === 'media'); store.multi = new Set([c.id]); store.selection = c.id;
+    store.mutate(() => { c.effects.push(createEffect('glitch'), createEffect('grain'), createEffect('bloom')); });
+    store.emit('selection', 'render'); return c.effects.map((e) => e.id);
+  });
+  const [gl, gr, bl] = ids;
+  await ev(() => document.querySelector('[data-tab="graph"]').click()); await settle(500);
+  const state = () => ev(() => { const s = window.__app.store; const c = s.project.clips.find((x) => x.type === 'media'); return { order: c.effects.map((e) => e.type), on: c.effects.map((e) => e.enabled !== false), bind: c.effects.map((e) => e.bindings), clipBind: c.bindings, depth: s.undoStack.length }; });
+  const centre = async (sel) => { const b = await page.locator(sel).first().boundingBox(); return { x: b.x + b.width / 2, y: b.y + b.height / 2 }; };
+  assert.equal(await ev(() => document.querySelectorAll('.g-btn').length), 0, 'read-only by default: no controls');
+  assert.equal(await ev(() => document.querySelectorAll('.g-node.signal').length), 0);
+  await page.click('#graph-edit'); await settle(500);
+  assert.equal(await ev(() => document.querySelectorAll('.g-node.signal').length), 5, 'all five signals are there to drag from');
+  assert.equal(await ev(() => document.querySelectorAll('.g-btn').length), 10, 'glitch: down, switch, remove; grain: up, down, switch, remove; bloom: up, switch, remove');
+  let st = await state(), d0 = st.depth;
+  // run earlier / switch off / run later
+  await page.click(`.g-btn[data-act="up"][data-node="${gr}"]`); await settle(300);
+  st = await state(); assert.deepEqual(st.order, ['grain', 'glitch', 'bloom']); assert.equal(st.depth, d0 + 1, 'one Undo step');
+  await page.click(`.g-btn[data-act="toggle"][data-node="${bl}"]`); await settle(300);
+  st = await state(); assert.deepEqual(st.on, [true, true, false]); assert.equal(st.depth, d0 + 2);
+  assert.equal(await ev((id) => document.querySelector(`.g-node[data-node="${id}"]`).classList.contains('off'), bl), true, 'the box shows it is off');
+  await page.click(`.g-btn[data-act="toggle"][data-node="${bl}"]`); await settle(300);
+  assert.deepEqual((await state()).on, [true, true, true]);
+  // drag from the bass box onto Glitch > Intensity
+  d0 = (await state()).depth;
+  const from = await centre('.g-node.signal[data-node="sig:bass"]'); await ev((f) => { window.__from = f; }, from); const to = await centre(`.g-hit[data-node="${gl}"][data-key="amount"]`);
+  await page.mouse.move(from.x, from.y); await page.mouse.down(); await page.mouse.move((from.x + to.x) / 2, (from.y + to.y) / 2, { steps: 6 }); await page.mouse.move(to.x, to.y, { steps: 6 }); await page.mouse.up(); await settle(500);
+  const diag = await ev(([x, y, id]) => ({ hits: document.querySelectorAll('.g-hit').length, mine: !!document.querySelector(`.g-hit[data-node="${id}"][data-key="amount"]`), top: (document.elementFromPoint(x, y)?.outerHTML || '').slice(0, 140), drag: !!document.querySelector('.g-wire.drag'), topFrom: (document.elementFromPoint(window.__from.x, window.__from.y)?.outerHTML || '').slice(0, 160), vp: [innerWidth, innerHeight] }), [to.x, to.y, gl]);
+  st = await state(); assert.deepEqual(st.bind[1].amount, { source: 'bass', amount: 0.5 }, `the link exists with the normal strength (${JSON.stringify(st.bind)} ${JSON.stringify(diag)})`); assert.equal(st.depth, d0 + 1);
+  assert.equal(await ev(() => document.querySelectorAll('.g-wire').length), 1);
+  assert.equal(await ev(() => !!document.getElementById('graph-amt')), true, 'the new link is selected so its strength can be set');
+  await shot('48-graph-edit');
+  // strength, then remove
+  await page.locator('#graph-amt').fill('-0.6'); await settle(400);
+  st = await state(); assert.equal(st.bind[1].amount.amount, -0.6); assert.equal(st.depth, d0 + 2);
+  await page.click('#graph-unlink'); await settle(400);
+  st = await state(); assert.equal(st.bind[1].amount, undefined); assert.equal(st.depth, d0 + 3); assert.equal(await ev(() => !!document.getElementById('graph-amt')), false);
+  // dropping on empty space does nothing
+  const d1 = st.depth, from2 = await centre('.g-node.signal[data-node="sig:high"]');
+  await page.mouse.move(from2.x, from2.y); await page.mouse.down(); await page.mouse.move(from2.x + 5, from2.y + 400, { steps: 5 }); await page.mouse.up(); await settle(300);
+  assert.equal((await state()).depth, d1, 'a drop on nothing changes nothing, and adds no Undo step');
+  // the menu: a parameter that has no row on the picture
+  await page.selectOption('#graph-add-target', gl); await page.selectOption('#graph-add-param', 'split'); await page.selectOption('#graph-add-signal', 'high'); await page.click('#graph-add-go'); await settle(400);
+  st = await state(); assert.equal(st.bind[1].split.source, 'high'); assert.equal(st.depth, d1 + 1);
+  const params = await ev(() => [...document.querySelectorAll('#graph-add-param option')].map((o) => o.value));
+  assert.ok(params.includes('amount') && params.includes('wet') && !params.includes('nonsense'));
+  // remove an effect, and Undo brings it back in its place
+  await page.click(`.g-btn[data-act="remove"][data-node="${gr}"]`); await settle(300);
+  st = await state(); assert.deepEqual(st.order, ['glitch', 'bloom']);
+  await ev(() => window.__app.store.undo()); await settle(300);
+  assert.deepEqual((await state()).order, ['grain', 'glitch', 'bloom'], 'Undo restores it where it was');
+  // never while a PREVIEW is showing
+  await ev(() => { const { store } = window.__app; const ids = [...store.multi]; store.showGhost({ label: 'x', apply: (p) => { p.clips.find((c) => c.id === ids[0]).effects.push({ id: 'zz', type: 'blur', enabled: true, params: { radius: 8, mix: 1 }, keyframes: {}, bindings: {} }); return true; } }); }); await settle(400);
+  assert.equal(await ev(() => document.querySelectorAll('.g-btn').length), 0, 'no controls over a preview'); assert.match(await ev(() => document.getElementById('graph-tools').textContent), /apply or cancel/i);
+  await ev(() => window.__app.store.clearGhost()); await settle(300);
+  assert.ok((await ev(() => document.querySelectorAll('.g-btn').length)) > 0, 'controls are back once the preview is gone');
+  // switched off again: read-only
+  await page.click('#graph-edit'); await settle(400);
+  assert.equal(await ev(() => document.querySelectorAll('.g-btn').length), 0); assert.equal(await ev(() => document.querySelectorAll('.g-node.signal').length), 1, 'only the used signal is drawn again');
+});
+
 const bad = logs.filter((l) => !/GPU stall|swiftshader|GL Driver Message|Automatic fallback/i.test(l));
 await step('no unexpected console errors during the whole run', async () => { assert.deepEqual(bad, []); });
 // Quitting mid-export must not leave ffmpeg processes behind (they would burn CPU forever).

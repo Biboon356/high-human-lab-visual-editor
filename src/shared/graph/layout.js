@@ -30,7 +30,8 @@ function effectPorts(fx, baseFx) {
   });
 }
 
-export function buildGraph(clip, base = null) {
+/** @param opts {allSignals: draw all five signal boxes (the unused ones dimmed) so a link can be dragged from any of them} */
+export function buildGraph(clip, base = null, opts = {}) {
   const G = GEOM;
   if (!clip) return { width: G.width, height: 0, nodes: [], edges: [], empty: true };
   const nodes = [], edges = [];
@@ -66,11 +67,12 @@ export function buildGraph(clip, base = null) {
   // signals: only the ones in use, each placed near the average height of what it drives
   const wires = [];
   for (const n of nodes) n.ports.forEach((p, i) => { if (p.bound && REACTIVE_SOURCES.includes(p.source)) wires.push({ node: n, port: p, y: portY(n, i) }); });
-  const used = REACTIVE_SOURCES.filter((s) => wires.some((w) => w.port.source === s));
-  const sigs = used.map((s) => { const ys = wires.filter((w) => w.port.source === s).map((w) => w.y); return { id: `sig:${s}`, kind: 'signal', source: s, label: SIGNAL_LABELS[s], enabled: true, isNew: false, ports: [], w: G.sigW, h: G.sigH, x: G.sigX, y: ys.reduce((a, b) => a + b, 0) / ys.length - G.sigH / 2 }; });
-  sigs.sort((a, b) => a.y - b.y);
+  const used = REACTIVE_SOURCES.filter((s) => opts.allSignals || wires.some((w) => w.port.source === s));
+  const sigs = used.map((s) => { const ys = wires.filter((w) => w.port.source === s).map((w) => w.y); return { id: `sig:${s}`, kind: 'signal', source: s, label: SIGNAL_LABELS[s], enabled: true, isNew: false, unused: !ys.length, ports: [], w: G.sigW, h: G.sigH, x: G.sigX, y: ys.length ? ys.reduce((a, b) => a + b, 0) / ys.length - G.sigH / 2 : 0 }; }); // unused ones are placed below the used ones
+  const live = sigs.filter((x) => !x.unused).sort((a, b) => a.y - b.y), idle = sigs.filter((x) => x.unused);
   let floor = G.top;
-  for (const s of sigs) { s.y = Math.max(s.y, floor); floor = s.y + G.sigH + G.sigGap; }
+  for (const x of live) { x.y = Math.max(x.y, floor); floor = x.y + G.sigH + G.sigGap; }
+  for (const x of idle) { x.y = floor; floor += G.sigH + G.sigGap; }
   nodes.push(...sigs);
   for (const w of wires) {
     const s = sigs.find((x) => x.source === w.port.source);

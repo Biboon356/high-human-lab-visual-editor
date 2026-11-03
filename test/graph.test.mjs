@@ -152,3 +152,16 @@ test('computing live values never changes the clip', () => {
   liveGraph(c, 1, { rms: 1, bass: 1, mid: 1, high: 1, beat: 1 });
   assert.equal(JSON.stringify(c), before);
 });
+
+test('allSignals draws all five signal boxes for editing: the used ones where their wires go, the unused ones dimmed below, none overlapping', () => {
+  const { c } = scene(); const e = createEffect('glitch'); e.bindings.amount = { source: 'bass', amount: 0.5 }; c.effects.push(e);
+  const g = buildGraph(c, null, { allSignals: true });
+  const sigs = g.nodes.filter((n) => n.kind === 'signal');
+  assert.deepEqual(sigs.map((n) => n.source).sort(), ['bass', 'beat', 'high', 'mid', 'rms']);
+  assert.deepEqual(sigs.filter((n) => n.unused).map((n) => n.source).sort(), ['beat', 'high', 'mid', 'rms']); assert.equal(sigs.find((n) => n.source === 'bass').unused, false);
+  const ys = sigs.map((n) => n.y).sort((a, b) => a - b); for (let i = 1; i < ys.length; i++) assert.ok(ys[i] - ys[i - 1] >= GEOM.sigH, 'no overlap'); assert.ok(ys.every(Number.isFinite));
+  assert.ok(sigs.find((n) => n.source === 'bass').y < Math.min(...sigs.filter((n) => n.unused).map((n) => n.y)), 'the used one comes first');
+  assert.ok(g.height >= Math.max(...sigs.map((n) => n.y + n.h)), 'the picture is tall enough for them all');
+  assert.equal(buildGraph(c).nodes.filter((n) => n.kind === 'signal').length, 1, 'by default only the used ones');
+  assert.equal(buildGraph(scene().c, null, { allSignals: true }).nodes.filter((n) => n.kind === 'signal').length, 5, 'even with nothing linked');
+});

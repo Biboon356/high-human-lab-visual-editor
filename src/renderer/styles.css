@@ -427,3 +427,11 @@ kbd { font: 500 9.5px var(--mono); letter-spacing: .04em; padding: 1px 6px; bord
 .vis-body, .vis-body .cmd-list li, .vis-body b { overflow-wrap: anywhere; word-break: break-word; } .vis-body .vis-src { display: block; margin: 2px 0 4px; }
 .vis-cand { overflow: hidden; } .vis-body .cmd-list { margin-bottom: 6px; }
 .cmd-row { flex-wrap: wrap; } .vision-card .cmd-row select, #vision-card .cmd-row select { max-width: 100%; }
+
+.graph-editrow { padding: 0 14px; } .graph-tools { padding: 0 14px 8px; } .graph-tools select { max-width: 100%; }
+.graph-svg .g-btn rect { fill: var(--panel, #181818); stroke: var(--line2, #444); cursor: pointer; } .graph-svg .g-btn:hover rect { stroke: var(--accent2, #5c8); } .graph-svg .g-btn text { fill: var(--text, #ddd); font-size: 10px; pointer-events: none; }
+.graph-svg .g-hit { fill: transparent; pointer-events: all; } .graph-svg .g-hit.over { fill: color-mix(in srgb, var(--accent2, #5c8) 25%, transparent); stroke: var(--accent2, #5c8); }
+.graph-svg .drag-from .g-box { stroke-width: 1.6; } .graph-svg .drag-from.idle { opacity: .55; } .graph-svg .g-wire.drag { stroke-dasharray: 3 3; pointer-events: none; opacity: 1; stroke-width: 2; }
+.graph-svg .g-wire-hit { fill: none; stroke: transparent; stroke-width: 10; cursor: pointer; pointer-events: stroke; } .graph-svg .g-wire-hit.sel { stroke: color-mix(in srgb, var(--accent2, #5c8) 30%, transparent); }
+.graph-svg text, .graph-svg circle { pointer-events: none; } /* so a drop lands on the parameter row underneath, not on its label */
+.graph-svg .g-box { pointer-events: all; } /* the signal boxes have no fill, but must still be grabbable */
