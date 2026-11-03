@@ -46,11 +46,15 @@ suggestions/curation are guesses, not tuned by real use.
 
 ## Where things stand
 
-* Released: v0.9.3 (Tell it + Hold to speak). **v0.9.4 pending release** (branch `feat/v0.9.4`): **Describe the look** (Looks tab: a free-form
-  description → three look plans via an offline mood dictionary `shared/vision/vibes.js`, or the optional online AI `main/ai.js` with the user's own
-  key kept by `main/ai-key.js` (safeStorage); every plan passes `shared/vision/plan.js` → Mutation Engine `validateChain/composeChain`; PREVIEW first;
-  refine by sentence) and the **Graph** tab (`shared/graph/layout.js` + `renderer/ui/graph-ui.js`: a READ-ONLY drawing of the selected clip's chain and audio bindings, draws the PREVIEW copy and marks what is new). The online AI has only been tested against a fake server, never a real key. Mic/Whisper on a real Mac/Windows: the owner is trying
-  v0.9.3. Planned next: make the Graph editable (drag to reorder, drag a wire to bind; NOT a free TouchDesigner graph, that would need a new compositor), Taste Brain, then the "known to tune" items below.
+* Released: v0.9.4 (Describe the look: offline mood dictionary or the optional online AI with the user's own key; read-only Graph tab). The owner confirmed
+  the mic button and the online AI work on their Mac. **v0.9.5 pending release** (branch `feat/v0.9.5`): the Graph moves with the sound (`shared/graph/live.js`
+  uses the renderer's own `resolveParam`; signal levels, line thickness, live numbers; notes when there is no analysis / bindings are off) and marks HEAVY effects
+  (`effect-meta` cost). Still read-only. Planned next: voice input in Describe the look (reuse Hold to speak; raise the 15 s cap), real-frame thumbnails per
+  reading, "Show different ideas" (3 more, up to 9), then an EDITABLE Graph (drag to reorder, drag a wire to bind; NOT a free TouchDesigner graph), Taste Brain,
+  and the "known to tune" items below.
+* Known issue found, not fixed: a binding moves a parameter by `amount x its whole range`, so Tell it's default amount 0.5 on clip Scale (range 0.05-5) swings it to
+  about 3.5x. Tell it should use a smaller default for wide-range clip properties.
+* e2e flakiness seen under load: a step can fail once in a full run and pass alone (preview editing; the Graph steps before the `defer` fix); rerun before suspecting code.
 * Known to tune: Ghost/Stain default `screen` blend washes out bright footage; a suggestion can pop up while a TIMELINE plan card is open;
   Take/Trace work on one clip only (no group); curator/gate thresholds untested on real use; clips imported before the HDR fix keep a flat proxy.
 * Ideas not built: Root-Letters (roots out of letters), Living Score, per-section looks, palette lock from album art, Look Card, Human Groove,

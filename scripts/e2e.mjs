@@ -2862,10 +2862,10 @@ await step('Graph: the chain is drawn in order with the music links as wires, a 
     store.emit('selection', 'render');
   });
   await ev(() => document.querySelector('[data-tab="graph"]').click()); await settle(500);
-  const info = () => ev(() => ({ nodes: [...document.querySelectorAll('.g-node')].map((n) => n.dataset.kind + ':' + (n.dataset.type || '')), wires: document.querySelectorAll('.g-wire').length, fresh: document.querySelectorAll('.g-node.new').length, cap: document.getElementById('graph-caption').textContent }));
+  const info = () => ev(() => ({ nodes: [...document.querySelectorAll('.g-node')].map((n) => n.dataset.kind + ':' + (n.dataset.type || '')), wires: document.querySelectorAll('.g-wire').length, fresh: document.querySelectorAll('.g-node.new').length, cap: document.getElementById('graph-caption').textContent, holder: document.getElementById('graph-holder').innerHTML.length, on: document.getElementById('graph').classList.contains('on'), sel: window.__app.store.selection }));
   const before = await ev(() => JSON.stringify(window.__app.store.project));
   let g = await info();
-  assert.deepEqual(g.nodes.filter((n) => !n.startsWith('signal')), ['clip:', 'effect:glitch', 'effect:grain', 'effect:bloom', 'out:'], 'chain in order');
+  assert.deepEqual(g.nodes.filter((n) => !n.startsWith('signal')), ['clip:', 'effect:glitch', 'effect:grain', 'effect:bloom', 'out:'], `chain in order (pane on: ${g.on}, selection: ${g.sel}, holder chars: ${g.holder}, caption: ${g.cap})`);
   assert.equal(g.nodes.filter((n) => n.startsWith('signal')).length, 3, 'bass, loudness and beats are in use'); assert.equal(g.wires, 3);
   assert.match(g.cap, /3 effects, 3 links/);
   await shot('43-graph');
@@ -2887,6 +2887,40 @@ await step('Graph: the chain is drawn in order with the music links as wires, a 
   await ev(() => { const { store } = window.__app; store.selection = null; store.multi = new Set(); store.emit('selection', 'render'); document.querySelector('[data-tab="graph"]').click(); }); await settle(400);
   assert.match(await ev(() => document.getElementById('graph-caption').textContent), /Select a clip/);
   assert.notEqual(await ev(() => JSON.stringify(window.__app.store.project)), before, 'the only change was the one binding removed on purpose');
+});
+
+await step('Graph live: lines, numbers and signal levels follow the sound at the playhead, heavy effects are marked, and it says what is missing', async () => {
+  await resetProject(); await ev((p) => window.__app.importPaths([p]), clip); await settle(800);
+  await ev(async () => {
+    const { store } = window.__app; const { createEffect } = await import('/shared/effects-defs.js');
+    store.analysis = null; store.analysisStale = false;
+    const c = store.project.clips.find((x) => x.type === 'media'); store.multi = new Set([c.id]); store.selection = c.id;
+    store.mutate(() => { const g = createEffect('glitch', { amount: 0.2 }); g.bindings.amount = { source: 'bass', amount: 0.6 }; c.effects.push(g, createEffect('pattern')); });
+    store.project.reactive.enabled = true; store.emit('selection', 'render');
+  });
+  await ev(() => document.querySelector('[data-tab="graph"]').click()); await settle(500);
+  const snap = () => ev(() => { const w = document.querySelector('.g-wire'); const lv = document.querySelector('.g-node.signal .g-level'); const val = [...document.querySelectorAll('.g-node.effect')].find((n) => n.dataset.type === 'glitch').querySelector('.g-val'); return { sw: parseFloat(w.style.strokeWidth || '0'), lvl: parseFloat(lv.getAttribute('width')), val: val.textContent, note: document.getElementById('graph-live-note').textContent, cap: document.getElementById('graph-caption').textContent }; });
+  assert.equal(await ev(() => document.querySelectorAll('.g-cost').length), 1, 'one heavy effect is marked'); assert.match((await snap()).cap, /1 heavy effect\./);
+  assert.match((await snap()).note, /Analyze the audio/, 'without an analysis it says why the lines are still');
+  // a made-up analysis: silence for 3 s, then a loud bass for the rest
+  await ev(() => { const { store } = window.__app; const n = 100, z = Array(n).fill(0); store.analysis = { rate: 10, duration: 10, rms: z.map((_, i) => (i < 30 ? 0.1 : 0.9)), bass: z.map((_, i) => (i < 30 ? 0 : 1)), mid: z, high: z, beat: z, beats: [], bpm: null }; store.analysisStale = false; store.emit('analysis', 'render'); });
+  const before = await ev(() => JSON.stringify(window.__app.store.project));
+  await ev(() => window.__app.store.setPlayhead(1)); await settle(300);
+  const quiet = await snap();
+  await ev(() => window.__app.store.setPlayhead(4)); await settle(300);
+  const loud = await snap();
+  assert.equal(quiet.note, ''); assert.ok(loud.sw > quiet.sw + 1.5, `the wire thickens with the bass (${quiet.sw} → ${loud.sw})`);
+  assert.ok(quiet.lvl < 1 && loud.lvl > 60, `the bass box fills (${quiet.lvl} → ${loud.lvl})`);
+  assert.equal(quiet.val, '0.2'); assert.equal(loud.val, '0.8', `the number is what the renderer computes: 0.2 + amount 0.6 x bass 1 x the range 1 (got ${loud.val})`);
+  await shot('45-graph-live');
+  assert.equal(await ev(() => JSON.stringify(window.__app.store.project)), before, 'following the sound changed nothing in the project');
+  // switched off in the project: the lines go still and it says so
+  await ev(() => { window.__app.store.project.reactive.enabled = false; window.__app.store.emit('project', 'render'); window.__app.store.setPlayhead(4.1); }); await settle(400);
+  const off = await snap(); assert.match(off.note, /switched off/); assert.equal(off.val, '0.2'); assert.ok(off.sw < 1.5);
+  await ev(() => { window.__app.store.project.reactive.enabled = true; });
+  // too many heavy effects: the caption warns
+  await ev(async () => { const { store } = window.__app; const { createEffect } = await import('/shared/effects-defs.js'); store.mutate(() => { const c = store.project.clips.find((x) => x.type === 'media'); c.effects.push(createEffect('object3d'), createEffect('pattern')); }); }); await settle(400);
+  assert.match((await snap()).cap, /3 heavy effects: more than the editor suggests/); assert.equal(await ev(() => document.querySelectorAll('.g-cost').length), 3);
 });
 
 const bad = logs.filter((l) => !/GPU stall|swiftshader|GL Driver Message|Automatic fallback/i.test(l));

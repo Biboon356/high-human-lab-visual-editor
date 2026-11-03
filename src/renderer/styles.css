@@ -418,3 +418,6 @@ kbd { font: 500 9.5px var(--mono); letter-spacing: .04em; padding: 1px 6px; bord
 .graph-svg .g-flow { stroke: var(--dim, #888); stroke-width: 1.2; } .graph-svg .g-flow.new { stroke: var(--accent2, #5c8); } .graph-svg .g-arrowhead { fill: var(--dim, #888); }
 .graph-svg .g-wire { fill: none; stroke: var(--accent2, #5c8); stroke-width: 1.3; opacity: .8; } .graph-svg .g-wire.neg { stroke-dasharray: 4 3; } .graph-svg .g-wire.new { stroke-width: 2; opacity: 1; }
 .graph-svg .g-dot { fill: var(--accent2, #5c8); } .graph-svg .g-amt { fill: var(--text, #ddd); font-size: 9px; paint-order: stroke; stroke: var(--panel, #111); stroke-width: 3px; stroke-linejoin: round; }
+
+.graph-svg .g-cost { fill: var(--warn, #e0a33a); font-size: 8.5px; text-transform: uppercase; letter-spacing: .1em; } .graph-svg .g-level { fill: var(--accent2, #5c8); }
+.graph-svg .g-wire { transition: opacity .08s linear; } .graph-note { color: var(--warn, #e0a33a); min-height: 0; }

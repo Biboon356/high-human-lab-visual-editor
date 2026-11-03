@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildGraph, describeGraph, GEOM, SIGNAL_LABELS } from '../src/shared/graph/layout.js';
+import { liveGraph } from '../src/shared/graph/live.js';
+import { resolveParam } from '../src/shared/params.js';
 import { createProject, createClip } from '../src/shared/project.js';
 import { createEffect } from '../src/shared/effects-defs.js';
 import { applyPlan } from '../src/shared/vision/plan.js';
@@ -92,5 +94,61 @@ test('the layout is a pure view: building a graph never changes the clip', () =>
   const { c } = scene(); const e = createEffect('glitch'); e.bindings.amount = { source: 'bass', amount: 0.5 }; c.effects.push(e);
   const before = JSON.stringify(c);
   buildGraph(c); buildGraph(c, structuredClone(c));
+  assert.equal(JSON.stringify(c), before);
+});
+
+test('heavy effects are marked from the same classification the Mutate engine uses, and the caption says when there are too many', () => {
+  const { c } = scene();
+  c.effects.push(createEffect('grain'), createEffect('pattern'));
+  let g = buildGraph(c);
+  assert.equal(g.nodes.find((n) => n.type === 'grain').cost, 'light'); assert.equal(g.nodes.find((n) => n.type === 'pattern').cost, 'heavy'); assert.equal(g.nodes.find((n) => n.type === 'blur'), undefined);
+  assert.equal(g.heavy, 1); assert.match(describeGraph(g), /1 heavy effect\./); assert.doesNotMatch(describeGraph(g), /stutter/);
+  c.effects.push(createEffect('object3d'), createEffect('pattern'));
+  g = buildGraph(c);
+  assert.equal(g.heavy, 3); assert.match(describeGraph(g), /3 heavy effects: more than the editor suggests/);
+  c.effects.forEach((e) => { if (e.type !== 'grain') e.enabled = false; });
+  assert.equal(buildGraph(c).heavy, 0, 'a switched-off effect costs nothing');
+  assert.equal(buildGraph(scene().c).heavy, 0);
+});
+
+test('ports carry their numeric range and base so the picture can be computed live', () => {
+  const { c } = scene(); const e = createEffect('glitch'); e.bindings.amount = { source: 'bass', amount: 0.5 }; e.params.amount = 0.4; c.effects.push(e);
+  const p = buildGraph(c).nodes.find((n) => n.type === 'glitch').ports[0];
+  assert.deepEqual(p.range, [0, 1]); assert.equal(p.base, 0.4);
+});
+
+test('live values match what the renderer resolves, move with the signal, and are plain numbers without audio', () => {
+  const { c } = scene();
+  const e = createEffect('glitch'); e.params.amount = 0.2; e.bindings.amount = { source: 'bass', amount: 0.5 };
+  const k = createEffect('grain'); k.params.size = 1; k.keyframes.size = [{ t: 0, v: 1 }, { t: 2, v: 3 }];
+  c.start = 1; c.effects.push(e, k); c.bindings.scale = { source: 'beat', amount: 0.5 };
+  const g = buildGraph(c);
+  const loud = liveGraph(c, 1, { rms: 0.5, bass: 1, mid: 0.2, high: 0.1, beat: 1 }, g);
+  const quiet = liveGraph(c, 1, { rms: 0.1, bass: 0, mid: 0, high: 0, beat: 0 }, g);
+  const key = `${e.id}|amount`;
+  assert.equal(loud.ports[key], String(+resolveParam(e, 'amount', 0.2, 0, { bass: 1 }, [0, 1]).toFixed(3)));
+  assert.equal(loud.ports[key], '0.7'); assert.equal(quiet.ports[key], '0.2');
+  assert.deepEqual(loud.wires[key], { source: 'bass', level: 1, push: 0.5 }); assert.equal(quiet.wires[key].level, 0);
+  assert.equal(loud.signals.bass, 1); assert.equal(quiet.signals.bass, 0);
+  assert.equal(liveGraph(c, 2, quiet).ports[`${k.id}|size`], '2', 'a keyframed parameter is read at the clip-relative time (project time 2 = 1 s into the clip)');
+  assert.equal(liveGraph(c, 99, quiet).ports[`${k.id}|size`], '3', 'past the end it holds the last keyframe');
+  assert.equal(liveGraph(c, 0, quiet).ports[`${k.id}|size`], '1', 'before the clip starts it holds the first');
+  assert.equal(loud.ports['clip|scale'], '3.475', 'a binding moves the value by amount x the parameter\'s whole range (Scale spans 0.05 to 5)'); assert.equal(quiet.ports['clip|scale'], '1');
+  const off = liveGraph(c, 1, null, g);
+  assert.equal(off.reactive, false); assert.equal(off.ports[key], '0.2'); assert.deepEqual(off.wires, {}); assert.equal(off.signals.bass, 0);
+});
+
+test('live values are tolerant: no clip, an empty graph, garbage features', () => {
+  assert.deepEqual(liveGraph(null, 0, null).ports, {});
+  const { c } = scene(); const e = createEffect('grain'); e.bindings.amount = { source: 'rms', amount: 0.5 }; c.effects.push(e);
+  const r = liveGraph(c, 0, { rms: NaN, bass: undefined, mid: 5, high: -2, beat: 'x' });
+  assert.equal(r.signals.rms, 0); assert.equal(r.signals.mid, 1); assert.equal(r.signals.high, 0);
+  assert.ok(Number.isFinite(Number(r.ports[`${e.id}|amount`])));
+});
+
+test('computing live values never changes the clip', () => {
+  const { c } = scene(); const e = createEffect('glitch'); e.bindings.amount = { source: 'bass', amount: 0.5 }; c.effects.push(e);
+  const before = JSON.stringify(c);
+  liveGraph(c, 1, { rms: 1, bass: 1, mid: 1, high: 1, beat: 1 });
   assert.equal(JSON.stringify(c), before);
 });

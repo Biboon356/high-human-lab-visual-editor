@@ -161,3 +161,8 @@ Engine's `validateChain`/`composeChain`, is shown with `store.showGhost`, and on
 
 The **Graph** tab (`shared/graph/layout.js`, `renderer/ui/graph-ui.js`) is a pure, read-only layout of one clip: effect chain top to bottom, audio bindings as wires from
 signal boxes to parameter rows. With a PREVIEW showing it receives the ghost copy plus the real clip as `base`, and flags what the preview adds.
+
+## v0.9.5 additions
+
+Graph live (`shared/graph/live.js`): signal levels, wire thickness and parameter values at the playhead, computed with `resolveParam` exactly like the compositor
+(features from `sampleFeatures(store.analysis, store.playhead)`, clip-relative time clamped to the clip). Heavy marking comes from `EFFECT_META[type].cost`.

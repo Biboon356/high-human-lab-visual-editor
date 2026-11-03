@@ -4,14 +4,17 @@
 // `base` (optional) is the real clip while `clip` is a PREVIEW copy: effects and wires that only exist in the preview are flagged `isNew`.
 import { EFFECTS } from '../effects-defs.js';
 import { REACTIVE_SOURCES, CLIP_PROPS } from '../params.js';
+import { metaFor } from '../mutation/effect-meta.js';
 
 export const SIGNAL_LABELS = { rms: 'loudness', bass: 'bass', mid: 'mids', high: 'highs', beat: 'beats' };
 export const GEOM = { width: 320, sigX: 6, sigW: 70, chainX: 142, chainW: 172, head: 24, row: 16, pad: 6, gap: 22, top: 10, sigH: 24, sigGap: 6 };
+export const HEAVY_SUGGESTED = 2; // the same limit the Mutate engine keeps (composeChain maxHeavy)
 const PRIMARY = ['amount', 'intensity', 'strength', 'growth', 'density', 'radius', 'size'];
 
 const isNumDef = (d) => !d.kind && !d.toggle && !d.options && Number.isFinite(d.min) && Number.isFinite(d.max);
 const shortName = (label) => { const t = String(label).replace(/ \(.*/, '').split(' / ')[0]; return t.length > 18 ? `${t.slice(0, 17)}…` : t; };
-const fmt = (v) => (typeof v === 'number' ? String(+v.toFixed(3)) : String(v));
+export const fmtValue = (v) => (typeof v === 'number' ? String(+v.toFixed(3)) : String(v));
+const fmt = fmtValue;
 
 function effectPorts(fx, baseFx) {
   const def = EFFECTS[fx.type];
@@ -22,7 +25,8 @@ function effectPorts(fx, baseFx) {
     const value = key === 'wet' ? fx.wet ?? 1 : fx.params?.[key] ?? d.def;
     const b = fx.bindings?.[key] || null;
     const was = baseFx?.bindings?.[key];
-    return { key, label: String(d.label).replace(/ \(.*/, ''), value: fmt(value), animated: !!fx.keyframes?.[key]?.length, bound: !!b, source: b?.source || null, amount: b ? b.amount : null, isNewBind: !!b && baseFx !== undefined && !(was && was.source === b.source && was.amount === b.amount) };
+    const numeric = key === 'wet' || isNumDef(d);
+    return { key, label: String(d.label).replace(/ \(.*/, ''), value: fmt(value), range: numeric ? (key === 'wet' ? [0, 1] : [d.min, d.max]) : null, base: numeric && typeof value === 'number' ? value : null, animated: !!fx.keyframes?.[key]?.length, bound: !!b, source: b?.source || null, amount: b ? b.amount : null, isNewBind: !!b && baseFx !== undefined && !(was && was.source === b.source && was.amount === b.amount) };
   });
 }
 
@@ -37,7 +41,7 @@ export function buildGraph(clip, base = null) {
   // clip node: its own bound properties (scale, opacity, ...)
   const clipPorts = Object.entries(clip.bindings || {}).filter(([k]) => CLIP_PROPS.some((d) => d.key === k)).map(([key, b]) => {
     const d = CLIP_PROPS.find((x) => x.key === key);
-    return { key, label: d.label, value: fmt(clip.props?.[key] ?? d.def), animated: !!clip.keyframes?.[key]?.length, bound: true, source: b.source, amount: b.amount, isNewBind: !!base && !(base.bindings?.[key] && base.bindings[key].source === b.source && base.bindings[key].amount === b.amount) };
+    return { key, label: d.label, value: fmt(clip.props?.[key] ?? d.def), range: [d.min, d.max], base: clip.props?.[key] ?? d.def, animated: !!clip.keyframes?.[key]?.length, bound: true, source: b.source, amount: b.amount, isNewBind: !!base && !(base.bindings?.[key] && base.bindings[key].source === b.source && base.bindings[key].amount === b.amount) };
   });
   const clipNode = place({ id: 'clip', kind: 'clip', label: String(clip.name || 'Clip').slice(0, 22), enabled: true, isNew: false, ports: clipPorts }, clipPorts.length);
   nodes.push(clipNode);
@@ -49,7 +53,7 @@ export function buildGraph(clip, base = null) {
     y += G.gap;
     const bfx = base ? baseById.get(fx.id) : undefined;
     const ports = effectPorts(fx, bfx);
-    const n = place({ id: fx.id || `fx${i}`, kind: 'effect', type: fx.type, label: shortName(EFFECTS[fx.type].label), enabled: fx.enabled !== false, isNew: !!base && !bfx, ports }, ports.length);
+    const n = place({ id: fx.id || `fx${i}`, kind: 'effect', type: fx.type, label: shortName(EFFECTS[fx.type].label), cost: metaFor(fx.type)?.cost || 'light', enabled: fx.enabled !== false, isNew: !!base && !bfx, ports }, ports.length);
     nodes.push(n);
     edges.push({ kind: 'flow', from: prev.id, to: n.id, x1: G.chainX + G.chainW / 2, y1: prev.y + prev.h, x2: G.chainX + G.chainW / 2, y2: n.y, isNew: n.isNew });
     prev = n;
@@ -73,12 +77,14 @@ export function buildGraph(clip, base = null) {
     edges.push({ kind: 'bind', from: s.id, to: w.node.id, key: w.port.key, x1: s.x + s.w, y1: s.y + G.sigH / 2, x2: G.chainX, y2: w.y, amount: w.port.amount, source: w.port.source, isNew: w.port.isNewBind || w.node.isNew });
   }
   const height = Math.max(out.y + out.h, floor) + G.top;
-  return { width: G.width, height, nodes, edges, empty: false, hasWires: wires.length > 0 };
+  const heavy = nodes.filter((n) => n.kind === 'effect' && n.enabled && n.cost === 'heavy').length;
+  return { width: G.width, height, nodes, edges, empty: false, hasWires: wires.length > 0, heavy };
 }
 
 /** One sentence for the graph's caption / screen readers. */
 export function describeGraph(g) {
   if (g.empty) return 'Select a clip to see its effect chain.';
   const fx = g.nodes.filter((n) => n.kind === 'effect'), wires = g.edges.filter((e) => e.kind === 'bind'), fresh = g.nodes.filter((n) => n.isNew).length + wires.filter((e) => e.isNew && !g.nodes.find((n) => n.id === e.to)?.isNew).length;
-  return `${fx.length} effect${fx.length === 1 ? '' : 's'}, ${wires.length} link${wires.length === 1 ? '' : 's'} to the music${fresh ? `, ${fresh} new in the preview` : ''}.`;
+  const heavy = g.heavy ? ` ${g.heavy} heavy effect${g.heavy === 1 ? '' : 's'}${g.heavy > HEAVY_SUGGESTED ? ': more than the editor suggests, playback may stutter on older computers' : ''}.` : '';
+  return `${fx.length} effect${fx.length === 1 ? '' : 's'}, ${wires.length} link${wires.length === 1 ? '' : 's'} to the music${fresh ? `, ${fresh} new in the preview` : ''}.${heavy}`;
 }

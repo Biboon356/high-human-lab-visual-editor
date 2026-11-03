@@ -272,6 +272,16 @@ without you.
 * Never tried on a real Mac or Windows machine, and the online AI has only been tested against a fake server (no real key was used here): how well it
   reads Thai descriptions of a picture, what it costs per request and the macOS keychain behaviour are unverified. The dictionary's strengths are guesses.
 
+## v0.9.5 — the Graph moves with the sound
+
+* **Graph, live**: while you play or scrub, each signal box fills with how loud that signal is at the playhead, the lines to the parameters it moves get thicker
+  with it, and the parameter numbers change to the value the renderer is actually using right then (the same maths as the picture). If the lines cannot move it
+  says why: no audio analysis yet, the audio changed since it was analyzed, or audio-reactive links are switched off in the project.
+* **Heavy effects are marked**: effects classed "heavy" (Pattern, 3D Object) get a HEAVY badge, and the caption warns when there are more than 2 enabled (the limit the
+  Mutate engine already keeps). The heavy/medium/light classes are the editor's own estimate: GPU timing has never been measured on a real computer.
+* Still a read-only view: it never changes the project.
+* Not tried on a real Mac or Windows machine; whether the live drawing stays smooth on a real GPU is unverified.
+
 ## HDR phone footage (iPhone HLG / PQ)
 
 A clip shot in HDR is 10-bit BT.2020 with an HLG curve. Decoded as ordinary video it looks washed out. The app now recognises such
@@ -348,7 +358,7 @@ Legend: ✅ works and is covered by the automated tests · 🧪 prototype (works
 
 ## Testing
 
-`npm test` runs 287 unit tests. `scripts/e2e.mjs` (85 checks) is a real end-to-end run of the Electron app (see table above): it
+`npm test` runs 292 unit tests. `scripts/e2e.mjs` (86 checks) is a real end-to-end run of the Electron app (see table above): it
 generates test media with ffmpeg, drives the app, reads pixels out of the compositor, and probes exported files.
 Native file dialogs are stubbed at the Electron main-process level; every other path is the production code.
 
