@@ -381,6 +381,15 @@ function registerIpc() {
     fs.writeFileSync(file, Buffer.from(bytes));
     return file;
   });
+  // a small JSON report the artist chooses to save (usage notes)
+  ipcMain.handle('file:saveJson', async (_e, { text, name } = {}) => {
+    if (typeof text !== 'string' || !text.length || text.length > 2e6) throw new Error('Nothing to save.');
+    const r = await dialog.showSaveDialog(win, { title: 'Save usage notes', defaultPath: `${String(name || 'hhlab-usage-notes').replace(/[^\w.\-]/g, '_')}.json`, filters: [{ name: 'JSON', extensions: ['json'] }] });
+    if (r.canceled) return null;
+    const file = r.filePath.endsWith('.json') ? r.filePath : `${r.filePath}.json`;
+    fs.writeFileSync(file, text);
+    return file;
+  });
   ipcMain.handle('export:pickPath', async (_e, { defaultName, format }) => {
     const f = FORMATS[format] || FORMATS.mp4;
     const r = await dialog.showSaveDialog(win, { title: 'Export video', defaultPath: `${defaultName}.${f.ext}`, filters: [{ name: f.label, extensions: [f.ext] }] });

@@ -6,6 +6,7 @@ import { parseCommand } from '/shared/command/parse.js';
 import { dictationPrompt } from '/shared/command/dictation.js';
 import { EFFECTS } from '/shared/effects-defs.js';
 import { attachDictation } from './dictation-button.js';
+import { diag } from '../diag.js';
 
 export function mountCommand(root, { runAnalysis, preview }) {
   const api = { dictate: (o) => window.hh.asrDictate(o) }; // a seam: window.hh is frozen by the preload bridge, so the e2e swaps this instead
@@ -31,6 +32,7 @@ export function mountCommand(root, { runAnalysis, preview }) {
   function show(lines, cls = '') { list.replaceChildren(...lines.map((t) => el('li', { class: cls, text: t }))); }
 
   async function submit() {
+    diag.count('tellit.show');
     store.clearGhost();
     const clipIds = [...store.multi];
     const r = parseCommand(input.value, store.project, { clipIds, hasAnalysis: !!store.analysis && !store.analysisStale });

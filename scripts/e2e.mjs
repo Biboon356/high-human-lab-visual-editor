@@ -3224,6 +3224,57 @@ await step('Taste Brain: it notes what is applied, cancelled or undone at once (
   await ev(async () => { const { taste } = await import('./taste.js'); taste.clock = () => Date.now(); taste.forget(); });
 });
 
+await step('Usage notes: off by default and silent; when switched on it notes playback smoothness, an export, feature use and scrubbed errors; the report has no names or paths and is saved only when asked', async () => {
+  await resetProject(); await ev((p) => window.__app.importPaths([p]), clip); await settle(800);
+  await ev(async () => { const { diag } = await import('./diag.js'); await diag.setEnabled(false); diag.clear(); localStorage.removeItem('hhlab.diag.v1'); localStorage.setItem('hhlab.vision.ai', '0'); const box = document.getElementById('vis-ai-on'); if (box?.checked) { box.checked = false; box.dispatchEvent(new Event('change')); } });
+  await ev(() => document.querySelector('[data-tab="project"]').click()); await settle(400);
+  const sum = () => ev(async () => { const { diag } = await import('./diag.js'); return { on: diag.enabled, ...diag.summary(), counts: { ...diag.notes.counts }, errors: Object.keys(diag.notes.errors), buckets: Object.keys(diag.notes.perf), machine: diag.notes.machine, exports: diag.notes.exports }; });
+  const play = async (ms) => { await ev(() => { const { store, preview } = window.__app; store.setPlayhead(0); preview.play(); }); await page.waitForTimeout(ms); await ev(() => window.__app.preview.pause()); await settle(200); };
+  assert.equal(await ev(() => document.getElementById('diag-on').checked), false, 'off by default');
+  assert.match(await ev(() => document.getElementById('diag-sum').textContent), /Nothing noted yet/);
+  assert.equal(await sticksOut('#diag-card').then((x) => x.length), 0, 'the card fits its panel');
+  // off: playing and using things notes nothing at all
+  await play(1500); await ev(async () => { const { diag } = await import('./diag.js'); diag.count('describe.interpret'); diag.error('x'); });
+  let s0 = await sum(); assert.equal(s0.frames, 0); assert.equal(s0.uses, 0); assert.deepEqual(s0.errors, []); assert.equal(s0.machine, null, 'off: not even the machine is looked at');
+  // on
+  await page.click('#diag-on'); await settle(800);
+  s0 = await sum(); assert.equal(s0.on, true); assert.equal(s0.counts['app.session'], 1);
+  assert.ok(s0.machine.cpus > 0 && s0.machine.platform && s0.machine.chrome, `machine facts are filled in (${JSON.stringify(s0.machine)})`); assert.deepEqual(Object.keys(s0.machine).sort(), ['app', 'arch', 'chrome', 'cpus', 'dpr', 'electron', 'gpu', 'memGB', 'platform', 'software']);
+  await play(2500);
+  let s1 = await sum(); assert.ok(s1.frames >= 10, `frames were noted while playing (${s1.frames})`); assert.ok(s1.buckets.length >= 1 && /^\d+x\d+\|fx\d\|h\d$/.test(s1.buckets[0]));
+  const before = s1.frames; await ev(() => window.__app.store.setPlayhead(1)); await settle(400); assert.equal((await sum()).frames, before, 'scrubbing while paused is not playback');
+  // feature use through the real UI, and a Cancel
+  await ev(() => document.querySelector('[data-tab="looks"]').click()); await settle(300);
+  await ev(() => { const { store } = window.__app; const c = store.project.clips.find((x) => x.type === 'media'); store.multi = new Set([c.id]); store.selection = c.id; store.emit('selection', 'render'); });
+  await page.fill('#vis-input', 'ฝัน'); await page.click('#vis-go'); await page.waitForFunction(() => document.querySelectorAll('.vis-cand:not(.vis-now)').length >= 3, null, { timeout: 20000 });
+  await page.click('#vis-prev-1'); await settle(300); await page.click('#ghost-cancel'); await settle(300);
+  let s2 = await sum(); assert.equal(s2.counts['describe.interpret'], 1); assert.equal(s2.counts['describe.preview'], 1); assert.equal(s2.counts['preview.cancelled'], 1);
+  assert.ok(!JSON.stringify(s2.counts).includes('ฝัน'), 'what was typed is not kept: only that the feature was used');
+  // an error, with a path (and a file name with spaces) in it
+  await ev(() => window.dispatchEvent(new ErrorEvent('error', { message: 'Cannot read /Users/jane/Music/My Secret Song/take1.wav (code 5)' })));
+  s2 = await sum(); assert.deepEqual(s2.errors, ['Cannot read <path>)'], `the path is gone, all of it (${JSON.stringify(s2.errors)})`);
+  // an export
+  const out = path.join(dir, 'diag-export.mp4');
+  await ev((o) => window.__app.exportTo(o, { width: 320, height: 180, fps: 15, quality: 'draft' }), out);
+  const s3 = await sum(); assert.equal(s3.exports.length, 1); assert.deepEqual({ w: s3.exports[0].w, h: s3.exports[0].h, fps: s3.exports[0].fps, ok: s3.exports[0].ok }, { w: 320, h: 180, fps: 15, ok: true }); assert.ok(s3.exports[0].frames > 0 && s3.exports[0].seconds > 0);
+  // the report: only what it promises
+  const rep = await ev(async () => { const { diag } = await import('./diag.js'); return diag.report(); }), txt = JSON.stringify(rep);
+  assert.equal(rep.format, 'hhlab-usage-notes'); assert.ok(rep.playbackByLoad.length >= 1 && rep.playbackByLoad[0].frames >= 10 && rep.playbackByLoad[0].medianFrameMs);
+  for (const secret of ['clip.mp4', 'jane', 'take1', 'Secret', 'ฝัน', path.basename(dir), 'diag-export', '/tmp', 'hhlab://', 'sk-ant']) assert.ok(!txt.includes(secret), `the report does not contain "${secret}"`);
+  assert.ok(txt.length < 20000);
+  // what would be saved is on screen, and saving writes exactly that file (the dialog is stubbed as in the other save steps)
+  await ev(() => { document.getElementById('diag-view').open = true; document.getElementById('diag-view').dispatchEvent(new Event('toggle')); }); await settle(300);
+  assert.match(await ev(() => document.getElementById('diag-pre').textContent), /hhlab-usage-notes/);
+  const saved = path.join(dir, 'usage-notes.json'); await stubDialog('showSaveDialog', { canceled: false, filePath: saved });
+  await ev(() => document.querySelector('[data-tab="project"]').click()); await page.click('#diag-save'); await settle(600);
+  const onDisk = JSON.parse(fs.readFileSync(saved, 'utf8')); assert.equal(onDisk.format, 'hhlab-usage-notes'); assert.ok(onDisk.playbackByLoad.length >= 1 && onDisk.exports.length === 1);
+  await stubDialog('showSaveDialog', { canceled: true }); fs.rmSync(saved); await page.click('#diag-save'); await settle(400); assert.equal(fs.existsSync(saved), false, 'Cancel saves nothing');
+  // clear and off
+  await page.click('#diag-clear'); await settle(300); let s4 = await sum(); assert.equal(s4.frames, 0); assert.equal(s4.exports.length, 0); assert.equal(s4.uses, 0); assert.deepEqual(s4.errors, []); assert.equal(s4.on, true, 'clearing does not switch it off');
+  await page.click('#diag-on'); await settle(500); assert.equal((await sum()).on, false);
+  await play(800); assert.equal((await sum()).frames, 0, 'off again: silent');
+});
+
 const bad = logs.filter((l) => !/GPU stall|swiftshader|GL Driver Message|Automatic fallback/i.test(l));
 await step('no unexpected console errors during the whole run', async () => { assert.deepEqual(bad, []); });
 // Quitting mid-export must not leave ffmpeg processes behind (they would burn CPU forever).

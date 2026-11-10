@@ -1,6 +1,8 @@
 // Offline renderer: for every output frame, seek all sources, render through the same
 // compositor as the preview, read the pixels back and stream them into ffmpeg (main process).
 import { ensureRecipes } from './font-recipes.js';
+import { diag } from '../diag.js';
+import { metaFor } from '/shared/mutation/effect-meta.js';
 import { Compositor } from './compositor.js';
 import { Sources } from './sources.js';
 import { sampleFeatures } from '/shared/audio-analysis.js';
@@ -28,6 +30,8 @@ export async function renderProject({ project, settings, analysis, onProgress, s
   const sources = new Sources({ mediaUrl: (p) => window.hh.mediaUrl(p), audible: false, decoder: settings.decoder || 'ffmpeg', maxDim: 2 * Math.max(settings.width, settings.height) });
   const useReactive = project.reactive?.enabled !== false;
   const started = performance.now();
+  // what an export cost, for the usage notes (a no-op unless switched on): size, frame rate, how long, how many effects, whether it worked
+  const noteExport = (ok) => { try { let effects = 0, heavy = 0; for (const c of project.clips || []) for (const e of c.effects || []) if (e.enabled !== false) { effects++; if (metaFor(e.type)?.cost === 'heavy') heavy++; } diag.exportDone({ w: settings.width, h: settings.height, fps, frames: total, seconds: (performance.now() - started) / 1000, effects, heavy, ok }); } catch { /* notes never break an export */ } };
   let started_ = false;
   let pendingFrame = null;
   try {
@@ -60,8 +64,10 @@ export async function renderProject({ project, settings, analysis, onProgress, s
     if (Math.abs(result.duration - duration) > Math.max(0.5, 2 / fps)) {
       throw new Error(`Output duration (${result.duration.toFixed(2)}s) doesn't match the timeline (${duration.toFixed(2)}s); the render is not trustworthy.`);
     }
+    noteExport(true);
     return result;
   } catch (e) {
+    if (!(e instanceof ExportCancelled)) noteExport(false);
     if (started_) await window.hh.exportCancel().catch(() => {});
     await pendingFrame?.catch(() => {}); // a frame in flight when we abort must not surface as an unhandled rejection
     throw e;

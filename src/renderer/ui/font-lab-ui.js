@@ -5,6 +5,7 @@ import { store } from '../store.js';
 import { el } from './dom.js';
 import { BASES, MOVES, MAX_RECIPES, normalizeRecipe, suggestName } from '/shared/fonts/recipes.js';
 import { ensureRecipeFont, dropRecipeFont } from '../engine/font-recipes.js';
+import { diag } from '../diag.js';
 
 export function mountFontLab(root) {
   const api = { ensure: ensureRecipeFont };
@@ -74,7 +75,7 @@ export function mountFontLab(root) {
     const rec = { ...r, id: `fr_${Math.random().toString(36).slice(2, 10)}` };
     try { await ensureRecipeFont(rec); } catch (e) { status.textContent = `The font could not be made: ${e.message}`; return; }
     store.mutate((p) => { p.fontRecipes = [...(p.fontRecipes || []), rec]; });
-    store.emit('render'); newDefaultName(); status.textContent = `"${rec.name}" is saved in this project. Select a text clip and press "Use on the selected text".`;
+    diag.count('fontlab.save'); store.emit('render'); newDefaultName(); status.textContent = `"${rec.name}" is saved in this project. Select a text clip and press "Use on the selected text".`;
   }
   function useFont(r) {
     const clip = store.selectedClip;

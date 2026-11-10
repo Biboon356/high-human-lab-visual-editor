@@ -3,6 +3,7 @@
 import { store } from '../store.js';
 import { el, toast } from './dom.js';
 import { taste } from '../taste.js';
+import { diag } from '../diag.js';
 
 export function mountGhostBar() {
   const wrap = document.getElementById('preview-wrap');
@@ -10,8 +11,8 @@ export function mountGhostBar() {
   const label = el('b', { class: 'ghost-label' });
   const bar = el('div', { id: 'ghost-bar', class: 'ghost-bar', hidden: true, role: 'status' },
     el('span', { class: 'ghost-tag', text: 'PREVIEW' }), label, el('span', { class: 'ghost-hint', text: 'not applied yet · Space plays it' }),
-    el('button', { id: 'ghost-apply', class: 'primary', text: 'APPLY', onclick: () => { const spec = store.ghostSpec; const r = store.commitGhost(); if (r) taste.noteApplied(spec); if (r) toast(typeof r === 'string' ? r : 'Applied. Undo takes it back.'); else toast('That no longer applies.', 'error'); } }),
-    el('button', { id: 'ghost-cancel', text: 'CANCEL', onclick: () => { taste.noteCancelled(store.ghostSpec); store.clearGhost(); } }));
+    el('button', { id: 'ghost-apply', class: 'primary', text: 'APPLY', onclick: () => { const spec = store.ghostSpec; const r = store.commitGhost(); if (r) { taste.noteApplied(spec); diag.count('preview.applied'); } if (r) toast(typeof r === 'string' ? r : 'Applied. Undo takes it back.'); else toast('That no longer applies.', 'error'); } }),
+    el('button', { id: 'ghost-cancel', text: 'CANCEL', onclick: () => { taste.noteCancelled(store.ghostSpec); diag.count('preview.cancelled'); store.clearGhost(); } }));
   wrap.append(bar);
   const render = () => { const g = store.ghostSpec; bar.hidden = !g; label.textContent = g?.label || ''; };
   store.on('ghost', render);

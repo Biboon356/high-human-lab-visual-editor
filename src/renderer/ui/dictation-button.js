@@ -2,6 +2,7 @@
 // Nothing is run from speech alone. Shared by "Tell it" (short commands) and "Describe the look" (longer descriptions).
 import { store } from '../store.js';
 import { startCapture } from './dictate.js';
+import { diag } from '../diag.js';
 
 /**
  * @param o {mic: HTMLButtonElement, input: HTMLInputElement|HTMLTextAreaElement, setStatus(text), getLang(): 'th'|'en', pauseChk?: HTMLInputElement,
@@ -39,7 +40,7 @@ export function attachDictation(o) {
       const res = await dictate({ pcm: pcm.buffer, language: getLang(), prompt: prompt?.(), maxSeconds });
       if (!res.ok) { setStatus(res.reason); return; }
       input.value = append && input.value.trim() ? `${input.value.trim()} ${res.text}` : res.text;
-      input.dispatchEvent(new Event('input')); input.focus();
+      diag.count('speak.used'); input.dispatchEvent(new Event('input')); input.focus();
       setStatus(doneText);
     } catch (e) { setStatus(`Speech failed: ${e.message}`); resume(); }
   }

@@ -9,6 +9,7 @@ import { buildGraph, describeGraph, GEOM } from '/shared/graph/layout.js';
 import { liveGraph } from '/shared/graph/live.js';
 import { moveEffect, setEffectEnabled, removeEffect, bindParam, setBindingAmount, unbindParam, bindableParams } from '/shared/graph/edit.js';
 import { SIGNAL_LABELS } from '/shared/graph/layout.js';
+import { diag } from '../diag.js';
 import { sampleFeatures } from '/shared/audio-analysis.js';
 
 const NS = 'http://www.w3.org/2000/svg';
@@ -40,7 +41,7 @@ export function mountGraph(root) {
   function tryEdit(op) {
     const id = store.selection; if (!id || store.ghost) return false;
     const probe = structuredClone(store.project); if (!op(probe, id)) return false;
-    store.mutate((p) => op(p, id)); return true;
+    store.mutate((p) => op(p, id)); diag.count('graph.edit'); return true;
   }
   const effectTargetId = (nodeId) => (nodeId === 'clip' ? 'clip' : nodeId);
   function act(kind, nodeId, idx, count) {

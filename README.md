@@ -292,6 +292,16 @@ without you.
   "at the loudest it moves up by 0.25". `subtle`, `strong`, `40%` and `invert` scale that normal strength.
 * Not tried on a real Mac or Windows machine; whether the live drawing stays smooth on a real GPU is unverified.
 
+## v0.9.7 — Usage notes (opt-in, local, you decide what to send)
+
+Project tab → **Usage notes**. Off by default; while off, nothing is noted at all (not even the machine). When switched on it keeps, on this
+computer only: how smooth playback is for each size of project (median and slowest frames, share below 30 fps, bucketed by how many effects
+and how many HEAVY ones are on screen), what each export took, which features were used (counts only), the machine (CPU count, memory, GPU
+name, screen scale) and error messages with paths, addresses and e-mail addresses scrubbed. It never contains pictures, project content,
+file names or paths, anything typed or spoken, the API key or AI prompts. **Show what would be saved** displays the exact text; **Save a file…**
+writes it only when you press it (nothing is sent anywhere); **Clear** erases it. Purpose: real numbers from a real Mac/Windows so thresholds
+(HEAVY, curator, gate) can be tuned from data instead of guesses.
+
 ## v0.9.6 — an editable Graph, the Font lab, and the first Taste Brain
 
 * **Editable Graph** (Graph tab, "Edit the graph", off by default): from the picture you can run an effect earlier or later (↑ ↓), switch it off or on (●), remove it (✕), **drag a link
@@ -390,7 +400,7 @@ Legend: ✅ works and is covered by the automated tests · 🧪 prototype (works
 
 ## Testing
 
-`npm test` runs 325 unit tests. `scripts/e2e.mjs` (91 checks) is a real end-to-end run of the Electron app (see table above): it
+`npm test` runs 331 unit tests. `scripts/e2e.mjs` (92 checks) is a real end-to-end run of the Electron app (see table above): it
 generates test media with ffmpeg, drives the app, reads pixels out of the compositor, and probes exported files.
 Native file dialogs are stubbed at the Electron main-process level; every other path is the production code.
 

@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld('hh', {
   saveProject: (project, filePath, saveAs) => invoke('project:save', { project, filePath, saveAs }),
   analyzeAudio: (project) => invoke('audio:analyze', project),
   savePng: (bytes, name) => invoke('file:savePng', { bytes, name }),
+  saveJson: (text, name) => invoke('file:saveJson', { text, name }),
   pickExportPath: (defaultName, format) => invoke('export:pickPath', { defaultName, format }),
   exportStart: (project, settings) => invoke('export:start', { project, settings }),
   exportDebug: () => invoke('export:debug'),

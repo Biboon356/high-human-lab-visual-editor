@@ -11,6 +11,7 @@ import { sampleFeatures } from '/shared/audio-analysis.js';
 import { MAX_DESCRIBE_SECONDS, MAX_SECONDS } from '/shared/command/dictation.js';
 import { attachDictation } from './dictation-button.js';
 import { taste } from '../taste.js';
+import { diag } from '../diag.js';
 import { EFFECTS } from '/shared/effects-defs.js';
 import { MIN_SCORE, effectOf } from '/shared/taste/taste.js';
 
@@ -148,7 +149,7 @@ export function mountVision(root, { preview, renderer } = {}) {
     next();
   }
 
-  function previewPlan(p) { // (not called `preview`: that name is the monitor's preview passed to mountVision)
+  function previewPlan(p) { diag.count('describe.preview'); // (not called `preview`: that name is the monitor's preview passed to mountVision)
     const ids = selectedIds();
     if (!ids.length) { status.textContent = 'Select a clip first, then press PREVIEW.'; return; }
     current = p;
@@ -173,7 +174,7 @@ export function mountVision(root, { preview, renderer } = {}) {
 
   async function interpret() {
     store.clearGhost(); current = null;
-    const text = input.value.trim(); lastText = text;
+    const text = input.value.trim(); lastText = text; diag.count('describe.interpret');
     const viaAi = await ask(text, false);
     if (viaAi) { plans = viaAi.plans; status.textContent = viaAi.notes[0] || 'Here are three readings.'; render(); return; }
     const r = interpretVision(text);
@@ -183,6 +184,7 @@ export function mountVision(root, { preview, renderer } = {}) {
 
   async function moreReadings() {
     if (!plans.length || plans.length >= MAX_IDEAS) return;
+    diag.count('describe.more');
     const text = lastText || input.value.trim();
     const viaAi = await ask(text, false, plans.map((p) => ({ title: p.title, types: p.chain.map((c) => c.type) })));
     let add = null, note = '';

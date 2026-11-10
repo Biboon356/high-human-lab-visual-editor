@@ -21,7 +21,7 @@ suggestions/curation are guesses, not tuned by real use.
 
 ## Tests
 
-* Unit: `node --test test/*.test.mjs` (≈241 tests).
+* Unit: `node --test test/*.test.mjs` (≈331 tests).
 * End to end (real Electron, software GL, ≈80 steps, ≈12 min): `xvfb-run -a -s "-screen 0 1700x1000x24" npm run test:e2e`.
   Run it in the background (`nohup … > log &`) and poll the log; wait with `sleep 30; while ps aux | grep '[n]ode scripts/e2e.mjs' >/dev/null; do sleep 10; done`.
   **Never** `pkill -f` / `pgrep -f` with a pattern that matches your own shell command line (it kills the shell, exit 144).
@@ -46,6 +46,7 @@ suggestions/curation are guesses, not tuned by real use.
 
 ## Where things stand
 
+* v0.9.7 (branch `feat/v0.9.7`): opt-in Usage notes (`shared/diag/notes.js`, `renderer/diag.js`, `ui/diag-ui.js`, Project tab; local, scrubbed, saved only on request via `file:saveJson`). Read it before adding any `diag.count`.
 * Released: v0.9.4. **v0.9.5 is pending release** (branch `feat/v0.9.5`, already on `feat/mvp-visual-editor`: Tell it default strengths, live Graph + HEAVY marks, Describe the look speaks / shows
   a picture per reading / "Show different ideas", font spike). **v0.9.6 is built on branch `feat/v0.9.6` and deliberately NOT yet on `feat/mvp-visual-editor`** (so that publishing v0.9.5 does not
   carry untested v0.9.6 work): fast-forward it only after v0.9.5 is published, rerun the full e2e if the branch moved, then the usual "cl". v0.9.6 = editable Graph (`shared/graph/edit.js`, graph-ui

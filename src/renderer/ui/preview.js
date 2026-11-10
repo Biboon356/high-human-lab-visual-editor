@@ -3,6 +3,7 @@ import { store } from '../store.js';
 import { Compositor } from '../engine/compositor.js';
 import { Sources } from '../engine/sources.js';
 import { sampleFeatures } from '/shared/audio-analysis.js';
+import { diag } from '../diag.js';
 import { projectDuration, activeRange } from '/shared/timeline.js';
 import { fmtTime } from './dom.js';
 import { MemoryAdapt } from '/shared/living/memory-plan.js';
@@ -41,7 +42,9 @@ export function mountPreview() {
     const proj = store.ghost || store.project; // a previewed "what if" is drawn instead of the real project (same renderer, nothing extra)
     sources.sync(proj, store.playhead, store.playing);
     try {
+      const t0 = performance.now();
       const r = comp.render({ project: proj, t: store.playhead, sources, features: features() });
+      diag.frame(performance.now() - t0, proj, store.playhead); // (a no-op unless the artist switched usage notes on)
       stats.frames++;
       const errs = [...sources.errors.values()];
       if (errs.length) show(errs[0]); else if (r.missing.length && !store.playing) show(`Loading ${r.missing[0]}…`); else show('');
