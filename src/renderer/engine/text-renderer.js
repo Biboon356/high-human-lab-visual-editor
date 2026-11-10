@@ -1,0 +1,285 @@
+// Draws a text clip into a 2D canvas the size of the frame. Position/rotation/scale are applied here
+// so rotation pivots on the text itself. Animations are pure functions of clip-local time.
+import { graphemes, safeTracking } from '/shared/script.js';
+
+const GENERIC = new Set(['sans-serif', 'serif', 'monospace', 'cursive', 'fantasy']);
+const hash = (n) => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+const ease = (u) => 1 - Math.pow(1 - Math.min(1, Math.max(0, u)), 3);
+
+// Fallbacks that carry Thai glyphs on macOS, Windows and Linux, so Thai text never renders as tofu boxes.
+const THAI_FALLBACK = '"Sukhumvit Set", "Thonburi", "Leelawadee UI", "Tahoma", "Noto Sans Thai", "Loma", "Garuda"';
+// ... and Hindi/Devanagari, for fonts that have no Devanagari glyphs of their own
+const DEVANAGARI_FALLBACK = '"Kohinoor Devanagari", "Devanagari Sangam MN", "Nirmala UI", "Mangal", "Noto Sans Devanagari", "Lohit Devanagari"';
+
+export function fontString(text, px) {
+  const fam = GENERIC.has(text.font) ? `${text.font}` : `"${text.font}", ${THAI_FALLBACK}, ${DEVANAGARI_FALLBACK}, sans-serif`;
+  return `${text.italic ? 'italic ' : ''}${text.weight} ${px}px ${fam}`;
+}
+
+
+// Ransom note: every letter on its own scrap of paper, in its own typeface, a little crooked. Deterministic per position, so it holds still.
+const RANSOM_FONTS = [['Anton', 400], ['Special Elite', 400], ['Rubik Distressed', 400], ['Permanent Marker', 400], ['Bebas Neue', 400], ['Archivo Black', 400], ['Courier Prime', 700], ['Londrina Solid', 900]];
+const RANSOM_PAPER = [['#f4efe3', '#111111'], ['#111111', '#f4efe3'], ['#d1002f', '#ffffff'], ['#ffe066', '#111111'], ['#e4e4e0', '#222222'], ['#1d4ed8', '#ffffff']];
+function drawRansom(ctx, lines, px, lh, maxW) {
+  let idx = 0;
+  const rows = lines.map((l) => graphemes(l).map((ch) => {
+    const i = idx++, h = (n) => hash(i * 7.13 + n * 3.1);
+    if (ch === ' ') return { gap: true, w: px * 0.4 };
+    const [fam, wt] = RANSOM_FONTS[Math.floor(h(1) * RANSOM_FONTS.length)], sz = px * (0.8 + h(2) * 0.42);
+    ctx.font = `${wt} ${sz}px "${fam}"`;
+    return { ch, fam, wt, sz, w: ctx.measureText(ch).width + sz * 0.26, rot: (h(4) - 0.5) * 0.22, dy: (h(5) - 0.5) * px * 0.14, paper: RANSOM_PAPER[Math.floor(h(3) * RANSOM_PAPER.length)] };
+  }));
+  const rowW = (row) => row.reduce((a, c) => a + c.w + px * 0.04, 0);
+  const k = Math.min(1, maxW / Math.max(1, ...rows.map(rowW))); // letters are wider on their paper than plain text: shrink to the requested width
+  ctx.scale(k, k);
+  rows.forEach((row, ri) => {
+    let x = -rowW(row) / 2;
+    const y = (ri - (rows.length - 1) / 2) * lh * 1.2;
+    for (const c of row) {
+      if (c.gap) { x += c.w; continue; }
+      ctx.save();
+      ctx.translate(x + c.w / 2, y + c.dy); ctx.rotate(c.rot);
+      ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = px * 0.06; ctx.shadowOffsetY = px * 0.03;
+      ctx.fillStyle = c.paper[0]; ctx.fillRect(-c.w / 2, -c.sz * 0.56, c.w, c.sz * 1.12);
+      ctx.shadowColor = 'transparent';
+      ctx.fillStyle = c.paper[1]; ctx.font = `${c.wt} ${c.sz}px "${c.fam}"`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(c.ch, 0, c.sz * 0.04);
+      ctx.restore();
+      x += c.w + px * 0.04;
+    }
+  });
+}
+
+export function drawTextClip(ctx, W, H, clip, t, p) {
+  const T = clip.text;
+  ctx.clearRect(0, 0, W, H);
+  const a = T.anim || { type: 'none', duration: 1, speed: 1 };
+  const dur = Math.max(0.05, a.duration);
+  const u = t / dur;
+  let alpha = p.opacity, dx = 0, dy = 0, scale = p.scale;
+  let perChar = null; // (charIndex) -> {dy, alpha, sc} for animations that move letters individually
+  let content = T.uppercase ? T.content.toUpperCase() : T.content;
+  const trk = safeTracking(T.content, p.tracking); // Hindi keeps its headline bar unbroken: no added letter-spacing
+
+  switch (a.type) {
+    case 'typewriter': {
+      const total = content.replace(/\n/g, '').length;
+      let n = Math.floor(Math.min(1, u) * total);
+      content = content.split('\n').map((l) => { const s = l.slice(0, Math.max(0, n)); n -= l.length; return s; }).join('\n');
+      break;
+    }
+    case 'fade': alpha *= Math.min(1, u) * Math.min(1, (clip.duration - t) / dur); break;
+    case 'slide': { const e = ease(u); alpha *= e; dy = (1 - e) * 0.06 * H; break; }
+    case 'flicker': {
+      const k = Math.floor(t * 18 * a.speed);
+      alpha *= hash(k) < 0.18 ? 0.15 + 0.5 * hash(k + 9) : 1;
+      break;
+    }
+    case 'jitter': {
+      const k = Math.floor(t * 16 * a.speed);
+      const on = hash(k + 3) < 0.35;
+      if (on) { dx = (hash(k) - 0.5) * 0.06 * W; dy = (hash(k + 1) - 0.5) * 0.02 * H; }
+      break;
+    }
+    case 'pulse': scale *= 1 + 0.08 * Math.sin(t * Math.PI * 2 * a.speed); break;
+    case 'slam': { // scale down from 1.7x with overshoot (easeOutBack), quick fade-in, tiny settle shake
+      const e = Math.min(1, u);
+      const back = 1 + 2.70158 * Math.pow(e - 1, 3) + 1.70158 * Math.pow(e - 1, 2);
+      scale *= 1.7 - 0.7 * back;
+      alpha *= Math.min(1, e * 6);
+      if (e < 1) { const k = Math.floor(t * 60); dx = (hash(k) - 0.5) * 0.012 * W * (1 - e); dy = (hash(k + 5) - 0.5) * 0.012 * H * (1 - e); }
+      break;
+    }
+    case 'stutter': { // rapid on/off + position stutter, then holds
+      if (t < dur) { const k = Math.floor(t * 24 * a.speed); alpha *= hash(k + 2) < 0.6 ? 1 : 0; dx = (hash(k) - 0.5) * 0.03 * W; }
+      break;
+    }
+    case 'karaoke': {
+      const K = T.karaoke;
+      if (K?.words?.length) {
+        const act = K.words.findIndex((w) => t >= w.start && t < w.end);
+        const lastDone = K.words.reduce((m, w, i) => (t >= w.end ? i : m), -1);
+        const active = act >= 0 ? act : -1;
+        // a short fade-in for the card, nothing else moves except the active word
+        alpha *= Math.min(1, t / Math.max(0.05, a.duration)) * Math.min(1, Math.max(0, (clip.duration - t) / 0.12));
+        perChar = (idx, abs) => {
+          const wi = K.words.findIndex((w) => abs >= w.from && abs < w.to);
+          if (wi < 0) return { dy: 0, alpha: 1, sc: 1 };
+          const w = K.words[wi];
+          if (wi === active) {
+            const e = ease((t - w.start) / 0.09);
+            return { dy: 0, alpha: 1, sc: 1 + ((K.pop || 1.12) - 1) * e, fill: K.hl, plate: K.mode === 'box' ? K.plate || '#1f7a46' : null, wordIdx: wi, fillActive: K.fillActive };
+          }
+          const spoken = wi <= lastDone;
+          return { dy: 0, alpha: spoken ? 1 : K.upcoming ?? 0.9, sc: 1, wordIdx: wi };
+        };
+      }
+      break;
+    }
+    case 'letters': {
+      const spd = Math.max(0.1, a.speed);
+      perChar = (idx) => { const e = ease((t - (idx * 0.05) / spd) / Math.max(0.15, dur * 0.3)); return { dy: (1 - e) * 0.06 * H, alpha: e, sc: 1 + (1 - e) * 0.45 }; };
+      break;
+    }
+    case 'wave':
+      perChar = (idx) => ({ dy: Math.sin(t * 3 * a.speed + idx * 0.6) * 0.014 * H, alpha: 1, sc: 1 });
+      break;
+    case 'scramble': { // characters flicker through random glyphs until they lock into place left-to-right
+      const GLYPHS = '#@$%&*+=<>?/|0123456789ABCDEFXZ';
+      const total = Math.max(1, content.replace(/\n/g, '').length);
+      let idx = 0;
+      const lock = Math.min(1.15, u * 1.15);
+      content = graphemes(content).map((ch) => {
+        if (ch === '\n' || ch === ' ') return ch;
+        const i = idx++;
+        return i / total < lock - hash(i * 5.3) * 0.12 ? ch : GLYPHS[Math.floor(hash(i * 13.1 + Math.floor(t * 24)) * GLYPHS.length)];
+      }).join('');
+      break;
+    }
+    case 'strobe': alpha *= Math.floor(t * 12 * a.speed) % 2 === 0 ? 1 : 0.12; break;
+    default: break;
+  }
+  if (alpha <= 0.001 || !content) return;
+
+  let px0 = T.size * H * scale;
+  if (T.fit > 0 && !T.vertical) { // size the text so its widest line spans `fit` of the frame width, whatever the aspect ratio
+    ctx.save();
+    ctx.font = fontString(T, 100); ctx.letterSpacing = `${trk * 100}px`;
+    const full = (T.uppercase ? T.content.toUpperCase() : T.content).split('\n');
+    const wmax = Math.max(...full.map((l) => ctx.measureText(l).width), 1);
+    ctx.restore();
+    px0 = ((T.fit * W) / wmax) * 100 * scale;
+  }
+  const px = Math.max(4, px0);
+  const FX = { split: 0, shadow: 0, glow: 0, halo: 0, gradient: false, grad1: '#fff', grad2: '#888', ...(T.fx || {}) };
+  ctx.save();
+  ctx.font = fontString(T, px);
+  ctx.letterSpacing = `${trk * px}px`;
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'left';
+  ctx.lineJoin = 'round';
+  ctx.globalAlpha = Math.min(1, alpha);
+
+  let lines = content.split('\n');
+  const lh = T.lineHeight * px;
+  let vpos = null, vcols = 0, vrows = 0;
+  const colGap = (T.colSpacing || 1.35) * px;
+  if (T.vertical) { // tategaki: every character is its own row, columns run right to left
+    const cols = lines.map((l) => graphemes(l));
+    vcols = cols.length; vrows = Math.max(1, ...cols.map((c) => c.length));
+    vpos = []; lines = [];
+    cols.forEach((chars, c) => chars.forEach((ch, r) => { lines.push(ch); vpos.push({ x: ((cols.length - 1) / 2 - c) * colGap, y: (r - (chars.length - 1) / 2) * lh }); }));
+  }
+  if (T.ransom) { // cut-out letters replace the normal fill/outline/fx pipeline
+    ctx.translate(W / 2 + p.x * W + dx, H / 2 - p.y * H + dy);
+    ctx.rotate((p.rotation * Math.PI) / 180);
+    drawRansom(ctx, lines, px, lh, (T.fit > 0 ? T.fit : 0.95) * W);
+    ctx.restore();
+    return;
+  }
+  const widths = lines.map((l) => ctx.measureText(l).width);
+  const blockW = vpos ? vcols * colGap : Math.max(...widths, 1);
+  const blockH = vpos ? vrows * lh : lines.length * lh;
+
+  let cx = W / 2 + p.x * W + dx;
+  if (a.type === 'ticker') {
+    const full = ctx.measureText(T.uppercase ? T.content.toUpperCase() : T.content).width;
+    const prog = ((t * a.speed) / dur) % 1;
+    cx = W + full / 2 - prog * (W + full);
+  }
+  ctx.translate(cx, H / 2 - p.y * H + dy);
+  ctx.rotate((p.rotation * Math.PI) / 180);
+
+  if (T.bg?.enabled) {
+    const pad = T.bg.pad * px;
+    const bw = a.type === 'ticker' ? W * 1.3 : blockW + pad * 2;
+    ctx.fillStyle = T.bg.color;
+    ctx.fillRect(-bw / 2, -blockH / 2 - pad * 0.6, bw, blockH + pad * 1.2);
+  }
+  const lineX = (i) => (vpos ? vpos[i].x - widths[i] / 2 : T.align === 'left' ? -blockW / 2 : T.align === 'right' ? blockW / 2 - widths[i] : -widths[i] / 2);
+  const lineY = (i) => (vpos ? vpos[i].y : (i - (lines.length - 1) / 2) * lh);
+  const baseIndex = lines.map((_, i) => lines.slice(0, i).reduce((n, l) => n + graphemes(l).length, 0));
+  const absStart = lines.map((_, i) => lines.slice(0, i).reduce((n, l) => n + l.length + 1, 0)); // offsets into the text incl. newlines
+  let fillOverride = null;
+  const pass = (paint, ox = 0) => lines.forEach((l, i) => {
+    if (!perChar) { paint(l, lineX(i) + ox, lineY(i)); return; }
+    const chars = graphemes(l);
+    let abs = absStart[i];
+    chars.forEach((ch, k) => {
+      const here = abs; abs += ch.length;
+      if (ch === ' ') return;
+      const c = perChar(baseIndex[i] + k, here);
+      if (c.alpha <= 0.002) return;
+      const gx = lineX(i) + ox + ctx.measureText(chars.slice(0, k).join('')).width, half = ctx.measureText(ch).width / 2;
+      ctx.save(); ctx.globalAlpha *= c.alpha; ctx.translate(gx + half, lineY(i) + c.dy); ctx.scale(c.sc, c.sc);
+      fillOverride = c.fill || null;
+      paint(ch, -half, 0, c);
+      fillOverride = null;
+      ctx.restore();
+    });
+  });
+  let fill = T.color;
+  if (FX.gradient) { // chrome-style vertical gradient with a bright band near the middle
+    const g = ctx.createLinearGradient(0, -blockH / 2, 0, blockH / 2);
+    if (Array.isArray(FX.gradStops) && FX.gradStops.length) for (const [at, col] of FX.gradStops) g.addColorStop(at, col); // multi-stop chrome (presets)
+    else { g.addColorStop(0, FX.grad1); g.addColorStop(0.48, FX.grad2); g.addColorStop(0.52, FX.grad1); g.addColorStop(1, FX.grad2); }
+    fill = g;
+  }
+  // karaoke "box" mode: a rounded plate behind the word being spoken
+  if (perChar && T.karaoke?.mode === 'box' && a.type === 'karaoke') {
+    const K = T.karaoke, act = K.words.findIndex((w) => t >= w.start && t < w.end);
+    if (act >= 0) {
+      const w = K.words[act];
+      lines.forEach((l, i) => {
+        const lo = absStart[i], hi = lo + l.length;
+        const from = Math.max(w.from, lo), to = Math.min(w.to, hi);
+        if (to <= from) return;
+        const x0 = lineX(i) + ctx.measureText(l.slice(0, from - lo)).width, x1 = lineX(i) + ctx.measureText(l.slice(0, to - lo)).width;
+        // plate height comes from plain base consonants, so every word gets the same-height plate whatever tone marks it carries
+        const body = ctx.measureText('กอา');
+        const padX = px * 0.2, padY = px * 0.2, y = lineY(i);
+        const top = y - body.actualBoundingBoxAscent, bottom = y + body.actualBoundingBoxDescent;
+        ctx.save(); ctx.fillStyle = K.plate || '#1f7a46'; ctx.beginPath();
+        ctx.roundRect(x0 - padX, top - padY, x1 - x0 + padX * 2, bottom - top + padY * 2, px * 0.22); ctx.fill(); ctx.restore();
+      });
+    }
+  }
+  // halo: a soft dark cloud behind the letters so a title stays readable over bright or busy pictures. The glyphs are painted far
+  // off-canvas and their shadow is pushed back onto the page (shadow offsets ignore the transform, so rotate the push with the text).
+  if (FX.halo > 0) {
+    const far = W * 4, rot = (p.rotation * Math.PI) / 180;
+    ctx.save(); ctx.fillStyle = '#000';
+    ctx.shadowColor = 'rgba(0,0,0,0.92)'; ctx.shadowBlur = px * 0.5 * FX.halo; ctx.shadowOffsetX = far * Math.cos(rot); ctx.shadowOffsetY = far * Math.sin(rot);
+    for (let k = 0; k < 3; k++) pass((l, x, y) => ctx.fillText(l, x - far, y));
+    ctx.restore();
+  }
+  // glow (soft, coloured) underneath, then drop shadow for depth
+  if (FX.glow > 0) {
+    ctx.save(); ctx.shadowColor = T.strokeColor && T.strokeWidth > 0 ? T.strokeColor : '#55b982'; ctx.shadowBlur = px * 0.45 * FX.glow;
+    ctx.fillStyle = T.color; pass((l, x, y) => ctx.fillText(l, x, y)); ctx.restore();
+  }
+  if (FX.split > 0) { // RGB fringe: additive red/cyan copies behind the main fill
+    const off = FX.split * px * 0.07;
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = '#ff2a3d'; pass((l, x, y) => ctx.fillText(l, x, y), -off);
+    ctx.fillStyle = '#00e0ff'; pass((l, x, y) => ctx.fillText(l, x, y), off);
+    ctx.restore();
+  }
+  ctx.save();
+  if (FX.shadow > 0) { ctx.shadowColor = `rgba(0,0,0,${0.55 + 0.4 * FX.shadow})`; ctx.shadowBlur = px * 0.14 * FX.shadow; ctx.shadowOffsetY = px * 0.05 * FX.shadow; ctx.shadowOffsetX = px * 0.02 * FX.shadow; }
+  const sw = T.hollow ? Math.max(T.strokeWidth || 0, 0.03) : T.strokeWidth || 0;
+  pass((l, x, y, c) => {
+    if (T.hollow) { // faint fill first, then a full-strength outline on top
+      const fa = c?.fillActive && c.fill ? 1 : T.fillAlpha ?? 0.15;
+      if (fa > 0) { ctx.save(); ctx.globalAlpha *= fa; ctx.fillStyle = fillOverride || fill; ctx.fillText(l, x, y); ctx.restore(); }
+      ctx.lineWidth = sw * px; ctx.strokeStyle = T.strokeColor || T.color; ctx.strokeText(l, x, y);
+      return;
+    }
+    if (T.outline2?.width > 0) { ctx.lineWidth = (sw + T.outline2.width) * px; ctx.strokeStyle = T.outline2.color; ctx.strokeText(l, x, y); } // sticker / bubble-chrome outer rim
+    if (sw > 0) { ctx.lineWidth = sw * px; ctx.strokeStyle = T.strokeColor; ctx.strokeText(l, x, y); }
+    ctx.fillStyle = fillOverride || fill;
+    ctx.fillText(l, x, y);
+  });
+  ctx.restore();
+  ctx.restore();
+}
